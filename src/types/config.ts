@@ -528,6 +528,10 @@ export type Live2DModelConfig = {
 		clickMessages?: string[]; // 点击时随机显示的文字消息
 		messageDisplayTime?: number; // 文字显示时间（毫秒），默认3000
 	};
+	author?: {
+		name: string; // 作者名字
+		url?: string; // 作者主页或视频链接
+	};
 	responsive?: {
 		hideOnMobile?: boolean; // 是否在移动端隐藏，默认false
 		mobileBreakpoint?: number; // 移动端断点，默认768px

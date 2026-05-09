@@ -1,4 +1,5 @@
 ---
+import Icon from "@/components/common/Icon.astro";
 import MessageBox from "@/components/common/PioMessageBox.astro";
 import type { Live2DModelConfig } from "@/types/config";
 import { url } from "@/utils/url-utils";
@@ -29,6 +30,36 @@ const size = config.size || { width: 280, height: 250 };
   `}
 >
   <canvas id="live2d-canvas" width={size.width} height={size.height}></canvas>
+
+  <!-- 右侧工具栏 -->
+  <div class="live2d-toolbar">
+    <button class="live2d-toolbar-btn" id="toolbar-drag" title="移动">
+      <Icon name="material-symbols:drag-indicator" class="text-base" />
+    </button>
+    <button class="live2d-toolbar-btn" id="toolbar-switch" title="切换动画组">
+      <Icon name="material-symbols:swap-horiz" class="text-base" />
+    </button>
+    <button class="live2d-toolbar-btn active" id="toolbar-info" title="作者信息">
+      <Icon name="material-symbols:info" class="text-base" />
+    </button>
+  </div>
+
+  <!-- 作者信息面板 -->
+  {config.author && (
+    <div class="live2d-author visible" id="live2d-author">
+      <span>by </span>
+      {config.author.url ? (
+        <a href={config.author.url} target="_blank" rel="noopener noreferrer">
+          {config.author.name}
+        </a>
+      ) : (
+        <span>{config.author.name}</span>
+      )}
+    </div>
+  )}
+
+  <!-- 动画组指示器 -->
+  <div class="live2d-group-indicator" id="live2d-group-indicator"></div>
 </div>
 
 <!-- 引入消息框组件 -->
@@ -103,15 +134,68 @@ const size = config.size || { width: 280, height: 250 };
       live2dApp.stage.addChild(live2dModel);
 
       // Click interaction — trigger random motion + expression + message
-      const clickMotionGroups = ["Expression", "TapShort"];
+      const allMotionGroups = ["Expression", "TapShort", "TapLong", "Other"];
+      let clickMotionGroups = ["Expression", "TapShort"];
+      let currentGroupIndex = 0;
+
       live2dModel.on("hit", (hitAreas) => {
         console.log("[Live2D] Hit areas:", hitAreas);
-        playRandomMotion();
+        if (!window._live2dWasDragging) playRandomMotion();
+        window._live2dWasDragging = false;
       });
 
       canvas.addEventListener("click", () => {
-        playRandomMotion();
+        if (!window._live2dWasDragging) playRandomMotion();
+        window._live2dWasDragging = false;
       });
+
+      // Toolbar: switch animation group
+      const switchBtn = document.getElementById("toolbar-switch");
+      const groupIndicator = document.getElementById("live2d-group-indicator");
+      let indicatorTimer = null;
+
+      if (switchBtn) {
+        switchBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          currentGroupIndex = (currentGroupIndex + 1) % allMotionGroups.length;
+          clickMotionGroups = [allMotionGroups[currentGroupIndex]];
+          // Show group name indicator
+          if (groupIndicator) {
+            const groupNames = { Expression: "表情", TapShort: "短动画", TapLong: "长动画", Other: "其他" };
+            groupIndicator.textContent = groupNames[allMotionGroups[currentGroupIndex]] || allMotionGroups[currentGroupIndex];
+            groupIndicator.classList.add("show");
+            clearTimeout(indicatorTimer);
+            indicatorTimer = setTimeout(() => groupIndicator.classList.remove("show"), 1500);
+          }
+          // Play a random motion from the new group
+          if (live2dModel) {
+            try {
+              live2dModel.motion(clickMotionGroups[0], undefined, 2);
+              live2dModel.expression();
+            } catch (e) { /* ignore */ }
+          }
+        });
+      }
+
+      // Toolbar: toggle author info
+      const infoBtn = document.getElementById("toolbar-info");
+      const authorPanel = document.getElementById("live2d-author");
+
+      if (infoBtn && authorPanel) {
+        infoBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          authorPanel.classList.toggle("visible");
+          infoBtn.classList.toggle("active");
+        });
+      }
+
+      // Toolbar: drag mode (prevent click-trigger after drag)
+      const dragBtn = document.getElementById("toolbar-drag");
+      if (dragBtn) {
+        dragBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+        });
+      }
 
       // Idle animation: play a random motion every 15-30s when idle
       let idleTimer = null;
@@ -159,10 +243,13 @@ const size = config.size || { width: 280, height: 250 };
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
     let containerStart = { x: 0, y: 0 };
+    let dragMoved = false;
+    const DRAG_THRESHOLD = 5;
 
     container.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
       isDragging = true;
+      dragMoved = false;
       dragStart = { x: e.clientX, y: e.clientY };
       const rect = container.getBoundingClientRect();
       containerStart = { x: rect.left, y: rect.top };
@@ -172,8 +259,13 @@ const size = config.size || { width: 280, height: 250 };
 
     document.addEventListener("mousemove", (e) => {
       if (!isDragging) return;
-      const clampedX = Math.max(0, Math.min(containerStart.x + e.clientX - dragStart.x, window.innerWidth - container.offsetWidth));
-      const clampedY = Math.max(0, Math.min(containerStart.y + e.clientY - dragStart.y, window.innerHeight - container.offsetHeight));
+      const dx = e.clientX - dragStart.x;
+      const dy = e.clientY - dragStart.y;
+      if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+        dragMoved = true;
+      }
+      const clampedX = Math.max(0, Math.min(containerStart.x + dx, window.innerWidth - container.offsetWidth));
+      const clampedY = Math.max(0, Math.min(containerStart.y + dy, window.innerHeight - container.offsetHeight));
       container.style.left = clampedX + "px";
       container.style.right = "auto";
       container.style.top = clampedY + "px";
@@ -183,6 +275,9 @@ const size = config.size || { width: 280, height: 250 };
     document.addEventListener("mouseup", () => {
       if (isDragging) {
         isDragging = false;
+        if (dragMoved) {
+          window._live2dWasDragging = true;
+        }
         container.style.cursor = "grab";
       }
     });
@@ -190,6 +285,7 @@ const size = config.size || { width: 280, height: 250 };
     container.addEventListener("touchstart", (e) => {
       if (e.touches.length !== 1) return;
       isDragging = true;
+      dragMoved = false;
       const touch = e.touches[0];
       dragStart = { x: touch.clientX, y: touch.clientY };
       const rect = container.getBoundingClientRect();
@@ -200,8 +296,13 @@ const size = config.size || { width: 280, height: 250 };
     document.addEventListener("touchmove", (e) => {
       if (!isDragging || e.touches.length !== 1) return;
       const touch = e.touches[0];
-      const clampedX = Math.max(0, Math.min(containerStart.x + touch.clientX - dragStart.x, window.innerWidth - container.offsetWidth));
-      const clampedY = Math.max(0, Math.min(containerStart.y + touch.clientY - dragStart.y, window.innerHeight - container.offsetHeight));
+      const dx = touch.clientX - dragStart.x;
+      const dy = touch.clientY - dragStart.y;
+      if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+        dragMoved = true;
+      }
+      const clampedX = Math.max(0, Math.min(containerStart.x + dx, window.innerWidth - container.offsetWidth));
+      const clampedY = Math.max(0, Math.min(containerStart.y + dy, window.innerHeight - container.offsetHeight));
       container.style.left = clampedX + "px";
       container.style.right = "auto";
       container.style.top = clampedY + "px";
@@ -210,6 +311,9 @@ const size = config.size || { width: 280, height: 250 };
     });
 
     document.addEventListener("touchend", () => {
+      if (isDragging && dragMoved) {
+        window._live2dWasDragging = true;
+      }
       isDragging = false;
     });
 
@@ -293,8 +397,8 @@ const size = config.size || { width: 280, height: 250 };
   .live2d-widget {
     position: fixed;
     z-index: 999;
-    pointer-events: auto; /* 启用指针事件以支持拖拽 */
-    cursor: grab; /* 默认显示拖拽光标 */
+    pointer-events: auto;
+    cursor: grab;
   }
 
   #live2d-canvas {
@@ -309,8 +413,157 @@ const size = config.size || { width: 280, height: 250 };
     opacity: 1;
   }
 
-  /* 拖拽时的光标样式 */
   .live2d-widget:active {
     cursor: grabbing;
+  }
+
+  /* 右侧工具栏 */
+  .live2d-toolbar {
+    position: absolute;
+    right: -34px;
+    top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* 透明桥接区域，防止鼠标移到 toolbar 时脱离 hover */
+  .live2d-widget::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: -40px;
+    width: 46px;
+    height: 100%;
+    z-index: 999;
+  }
+
+  .live2d-widget:hover .live2d-toolbar {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .live2d-toolbar-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: oklch(0.95 0 0 / 0.85);
+    border: 1px solid oklch(0.8 0 0);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    color: oklch(0.4 0 0);
+    backdrop-filter: blur(4px);
+  }
+
+  :root.dark .live2d-toolbar-btn {
+    background: oklch(0.2 0 0 / 0.85);
+    border-color: oklch(0.4 0 0);
+    color: oklch(0.8 0 0);
+  }
+
+  .live2d-toolbar-btn:hover {
+    background: oklch(0.5 0 0 / 0.9);
+    color: oklch(1 0 0);
+  }
+
+  :root.dark .live2d-toolbar-btn:hover {
+    background: oklch(0.7 0 0 / 0.9);
+    color: oklch(0.1 0 0);
+  }
+
+  .live2d-toolbar-btn.active {
+    background: oklch(0.4 0 0 / 0.9);
+    color: oklch(1 0 0);
+  }
+
+  :root.dark .live2d-toolbar-btn.active {
+    background: oklch(0.7 0 0 / 0.9);
+    color: oklch(0.1 0 0);
+  }
+
+  /* 作者信息面板 */
+  .live2d-author {
+    position: absolute;
+    top: -28px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1;
+    color: oklch(0.3 0 0);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    white-space: nowrap;
+    text-shadow: 0 1px 3px oklch(1 0 0 / 0.6);
+    letter-spacing: 0.02em;
+  }
+
+  .live2d-author.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .live2d-author a {
+    color: oklch(0.25 0 0);
+    text-decoration: none;
+    border-bottom: 2px solid oklch(0.25 0 0);
+    padding-bottom: 1px;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .live2d-author a:hover {
+    color: oklch(0.1 0 0);
+    border-color: oklch(0.1 0 0);
+  }
+
+  :root.dark .live2d-author {
+    color: oklch(0.85 0 0);
+    text-shadow: 0 1px 3px oklch(0 0 0 / 0.6);
+  }
+
+  :root.dark .live2d-author a {
+    color: oklch(0.95 0 0);
+    border-bottom-color: oklch(0.95 0 0);
+  }
+
+  :root.dark .live2d-author a:hover {
+    color: oklch(1 0 0);
+    border-color: oklch(1 0 0);
+  }
+
+  /* 动画组指示器 */
+  .live2d-group-indicator {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    padding: 2px 8px;
+    background: oklch(0.2 0 0 / 0.7);
+    color: oklch(0.95 0 0);
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    white-space: nowrap;
+    backdrop-filter: blur(4px);
+  }
+
+  :root.dark .live2d-group-indicator {
+    background: oklch(0.9 0 0 / 0.7);
+    color: oklch(0.1 0 0);
+  }
+
+  .live2d-group-indicator.show {
+    opacity: 1;
   }
 </style>

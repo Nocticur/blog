@@ -139,6 +139,12 @@ export const live2dModelConfig: Live2DModelConfig = {
 		messageDisplayTime: 3000,
 	},
 
+	// 作者信息
+	author: {
+		name: "木果阿木果",
+		url: "https://www.bilibili.com/video/BV1Ts9eBkEXX",
+	},
+
 	// 响应式配置
 	responsive: {
 		// 在移动端隐藏
