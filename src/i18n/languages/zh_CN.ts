@@ -3,7 +3,7 @@ import type { Translation } from "../translation";
 
 export const zh_CN: Translation = {
 	[Key.home]: "主页",
-	[Key.about]: "关于我",
+	[Key.about]: "关于",
 	[Key.archive]: "归档",
 	[Key.search]: "搜索",
 	[Key.searchNoResults]: "找不到相关结果。",
@@ -302,6 +302,19 @@ export const zh_CN: Translation = {
 	[Key.galleryAlbums]: "本相册",
 	[Key.galleryNoAlbums]: "暂无相册",
 	[Key.galleryBackToAlbums]: "返回相册列表",
+
+	// 收藏API页面
+	[Key.collections]: "实用API&TOOL",
+	[Key.collectionsDescription]: "收集和管理常用的 API 与工具",
+	[Key.collectionsEmpty]: "暂无收藏的 API",
+	[Key.collectionsCopy]: "复制链接",
+	[Key.collectionsCopied]: "已复制",
+
+	// 统计页面
+	[Key.stats]: "统计",
+	[Key.statsDescription]: "站点数据统计与分析",
+	[Key.statsDeveloping]: "正在开发中",
+	[Key.statsDevelopingDesc]: "此页面正在紧锣密鼓地开发中，敬请期待",
 
 	// 密码保护
 	[Key.passwordProtected]: "密码保护",

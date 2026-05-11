@@ -299,6 +299,19 @@ enum I18nKey {
 	galleryNoAlbums = "galleryNoAlbums",
 	galleryBackToAlbums = "galleryBackToAlbums",
 
+	// 收藏API页面
+	collections = "collections",
+	collectionsDescription = "collectionsDescription",
+	collectionsEmpty = "collectionsEmpty",
+	collectionsCopy = "collectionsCopy",
+	collectionsCopied = "collectionsCopied",
+
+	// 统计页面
+	stats = "stats",
+	statsDescription = "statsDescription",
+	statsDeveloping = "statsDeveloping",
+	statsDevelopingDesc = "statsDevelopingDesc",
+
 	// 密码保护
 	passwordProtected = "passwordProtected",
 	passwordProtectedDesc = "passwordProtectedDesc",

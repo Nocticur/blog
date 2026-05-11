@@ -59,29 +59,29 @@ const showSponsorsList = sponsorConfig.showSponsorsList !== false;
 
       <!-- 赞助方式 -->
       <div class="mb-8">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div class="flex flex-wrap justify-center gap-6">
                     {enabledMethods.map((method) => (
-                      <div class="flex flex-col items-center card-base p-6 rounded-lg bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 hover:border-(--primary) transition-colors">
+                      <div class="flex flex-col items-center card-base p-8 rounded-lg bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 hover:border-(--primary) transition-colors w-full max-w-sm">
                         <!-- 图标和名称 -->
-                        <div class="flex items-center gap-3 mb-4">
+                        <div class="flex items-center gap-3 mb-5">
                           {method.icon && (
-                            <Icon name={method.icon} class="text-2xl text-neutral-900 dark:text-neutral-100 transition-colors" />
+                            <Icon name={method.icon} class="text-3xl text-neutral-900 dark:text-neutral-100 transition-colors" />
                           )}
-                          <h3 class="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
+                          <h3 class="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">
                             {method.name}
                           </h3>
                         </div>
 
                         <!-- 描述 -->
                         {method.description && (
-                          <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-4 text-center">
+                          <p class="text-base text-neutral-600 dark:text-neutral-400 mb-5 text-center">
                             {method.description}
                           </p>
                         )}
 
                         <!-- 二维码或链接 -->
                         {method.qrCode && (
-                          <div class="relative w-full max-w-[200px] aspect-square bg-white rounded-lg p-4 shadow-md mb-4">
+                          <div class="relative w-full max-w-[260px] aspect-square bg-white rounded-lg p-4 shadow-md mb-5">
                             <img
                               src={url(method.qrCode)}
                               alt={`${method.name} ${i18n(I18nKey.scanToSponsor)}`}
@@ -96,7 +96,7 @@ const showSponsorsList = sponsorConfig.showSponsorsList !== false;
                             href={method.link}
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="inline-flex items-center gap-2 px-4 py-2 bg-(--primary) text-white dark:text-black/70 rounded-lg font-medium hover:bg-(--primary)/90 active:scale-95 transition-all"
+                            class="inline-flex items-center gap-2 px-5 py-2.5 bg-(--primary) text-white dark:text-black/70 rounded-lg font-medium hover:bg-(--primary)/90 active:scale-95 transition-all"
                           >
                             <span>{i18n(I18nKey.sponsorGoTo)}</span>
                             <Icon name="fa7-solid:arrow-up-right-from-square" class="text-sm" />

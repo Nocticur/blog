@@ -85,6 +85,8 @@ export type SiteConfig = {
 		guestbook: boolean; // 留言板页面开关
 		bangumi: boolean;
 		gallery: boolean; // 相册页面开关
+		collections: boolean; // 收藏API页面开关
+		stats: boolean; // 统计页面开关
 	};
 
 	// 分类导航栏开关
@@ -185,6 +187,8 @@ export enum LinkPreset {
 	Guestbook = 5,
 	Bangumi = 6,
 	Gallery = 7,
+	Collections = 8,
+	Stats = 9,
 }
 
 export type NavBarLink = {
@@ -812,4 +816,22 @@ export type GalleryAlbum = {
 export type GalleryConfig = {
 	albums: GalleryAlbum[];
 	columnWidth?: number; // 瀑布流最小列宽(px)，默认 240，浏览器根据容器宽度自动计算列数
+};
+
+// 收藏API单项
+export type CollectionApiItem = {
+	name: string; // API 名称
+	url: string; // API 链接地址
+	description: string; // API 描述
+	category: string; // 分类
+	icon?: string; // 图标（Iconify 格式 或 外部图片 URL）
+	enabled: boolean; // 是否启用
+};
+
+// 收藏API配置
+export type CollectionsApiConfig = {
+	title?: string; // 页面标题，留空则使用 i18n 翻译
+	description?: string; // 页面描述，留空则使用 i18n 翻译
+	apis: CollectionApiItem[]; // API 收藏列表
+	categories?: string[]; // 自定义分类列表，留空则从 apis 中自动提取
 };

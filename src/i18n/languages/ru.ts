@@ -313,6 +313,20 @@ export const ru: Translation = {
 	[Key.galleryNoAlbums]: "Пока нет альбомов",
 	[Key.galleryBackToAlbums]: "Вернуться к альбомам",
 
+	// Страница коллекций API
+	[Key.collections]: "Коллекции",
+	[Key.collectionsDescription]: "Сбор и управление часто используемыми API",
+	[Key.collectionsEmpty]: "Нет сохранённых API",
+	[Key.collectionsCopy]: "Копировать ссылку",
+	[Key.collectionsCopied]: "Скопировано",
+
+	// Страница статистики
+	[Key.stats]: "Статистика",
+	[Key.statsDescription]: "Статистика и аналитика сайта",
+	[Key.statsDeveloping]: "В разработке",
+	[Key.statsDevelopingDesc]:
+		"Эта страница находится в разработке, следите за обновлениями",
+
 	// Защита паролем
 	[Key.passwordProtected]: "Защищено паролем",
 	[Key.passwordProtectedDesc]:

@@ -146,6 +146,10 @@ export const siteConfig: SiteConfig = {
 		bangumi: true,
 		// 相册页面开关
 		gallery: true,
+		// 收藏API页面开关
+		collections: true,
+		// 统计页面开关
+		stats: true,
 	},
 
 	// 分类导航栏开关，在首页和归档页顶部显示分类快捷导航

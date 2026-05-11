@@ -311,6 +311,19 @@ export const ja: Translation = {
 	[Key.galleryNoAlbums]: "アルバムがありません",
 	[Key.galleryBackToAlbums]: "アルバム一覧に戻る",
 
+	// 收藏APIページ
+	[Key.collections]: "コレクション",
+	[Key.collectionsDescription]: "よく使うAPIの収集と管理",
+	[Key.collectionsEmpty]: "収集したAPIはまだありません",
+	[Key.collectionsCopy]: "リンクをコピー",
+	[Key.collectionsCopied]: "コピーしました",
+
+	// 統計ページ
+	[Key.stats]: "統計",
+	[Key.statsDescription]: "サイトの統計と分析",
+	[Key.statsDeveloping]: "開発中",
+	[Key.statsDevelopingDesc]: "このページは現在開発中です。お楽しみに",
+
 	// パスワード保護
 	[Key.passwordProtected]: "パスワード保護",
 	[Key.passwordProtectedDesc]:

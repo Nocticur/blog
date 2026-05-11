@@ -34,25 +34,21 @@ const getDynamicNavBarConfig = (): NavBarConfig => {
 		url: "/my/",
 		icon: "material-symbols:person",
 		children: [
-			// 根据配置决定是否添加相册，在siteConfig关闭pages.gallery时导航栏不显示相册
 			...(siteConfig.pages.gallery ? [LinkPreset.Gallery] : []),
-
-			// 根据配置决定是否添加番组计划，在siteConfig关闭pages.bangumi时导航栏不显示番组计划
 			...(siteConfig.pages.bangumi ? [LinkPreset.Bangumi] : []),
+			...(siteConfig.pages.sponsor ? [LinkPreset.Sponsor] : []),
+			LinkPreset.About,
 		],
 	});
 
-	// 关于及其子菜单
+	// 其他及其子菜单
 	links.push({
-		name: "关于",
-		url: "/content/",
-		icon: "material-symbols:info",
+		name: "其他",
+		url: "/other/",
+		icon: "material-symbols:more-horiz",
 		children: [
-			// 根据配置决定是否添加赞助，在siteConfig关闭pages.sponsor时导航栏不显示赞助
-			...(siteConfig.pages.sponsor ? [LinkPreset.Sponsor] : []),
-
-			// 关于页面
-			LinkPreset.About,
+			...(siteConfig.pages.collections ? [LinkPreset.Collections] : []),
+			...(siteConfig.pages.stats ? [LinkPreset.Stats] : []),
 		],
 	});
 

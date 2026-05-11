@@ -1,0 +1,184 @@
+---
+import Icon from "@components/common/Icon.astro";
+import { collectionsApiConfig, siteConfig } from "@/config";
+import I18nKey from "@/i18n/i18nKey";
+import { i18n } from "@/i18n/translation";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+
+if (!siteConfig.pages.collections) {
+	return Astro.redirect("/404/");
+}
+
+const title = collectionsApiConfig.title || i18n(I18nKey.collections);
+const description =
+	collectionsApiConfig.description || i18n(I18nKey.collectionsDescription);
+const enabledApis = collectionsApiConfig.apis.filter((api) => api.enabled);
+
+// 提取分类
+const categories = collectionsApiConfig.categories?.length
+	? collectionsApiConfig.categories
+	: [...new Set(enabledApis.map((api) => api.category))];
+---
+
+<MainGridLayout title={title} description={description}>
+  <div class="flex w-full rounded-(--radius-large) overflow-hidden relative min-h-32">
+    <div class="card-base z-10 px-9 py-6 relative w-full">
+      <!-- 页面标题 -->
+      <div class="mb-8">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="h-8 w-8 rounded-lg bg-black dark:bg-white flex items-center justify-center">
+            <Icon name="material-symbols:bookmark" class="text-[1.5rem] text-white dark:text-black" />
+          </div>
+          <div class="text-3xl font-bold text-neutral-900 dark:text-neutral-100">
+            {title}
+          </div>
+        </div>
+        {description && (
+          <p class="text-base text-neutral-500 dark:text-neutral-400 leading-relaxed">
+            {description}
+          </p>
+        )}
+      </div>
+
+      <!-- API 列表：按分类分组 -->
+      {enabledApis.length > 0 ? (
+        categories.map((cat) => {
+          const catApis = enabledApis.filter((api) => api.category === cat);
+          if (catApis.length === 0) return null;
+          return (
+            <div class="category-group mt-10 first:mt-0">
+              <!-- 分类头部：图标 + 名称 + 数量 + 分隔线 -->
+              <div class="flex items-center gap-3 mb-6">
+                <div class="flex items-center gap-2">
+                  <Icon name="material-symbols:label-outline" class="text-lg text-neutral-900 dark:text-neutral-100" />
+                  <span class="text-lg font-bold text-neutral-900 dark:text-neutral-100">{cat}</span>
+                </div>
+                <span class="text-xs text-neutral-400 dark:text-neutral-500">{catApis.length}</span>
+                <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
+              </div>
+
+              <!-- 分类下的 API 卡片 -->
+              <div class="api-grid">
+                {catApis.map((api, index) => (
+                  <div
+                    class="api-card group relative border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 transition-all duration-500 ease-out hover:border-neutral-900 dark:hover:border-neutral-100 hover:shadow-lg dark:hover:shadow-neutral-900/50 cursor-pointer"
+                    data-category={api.category}
+                    style={`animation-delay: ${index * 60}ms`}
+                    onclick={`window.open('${api.url}', '_blank')`}
+                  >
+                    <!-- 顶部：图标 + 名称同行 -->
+                    <div class="flex items-center gap-2 mb-3">
+                      {api.icon ? (
+                        api.icon.startsWith('http') ? (
+                          <img src={api.icon} alt={api.name} class="w-6 h-6 rounded object-contain shrink-0" />
+                        ) : (
+                          <Icon name={api.icon} class="text-2xl text-neutral-600 dark:text-neutral-300 group-hover:text-black dark:group-hover:text-white transition-colors duration-300 shrink-0" />
+                        )
+                      ) : (
+                        <Icon name="material-symbols:api" class="text-2xl text-neutral-600 dark:text-neutral-300 group-hover:text-black dark:group-hover:text-white transition-colors duration-300 shrink-0" />
+                      )}
+                      <h3 class="text-lg font-bold text-neutral-900 dark:text-neutral-100 group-hover:translate-x-1 transition-transform duration-300">
+                        {api.name}
+                      </h3>
+                    </div>
+
+                    <!-- 描述 -->
+                    <p class="text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed mb-4 line-clamp-2">
+                      {api.description}
+                    </p>
+
+                    <!-- 底部操作栏 -->
+                    <div class="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                      <span class="text-xs text-neutral-400 dark:text-neutral-500 truncate max-w-[60%]">
+                        {new URL(api.url).hostname}
+                      </span>
+                      <button
+                        class="copy-btn flex items-center gap-1 text-xs text-neutral-400 dark:text-neutral-500 hover:text-black dark:hover:text-white transition-colors duration-200"
+                        data-url={api.url}
+                        onclick="event.stopPropagation();"
+                      >
+                        <Icon name="material-symbols:content-copy" class="text-sm" />
+                        <span>{i18n(I18nKey.collectionsCopy)}</span>
+                      </button>
+                    </div>
+
+                    <!-- 悬浮指示条 -->
+                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-black dark:bg-white rounded-full group-hover:w-12 transition-all duration-500 ease-out" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })
+      ) : (
+        <div class="text-center py-16">
+          <Icon name="material-symbols:bookmark-outline" class="text-5xl text-neutral-300 dark:text-neutral-600 mb-4" />
+          <p class="text-neutral-500 dark:text-neutral-400">{i18n(I18nKey.collectionsEmpty)}</p>
+        </div>
+      )}
+    </div>
+  </div>
+</MainGridLayout>
+
+<style is:global>
+  .api-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+  }
+
+  /* 入场动画 */
+  .api-card {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: cardSlideIn 0.5s ease-out forwards;
+  }
+
+  @keyframes cardSlideIn {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* 复制成功提示 */
+  .copy-btn.copied {
+    color: var(--primary) !important;
+  }
+</style>
+
+<script>
+  // 复制链接
+  document.addEventListener("astro:page-load", () => {
+    const copyButtons = document.querySelectorAll(".copy-btn");
+    copyButtons.forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const url = btn.getAttribute("data-url");
+        if (!url) return;
+
+        try {
+          await navigator.clipboard.writeText(url);
+          const span = btn.querySelector("span");
+          if (span) {
+            const original = span.textContent;
+            span.textContent = "已复制";
+            btn.classList.add("copied");
+            setTimeout(() => {
+              span.textContent = original;
+              btn.classList.remove("copied");
+            }, 2000);
+          }
+        } catch {
+          // fallback
+          const textarea = document.createElement("textarea");
+          textarea.value = url;
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        }
+      });
+    });
+  });
+</script>

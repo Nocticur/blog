@@ -312,6 +312,20 @@ export const en: Translation = {
 	[Key.galleryNoAlbums]: "No albums yet",
 	[Key.galleryBackToAlbums]: "Back to albums",
 
+	// Collections API page
+	[Key.collections]: "API&TOOL",
+	[Key.collectionsDescription]: "Collect and manage useful APIs and tools",
+	[Key.collectionsEmpty]: "No collected APIs yet",
+	[Key.collectionsCopy]: "Copy link",
+	[Key.collectionsCopied]: "Copied",
+
+	// Stats page
+	[Key.stats]: "Stats",
+	[Key.statsDescription]: "Site statistics and analytics",
+	[Key.statsDeveloping]: "Under Development",
+	[Key.statsDevelopingDesc]:
+		"This page is currently being developed, stay tuned",
+
 	// Password Protection
 	[Key.passwordProtected]: "Password Protected",
 	[Key.passwordProtectedDesc]:
