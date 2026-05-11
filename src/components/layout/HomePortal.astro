@@ -481,6 +481,27 @@ import { initMagicRings } from '@components/features/MagicRings.ts';
 
 <script is:inline>
 (function() {
+	if (window.__homePortalCounterInitialized) {
+		// Swup 跳转时只需更新计数
+		var uvEl = document.querySelector('[data-stat-id="counter-uv"]');
+		var pvEl = document.querySelector('[data-stat-id="counter-pv"]');
+		if (uvEl && pvEl) {
+			fetch('/api/count', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ path: location.pathname }),
+			})
+			.then(function(r) { return r.json(); })
+			.then(function(data) {
+				if (data.uv != null) uvEl.textContent = Number(data.uv).toLocaleString();
+				if (data.pv != null) pvEl.textContent = Number(data.pv).toLocaleString();
+			})
+			.catch(function() {});
+		}
+		return;
+	}
+	window.__homePortalCounterInitialized = true;
+
 	function updateCounter() {
 		var uvEl = document.querySelector('[data-stat-id="counter-uv"]');
 		var pvEl = document.querySelector('[data-stat-id="counter-pv"]');

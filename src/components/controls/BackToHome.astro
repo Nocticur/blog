@@ -28,23 +28,25 @@ import { url } from "@/utils/url-utils";
 </script>
 
 <script is:inline define:vars={{ homeUrl: url("/") }}>
-  function updateBackToHomeVisibility() {
-    const btn = document.getElementById("back-to-home-btn");
-    if (!btn) return;
+  if (!window.__backToHomeInitialized) {
+    window.__backToHomeInitialized = true;
 
-    const path = window.location.pathname.replace(/\/$/, "") || "/";
-    const homePath = homeUrl.replace(/\/$/, "") || "/";
-    if (path === homePath) {
-      btn.classList.add("hide");
-    } else {
-      btn.classList.remove("hide");
+    function updateBackToHomeVisibility() {
+      const btn = document.getElementById("back-to-home-btn");
+      if (!btn) return;
+
+      const path = window.location.pathname.replace(/\/$/, "") || "/";
+      const homePath = homeUrl.replace(/\/$/, "") || "/";
+      if (path === homePath) {
+        btn.classList.add("hide");
+      } else {
+        btn.classList.remove("hide");
+      }
     }
-  }
 
-  // Initial check
-  updateBackToHomeVisibility();
-  
-  // Re-check on view transitions or swup navigation
-  document.addEventListener("astro:page-load", updateBackToHomeVisibility);
-  document.addEventListener("swup:contentReplaced", updateBackToHomeVisibility);
+    updateBackToHomeVisibility();
+
+    document.addEventListener("astro:page-load", updateBackToHomeVisibility);
+    document.addEventListener("swup:contentReplaced", updateBackToHomeVisibility);
+  }
 </script>

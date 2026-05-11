@@ -401,28 +401,28 @@ const size = config.size || { width: 280, height: 250 };
     handleResponsive();
   }
 
-  // Handle window resize for responsive behavior
-  window.addEventListener("resize", handleResponsive);
+  if (!window.__live2dListenersAttached) {
+    window.__live2dListenersAttached = true;
 
-  // 监听 Swup 页面切换事件（如果使用了 Swup）
-  if (typeof window.swup !== "undefined" && window.swup.hooks) {
-    window.swup.hooks.on("content:replace", () => {
-      // 只更新响应式显示，不重新创建模型
-      setTimeout(() => {
-        handleResponsive();
-      }, 100);
-    });
-  } else {
-    // 如果 Swup 还未加载，监听启用事件
-    document.addEventListener("swup:enable", () => {
-      if (window.swup && window.swup.hooks) {
-        window.swup.hooks.on("content:replace", () => {
-          setTimeout(() => {
-            handleResponsive();
-          }, 100);
-        });
-      }
-    });
+    window.addEventListener("resize", handleResponsive);
+
+    if (typeof window.swup !== "undefined" && window.swup.hooks) {
+      window.swup.hooks.on("content:replace", () => {
+        setTimeout(() => {
+          handleResponsive();
+        }, 100);
+      });
+    } else {
+      document.addEventListener("swup:enable", () => {
+        if (window.swup && window.swup.hooks) {
+          window.swup.hooks.on("content:replace", () => {
+            setTimeout(() => {
+              handleResponsive();
+            }, 100);
+          });
+        }
+      });
+    }
   }
 </script>
 

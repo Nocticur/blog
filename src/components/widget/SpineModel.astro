@@ -367,28 +367,28 @@ import { url } from "@/utils/url-utils";
     }
   }
 
-  // 监听页面卸载事件，清理资源
-  window.addEventListener("beforeunload", cleanupSpineModel);
+  // 监听页面卸载事件，清理资源（只注册一次）
+  if (!window.__spineListenersAttached) {
+    window.__spineListenersAttached = true;
 
-  // 监听 Swup 页面切换事件（如果使用了 Swup）
-  if (typeof window.swup !== "undefined" && window.swup.hooks) {
-    window.swup.hooks.on("content:replace", () => {
-      // 只更新响应式显示，不重新创建模型
+    window.addEventListener("beforeunload", cleanupSpineModel);
+
+    if (typeof window.swup !== "undefined" && window.swup.hooks) {
+      window.swup.hooks.on("content:replace", () => {
+        setTimeout(() => {
+          updateResponsiveDisplay();
+        }, 100);
+      });
+    }
+
+    window.addEventListener("popstate", () => {
       setTimeout(() => {
         updateResponsiveDisplay();
       }, 100);
     });
+
+    window.addEventListener("resize", updateResponsiveDisplay);
   }
-
-  // 监听 popstate 事件（浏览器前进后退）
-  window.addEventListener("popstate", () => {
-    setTimeout(() => {
-      updateResponsiveDisplay();
-    }, 100);
-  });
-
-  // 监听窗口大小变化
-  window.addEventListener("resize", updateResponsiveDisplay);
 
   // 页面加载完成后初始化（只初始化一次）
   if (document.readyState === "loading") {

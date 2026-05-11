@@ -13,53 +13,48 @@ import FloatingButton from "@/components/common/FloatingButton.astro";
 
 <script is:raw is:inline>
   function backToTop() {
-    // 直接使用原生滚动，避免OverlayScrollbars冲突
     window.scroll({ top: 0, behavior: "smooth" });
   }
 
-  // 响应式返回顶部按钮管理器
-  if (typeof window.BackToTopManager === "undefined") {
-    window.BackToTopManager = class BackToTopManager {
-      constructor() {
-        this.button = document.getElementById("back-to-top-btn");
-        this.init();
-      }
+  if (!window.__backToTopInitialized) {
+    window.__backToTopInitialized = true;
 
-      init() {
-        if (!this.button) return; // wrapper checks removed as it is now flexible
+    if (typeof window.BackToTopManager === "undefined") {
+      window.BackToTopManager = class BackToTopManager {
+        constructor() {
+          this.button = document.getElementById("back-to-top-btn");
+          this.init();
+        }
 
-        this.setupScrollListener();
-      }
+        init() {
+          if (!this.button) return;
+          this.setupScrollListener();
+        }
 
-      setupScrollListener() {
-        const updateVisibility = () => {
-          const scrollTop =
-            window.pageYOffset || document.documentElement.scrollTop;
+        setupScrollListener() {
+          const updateVisibility = () => {
+            const scrollTop =
+              window.pageYOffset || document.documentElement.scrollTop;
+            if (scrollTop > 200) {
+              this.button.classList.remove("hide");
+            } else {
+              this.button.classList.add("hide");
+            }
+          };
 
-          // 当滚动超过200px时显示按钮
-          if (scrollTop > 200) {
-            this.button.classList.remove("hide");
-          } else {
-            this.button.classList.add("hide");
-          }
-        };
+          window.addEventListener("scroll", updateVisibility, { passive: true });
+        }
+      };
+    }
 
-        window.addEventListener("scroll", updateVisibility, { passive: true });
-      }
-    };
-  }
-  // ... existing initialization logic ...
-  // 页面加载完成后初始化
-  document.addEventListener("DOMContentLoaded", () => {
-    new BackToTopManager();
-  });
-
-  // 如果页面已经加载完成，立即初始化
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
+    function initBackToTop() {
       new BackToTopManager();
-    });
-  } else {
-    new BackToTopManager();
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initBackToTop);
+    } else {
+      initBackToTop();
+    }
   }
 </script>

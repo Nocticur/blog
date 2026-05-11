@@ -46,23 +46,28 @@ const giscus = commentConfig.giscus;
     container.appendChild(s);
   }
 
-  loadGiscus();
+  if (!window.__giscusInitialized) {
+    window.__giscusInitialized = true;
 
-  // 站点主题切换时同步 Giscus 主题
-  window.addEventListener('theme-change', syncGiscusTheme);
+    loadGiscus();
 
-  // Swup 页面切换后重新加载
-  if (window.swup && window.swup.hooks) {
-    window.swup.hooks.on('content:replace', function () {
-      setTimeout(loadGiscus, 200);
-    });
-  } else {
-    document.addEventListener('swup:enable', function () {
+    window.addEventListener('theme-change', syncGiscusTheme);
+
+    function setupGiscusSwup() {
       if (window.swup && window.swup.hooks) {
         window.swup.hooks.on('content:replace', function () {
           setTimeout(loadGiscus, 200);
         });
       }
-    });
+    }
+
+    if (window.swup && window.swup.hooks) {
+      setupGiscusSwup();
+    } else {
+      document.addEventListener('swup:enable', setupGiscusSwup);
+    }
+  } else {
+    // Swup 跳转时重新加载评论组件
+    loadGiscus();
   }
 </script>

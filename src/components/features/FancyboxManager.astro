@@ -8,6 +8,9 @@ import "@/styles/fancybox-custom.css";
   let Fancybox: any;
 
   async function setup() {
+    // 先清理旧绑定，防止累积
+    cleanupFancybox();
+
     const selectors = [
       ".custom-md img, #post-cover img, .moment-images img",
       ".moment-images a[data-fancybox]",

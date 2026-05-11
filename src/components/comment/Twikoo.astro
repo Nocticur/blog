@@ -19,7 +19,6 @@ const config = {
 <link rel="stylesheet" href={url("/assets/css/twikoo.css")} />
 <link rel="stylesheet" href={url("/assets/css/twikoo-custom.css")} />
 <script is:inline define:vars={{ config }}>
-  // 获取当前页面路径
   function getCurrentPath() {
     const pathname = window.location.pathname;
     return pathname.endsWith("/") && pathname.length > 1
@@ -27,7 +26,6 @@ const config = {
       : pathname;
   }
 
-  // 动态创建配置对象
   function createTwikooConfig() {
     return {
       ...config,
@@ -36,7 +34,6 @@ const config = {
     };
   }
 
-  // 初始化 Twikoo
   function initTwikoo() {
     if (typeof twikoo !== "undefined") {
       const commentEl = document.getElementById("tcomment");
@@ -56,35 +53,38 @@ const config = {
           });
       }
     } else {
-      // 如果 Twikoo 未加载，稍后重试
       setTimeout(initTwikoo, 500);
     }
   }
 
-  // 页面加载时初始化
-  document.addEventListener("DOMContentLoaded", initTwikoo);
+  if (!window.__twikooInitialized) {
+    window.__twikooInitialized = true;
 
-  // Swup 页面切换后重新初始化
-  if (window.swup && window.swup.hooks) {
-    window.swup.hooks.on("content:replace", function () {
-      setTimeout(initTwikoo, 200);
-    });
-  } else {
-    document.addEventListener("swup:enable", function () {
+    document.addEventListener("DOMContentLoaded", initTwikoo);
+
+    function setupTwikooSwup() {
       if (window.swup && window.swup.hooks) {
         window.swup.hooks.on("content:replace", function () {
           setTimeout(initTwikoo, 200);
         });
       }
-    });
-  }
-
-  // 自定义事件监听
-  document.addEventListener("firefly:page:loaded", function () {
-    const commentEl = document.getElementById("tcomment");
-    if (commentEl) {
-      console.log("[Twikoo] 通过自定义事件重新初始化");
-      initTwikoo();
     }
-  });
+
+    if (window.swup && window.swup.hooks) {
+      setupTwikooSwup();
+    } else {
+      document.addEventListener("swup:enable", setupTwikooSwup);
+    }
+
+    document.addEventListener("firefly:page:loaded", function () {
+      const commentEl = document.getElementById("tcomment");
+      if (commentEl) {
+        console.log("[Twikoo] 通过自定义事件重新初始化");
+        initTwikoo();
+      }
+    });
+  } else {
+    // Swup 跳转时重新初始化评论组件
+    setTimeout(initTwikoo, 200);
+  }
 </script>
