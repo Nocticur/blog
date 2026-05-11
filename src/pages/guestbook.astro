@@ -93,7 +93,6 @@ const navLinks = navBarConfig.links.map((item) => {
 		live2dPosition: live2dModelConfig.position || { corner: "bottom-left", offsetX: 0, offsetY: 0 },
 	}}
 >
-	// 留言页全屏布局：通过 JS 设置 #main-grid 为全屏，离开时清理
 	function applyGuestbookFullscreen() {
 		const grid = document.getElementById("main-grid");
 		if (!grid) return;
@@ -118,7 +117,6 @@ const navLinks = navBarConfig.links.map((item) => {
 		});
 	}
 
-	// 重置 Live2D 到左下角
 	function resetLive2DPosition() {
 		const widget = document.getElementById("live2d-widget");
 		if (!widget) return;
@@ -137,22 +135,26 @@ const navLinks = navBarConfig.links.map((item) => {
 	applyGuestbookFullscreen();
 	resetLive2DPosition();
 
-	// Swup 导航：离开时清理，回来时重新设置
-	const setupGuestbookHooks = () => {
-		// content:replace 在退出动画完成后、新内容插入前触发
-		window.swup.hooks.on("content:replace", () => {
-			removeGuestbookFullscreen();
-		});
-		window.swup.hooks.on("page:view", () => {
-			if (location.pathname.replace(/\/$/, "").endsWith("/guestbook")) {
-				applyGuestbookFullscreen();
-				resetLive2DPosition();
-			}
-		});
-	};
+	// 防止 Swup 跳转时重复注册 hooks
+	if (!window.__guestbookHooksAttached) {
+		window.__guestbookHooksAttached = true;
 
-	if (window?.swup?.hooks) setupGuestbookHooks();
-	else document.addEventListener("swup:enable", setupGuestbookHooks);
+		const setupGuestbookHooks = () => {
+			// visit:start 时清理（动画开始前），避免 content:replace 时移除样式导致截断
+			window.swup.hooks.on("visit:start", () => {
+				removeGuestbookFullscreen();
+			});
+			window.swup.hooks.on("page:view", () => {
+				if (location.pathname.replace(/\/$/, "").endsWith("/guestbook")) {
+					applyGuestbookFullscreen();
+					resetLive2DPosition();
+				}
+			});
+		};
+
+		if (window?.swup?.hooks) setupGuestbookHooks();
+		else document.addEventListener("swup:enable", setupGuestbookHooks);
+	}
 </script>
 
 <style>

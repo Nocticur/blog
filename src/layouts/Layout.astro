@@ -266,6 +266,22 @@ const siteLang = lang.replace("_", "-");
       import("@/utils/icon-loader").then(({ initIconLoader }) => initIconLoader());
     });
 
+    // 侧边栏组件在 Swup 容器之外，页面切换后需要手动更新显隐状态
+    function updateSidebarWidgetVisibility() {
+      const isPost = window.location.pathname.includes("/posts/");
+      document.querySelectorAll(".widget-hide-on-post").forEach((el) => {
+        el.classList.toggle("hidden", isPost);
+      });
+      document.querySelectorAll(".widget-hide-on-non-post").forEach((el) => {
+        el.classList.toggle("hidden", !isPost);
+      });
+    }
+
+    // content:replace 时 URL 已更新，立即同步侧边栏显隐
+    window.swup.hooks.on("content:replace", () => {
+      updateSidebarWidgetVisibility();
+    });
+
     window.swup.hooks.on("visit:start", () => {
       const progressBar = document.getElementById("progress-bar");
       if (progressBar) {
@@ -285,6 +301,7 @@ const siteLang = lang.replace("_", "-");
       if (currentTheme !== expectedTheme) {
         document.documentElement.setAttribute("data-theme", expectedTheme);
       }
+      updateSidebarWidgetVisibility();
       setTimeout(() => {
         if (document.getElementById("tcomment")) {
           document.dispatchEvent(new CustomEvent("firefly:page:loaded", {
