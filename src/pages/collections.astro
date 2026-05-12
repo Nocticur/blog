@@ -169,13 +169,15 @@ const categories = collectionsApiConfig.categories?.length
             }, 2000);
           }
         } catch {
-          // fallback
-          const textarea = document.createElement("textarea");
-          textarea.value = url;
-          document.body.appendChild(textarea);
-          textarea.select();
-          document.execCommand("copy"); // biome-ignore lint/correctness/noDocumentExecCommand: clipboard fallback for older browsers
-          document.body.removeChild(textarea);
+          const span = btn.querySelector("span");
+          if (span) {
+            span.textContent = "复制失败";
+            btn.classList.add("copied");
+            setTimeout(() => {
+              span.textContent = "复制链接";
+              btn.classList.remove("copied");
+            }, 2000);
+          }
         }
       });
     });
