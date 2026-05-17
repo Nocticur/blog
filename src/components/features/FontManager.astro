@@ -73,8 +73,13 @@ const fontFamilyStyle = generateFontFamilyStyle();
           <link rel="stylesheet" href={font.src} />
         </>
       );
+    } else if (font.src.endsWith('.css')) {
+      // 本地字体 CSS 文件
+      return (
+        <link rel="stylesheet" href={font.src} />
+      );
     } else {
-      // 本地字体文件
+      // 本地单个字体文件
       return (
         <style
           set:html={`

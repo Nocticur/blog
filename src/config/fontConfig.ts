@@ -22,11 +22,11 @@ export const fontConfig = {
 				"system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif",
 		},
 
-		// Google Fonts - Zen Maru Gothic
+		// 本地字体 - Zen Maru Gothic
 		"zen-maru-gothic": {
 			id: "zen-maru-gothic",
 			name: "Zen Maru Gothic",
-			src: "https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap",
+			src: "/fonts/zen-maru-gothic/zen-maru-gothic.css",
 			family: "Zen Maru Gothic",
 			display: "swap" as const,
 		},

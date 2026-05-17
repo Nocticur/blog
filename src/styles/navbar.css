@@ -65,6 +65,10 @@
     border: 1px solid transparent;
     box-shadow: none;
     backdrop-filter: none;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
 /* ============================================
@@ -91,6 +95,28 @@
         0 0 0 1px oklch(0.30 0 0 / 0.45),
         0 4px 24px -4px rgba(0, 0, 0, 0.45),
         0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================
+ * 移动端性能优化：简化过渡、延迟 backdrop-filter
+ * ============================================ */
+@media (max-width: 1023px) {
+    #navbar > div {
+        will-change: width, max-width, border-radius, background-color, box-shadow;
+        contain: layout style paint;
+    }
+
+    #navbar.scrolled > div {
+        will-change: width, max-width, border-radius, background-color, box-shadow;
+        transition:
+            width 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+            max-width 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+            border-radius 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+            background-color 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.05s,
+            border-color 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.05s,
+            box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.05s,
+            backdrop-filter 0.25s ease 0.2s !important;
+    }
 }
 
 /* ============================================

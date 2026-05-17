@@ -106,6 +106,26 @@ if (isLocalSrcLogo) {
         padding: 0.35rem 0.5rem;
     }
 
+    /* 移动端：简化 pill 过渡，减少复合开销 */
+    @media (max-width: 1023px) {
+        .navbar-pill {
+            transition:
+                width 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                max-width 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                border-radius 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                padding 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                background-color 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.05s,
+                border-color 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.05s,
+                box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.05s,
+                backdrop-filter 0.25s ease 0.2s;
+            will-change: width, max-width, border-radius, padding, background-color, box-shadow;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+    }
+
     /* ── 内层 flex 行 ── */
     .navbar-inner {
         display: flex;
@@ -173,6 +193,21 @@ if (isLocalSrcLogo) {
         opacity: 0;
         transform: translateX(-6px);
         margin-left: 0 !important;
+    }
+
+    /* 移动端：logo 文字使用 GPU 友好的 transform，避免 max-width 布局抖动 */
+    @media (max-width: 1023px) {
+        .navbar-logo-text {
+            transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            will-change: transform, opacity;
+        }
+
+        :global(#navbar.scrolled) .navbar-logo-text {
+            opacity: 0;
+            transform: translateX(-8px) scale(0.95);
+            max-width: 12rem;
+            margin-left: 0 !important;
+        }
     }
 
     /* ── 中间导航菜单 ── */

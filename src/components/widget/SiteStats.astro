@@ -117,7 +117,10 @@ const revealLine1 = `${i18n(I18nKey.siteStatsPostCount)} ${postCount}`;
 <script is:inline>
 (function() {
 	// ========== Stars (粒子) ==========
+	var isMobile = window.innerWidth < 1024;
+
 	function initStars() {
+		if (isMobile) return;
 		var containers = document.querySelectorAll('.stars-container');
 		containers.forEach(function(container) {
 			if (container.dataset.starsInitialized) return;
@@ -144,6 +147,7 @@ const revealLine1 = `${i18n(I18nKey.siteStatsPostCount)} ${postCount}`;
 	}
 
 	function animateStars() {
+		if (isMobile) return;
 		var stars = document.querySelectorAll('.star');
 		var now = Date.now() / 1000;
 		stars.forEach(function(star) {

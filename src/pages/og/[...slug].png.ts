@@ -41,55 +41,22 @@ export const getStaticPaths: GetStaticPaths = async () => {
 
 let fontCache: { regular: Buffer | null; bold: Buffer | null } | null = null;
 
-async function fetchNotoSansSCFonts() {
+function loadLocalNotoSansSCFonts() {
 	if (fontCache) return fontCache;
 	try {
-		const cssResp = await fetch(
-			"https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap",
-		);
-		if (!cssResp.ok) throw new Error("Failed to fetch Google Fonts CSS");
-		const cssText = await cssResp.text();
+		const regularPath =
+			"./public/fonts/noto-sans-sc/static/NotoSansSC-Regular.ttf";
+		const boldPath = "./public/fonts/noto-sans-sc/static/NotoSansSC-Bold.ttf";
 
-		const getUrlForWeight = (weight: number) => {
-			const blockRe = new RegExp(
-				`@font-face\\s*{[^}]*font-weight:\\s*${weight}[^}]*}`,
-				"g",
-			);
-			const match = cssText.match(blockRe);
-			if (!match || match.length === 0) return null;
-			const urlMatch = match[0].match(/url\((https:[^)]+)\)/);
-			return urlMatch ? urlMatch[1] : null;
-		};
+		const regular = fs.existsSync(regularPath)
+			? fs.readFileSync(regularPath)
+			: null;
+		const bold = fs.existsSync(boldPath) ? fs.readFileSync(boldPath) : null;
 
-		const regularUrl = getUrlForWeight(400);
-		const boldUrl = getUrlForWeight(700);
-
-		if (!regularUrl || !boldUrl) {
-			console.warn(
-				"Could not find font urls in Google Fonts CSS; falling back to no fonts.",
-			);
-			fontCache = { regular: null, bold: null };
-			return { regular: null, bold: null };
-		}
-
-		const [rResp, bResp] = await Promise.all([
-			fetch(regularUrl),
-			fetch(boldUrl),
-		]);
-		if (!rResp.ok || !bResp.ok) {
-			console.warn(
-				"Failed to download font files from Google; falling back to no fonts.",
-			);
-			fontCache = { regular: null, bold: null };
-			return { regular: null, bold: null };
-		}
-
-		const rBuf = Buffer.from(await rResp.arrayBuffer());
-		const bBuf = Buffer.from(await bResp.arrayBuffer());
-		fontCache = { regular: rBuf, bold: bBuf };
+		fontCache = { regular, bold };
 		return fontCache;
 	} catch (err) {
-		console.warn("Error fetching fonts:", err);
+		console.warn("Error loading local fonts:", err);
 		fontCache = { regular: null, bold: null };
 		return { regular: null, bold: null };
 	}
@@ -100,8 +67,8 @@ export async function GET({
 }: APIContext<{ post: CollectionEntry<"posts"> }>) {
 	const { post } = props;
 
-	// Try to fetch fonts from Google Fonts (woff2) at runtime.
-	const { regular: fontRegular, bold: fontBold } = await fetchNotoSansSCFonts();
+	// Load local Noto Sans SC fonts
+	const { regular: fontRegular, bold: fontBold } = loadLocalNotoSansSCFonts();
 
 	// Avatar + icon: still read from disk (small assets)
 	let avatarBase64: string;
