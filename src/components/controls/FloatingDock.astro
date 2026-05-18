@@ -8,11 +8,7 @@ import Icon from "@components/common/Icon.astro";
 import type { MarkdownHeading } from "astro";
 import Search from "@/components/controls/Search.svelte";
 import MusicPlayer from "@/components/features/MusicPlayer.astro";
-import {
-	announcementConfig,
-	live2dModelConfig,
-	spineModelConfig,
-} from "@/config";
+import { announcementConfig, spineModelConfig } from "@/config";
 import { musicPlayerConfig } from "@/config/musicConfig";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
@@ -59,12 +55,6 @@ const tags = await getTagList();
 			<button class="dock-btn" id="dock-tags-btn" aria-label={i18n(I18nKey.tags)} type="button" data-tooltip={i18n(I18nKey.tags)}>
 				<Icon name="material-symbols:label-outline" class="text-xl" />
 			</button>
-
-			{live2dModelConfig.enable && (
-				<button class="dock-btn" id="dock-live2d-btn" aria-label="Live2D" type="button" data-active="true" data-tooltip="Live2D 看板娘">
-					<Icon name="fa7-regular:address-card" class="text-xl" />
-				</button>
-			)}
 
 			{spineModelConfig?.enable && (
 				<button class="dock-btn" id="dock-spine-btn" aria-label="Spine" type="button" data-active="true" data-tooltip="Spine 模型">
@@ -310,13 +300,12 @@ const tags = await getTagList();
 			}
 		});
 
-		// Live2D / Spine 显隐切换（状态持久化到 localStorage）
-		function bindToggleVisibility(btnId: string, targetId: string, storageKey: string) {
+		// Spine 显隐切换（简单切换，保持原有行为）
+		function bindSpineToggle(btnId: string, targetId: string, storageKey: string) {
 			const btn = document.getElementById(btnId);
 			const target = document.getElementById(targetId);
 			if (!btn || !target) return;
 
-			// 读取持久化的隐藏状态
 			const savedHidden = localStorage.getItem(storageKey) === "true";
 			if (savedHidden) {
 				(target as HTMLElement).style.display = "none";
@@ -331,8 +320,7 @@ const tags = await getTagList();
 				localStorage.setItem(storageKey, String(!isHidden));
 			});
 		}
-		bindToggleVisibility("dock-live2d-btn", "live2d-widget", "live2d-hidden");
-		bindToggleVisibility("dock-spine-btn", "spine-model-container", "spine-hidden");
+		bindSpineToggle("dock-spine-btn", "spine-model-container", "spine-hidden");
 
 		// 主题切换：点击直接切换亮/暗
 		const themeBtnEl = document.getElementById("dock-theme-btn");

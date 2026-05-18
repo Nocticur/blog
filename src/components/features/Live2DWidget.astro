@@ -10,7 +10,6 @@ interface Props {
 
 const { config } = Astro.props;
 
-// 获取位置和尺寸配置
 const position = config.position || {
 	corner: "bottom-right" as const,
 	offsetX: 20,
@@ -20,565 +19,1050 @@ const size = config.size || { width: 280, height: 250 };
 ---
 
 <div
-  id="live2d-widget"
-  class="live2d-widget"
-  style={`
+	id="live2d-widget"
+	class="live2d-widget live2d-initial"
+	data-position={position.corner}
+	style={`
     width: ${size.width}px;
     height: ${size.height}px;
     ${position.corner?.includes("right") ? "right" : "left"}: ${position.offsetX}px;
     ${position.corner?.includes("top") ? "top" : "bottom"}: ${position.offsetY}px;
   `}
 >
-  <canvas id="live2d-canvas" width={size.width} height={size.height}></canvas>
+	<canvas id="live2d-canvas" width={size.width} height={size.height}></canvas>
 
-  <!-- 右侧工具栏 -->
-  <div class="live2d-toolbar">
-    <button class="live2d-toolbar-btn" id="toolbar-drag" title="移动">
-      <Icon name="material-symbols:drag-indicator" class="text-base" />
-    </button>
-    <button class="live2d-toolbar-btn" id="toolbar-switch" title="切换动画组">
-      <Icon name="material-symbols:swap-horiz" class="text-base" />
-    </button>
-    <button class="live2d-toolbar-btn active" id="toolbar-info" title="作者信息">
-      <Icon name="material-symbols:info" class="text-base" />
-    </button>
-  </div>
+	<div class="live2d-toolbar">
+		<button class="live2d-toolbar-btn" id="toolbar-drag" title="移动">
+			<Icon name="material-symbols:drag-indicator" class="text-base" />
+		</button>
+		<button class="live2d-toolbar-btn" id="toolbar-switch" title="切换动画组">
+			<Icon name="material-symbols:swap-horiz" class="text-base" />
+		</button>
+		<button class="live2d-toolbar-btn active" id="toolbar-info" title="作者信息">
+			<Icon name="material-symbols:info" class="text-base" />
+		</button>
+		<button class="live2d-toolbar-btn" id="toolbar-close" title="关闭">
+			<Icon name="material-symbols:close" class="text-base" />
+		</button>
+	</div>
 
-  <!-- 作者信息面板 -->
-  {config.author && (
-    <div class="live2d-author visible" id="live2d-author">
-      <span>by </span>
-      {config.author.url ? (
-        <a href={config.author.url} target="_blank" rel="noopener noreferrer">
-          {config.author.name}
-        </a>
-      ) : (
-        <span>{config.author.name}</span>
-      )}
-    </div>
-  )}
+	{
+		config.author && (
+			<div class="live2d-author" id="live2d-author">
+				<span>by </span>
+				{config.author.url ? (
+					<a
+						href={config.author.url}
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						{config.author.name}
+					</a>
+				) : (
+					<span>{config.author.name}</span>
+				)}
+			</div>
+		)
+	}
 
-  <!-- 动画组指示器 -->
-  <div class="live2d-group-indicator" id="live2d-group-indicator"></div>
+	<div class="live2d-group-indicator" id="live2d-group-indicator" />
 </div>
 
-<!-- 引入消息框组件 -->
+<div class="live2d-trigger" id="live2d-trigger" title="显示看板娘">
+	<div class="live2d-trigger-inner">
+		<Icon name="fa7-regular:address-card" class="text-lg" />
+		<span class="live2d-trigger-text">看板娘</span>
+	</div>
+</div>
+
 <MessageBox />
 
-<script is:inline define:vars={{ config, modelPathUrl: url(config.model.path) }}>
-  // 使用 window 持久化引用，避免 Swup 导航后局部变量丢失
-  let live2dApp = window._live2dApp || null;
-  let live2dModel = window._live2dModel || null;
+<script
+	is:inline
+	define:vars={{ config, modelPathUrl: url(config.model.path) }}
+>
+	class Live2DStateManager {
+		constructor() {
+			this.state = "idle";
+			this.loadPromise = null;
+			this.loadError = null;
+			this.retryCount = 0;
+			this.maxRetries = 2;
+			this.visibilityCache = null;
+		}
 
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      if (document.querySelector(`script[src="${src}"]`)) {
-        resolve();
-        return;
-      }
-      const s = document.createElement("script");
-      s.src = src;
-      s.crossOrigin = "anonymous";
-      s.onload = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }
+		static async getInstance() {
+			if (!Live2DStateManager._instance) {
+				Live2DStateManager._instance = new Live2DStateManager();
+				Live2DStateManager._instance.visibilityCache = localStorage.getItem("live2d-visibility-cache");
+			}
+			return Live2DStateManager._instance;
+		}
 
-  async function initLive2D() {
-    if (!config.model || !config.model.path) {
-      return;
-    }
+		getState() {
+			return this.state;
+		}
 
-    try {
-      await loadScript("https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js");
-      await loadScript("https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js");
-      await loadScript("https://cdn.jsdelivr.net/npm/pixi-live2d-display/dist/cubism4.min.js");
+		setState(newState) {
+			const oldState = this.state;
+			this.state = newState;
+			if (newState === "error" || newState === "ready") {
+				this.loadError = null;
+			}
+		}
 
-      if (!window.PIXI || !window.PIXI.live2d) {
-        return;
-      }
+		async ensureLoaded() {
+			if (this.state === "ready") {
+				return true;
+			}
+			if (this.state === "loading" && this.loadPromise) {
+				try {
+					await this.loadPromise;
+					return this.state === "ready";
+				} catch {
+					return false;
+				}
+			}
+			if (this.state === "error" && this.retryCount < this.maxRetries) {
+				this.retryCount++;
+				this.loadError = null;
+			} else if (this.state === "error") {
+				return false;
+			}
+			this.setState("loading");
+			this.loadPromise = this.loadResources().then(() => {
+				this.setState("ready");
+				return true;
+			}).catch((error) => {
+				this.setState("error");
+				this.loadError = error;
+				return false;
+			});
+			return this.loadPromise;
+		}
 
-      const canvas = document.getElementById("live2d-canvas");
-      const size = config.size || { width: 280, height: 250 };
-      const resolution = config.resolution || Math.min(window.devicePixelRatio || 1, 2);
+		async loadResources() {
+			await Live2DStateManager.loadScript(
+				"https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js",
+			);
+			await Live2DStateManager.loadScript(
+				"https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js",
+			);
+			await Live2DStateManager.loadScript(
+				"https://cdn.jsdelivr.net/npm/pixi-live2d-display/dist/cubism4.min.js",
+			);
+			if (!window.PIXI || !window.PIXI.live2d) {
+				throw new Error("PIXI or live2d not available");
+			}
+			return true;
+		}
 
-      live2dApp = new PIXI.Application({
-        view: canvas,
-        width: size.width,
-        height: size.height,
-        backgroundAlpha: 0,
-        antialias: true,
-        resolution: resolution,
-        autoDensity: true,
-      });
+		static loadScript(src) {
+			return new Promise((resolve, reject) => {
+				if (document.querySelector(`script[src="${src}"]`)) {
+					resolve();
+					return;
+				}
+				const s = document.createElement("script");
+				s.src = src;
+				s.crossOrigin = "anonymous";
+				s.onload = resolve;
+				s.onerror = () => reject(new Error(`Failed to load: ${src}`));
+				document.head.appendChild(s);
+			});
+		}
 
-      live2dModel = await PIXI.live2d.Live2DModel.from(modelPathUrl);
+		getCachedVisibility() {
+			return this.visibilityCache;
+		}
 
-      // Auto-fit model to canvas
-      const scaleX = size.width / live2dModel.width;
-      const scaleY = size.height / live2dModel.height;
-      const fitScale = Math.min(scaleX, scaleY);
-      live2dModel.scale.set(fitScale);
-      live2dModel.anchor.set(0.5, 0.5);
-      live2dModel.x = size.width / 2;
-      live2dModel.y = size.height / 2;
+		setCachedVisibility(visible) {
+			this.visibilityCache = visible ? "visible" : "hidden";
+			localStorage.setItem("live2d-visibility-cache", this.visibilityCache);
+		}
+	}
 
-      live2dApp.stage.addChild(live2dModel);
+	let stateManager = null;
+	let live2dApp = null;
+	let live2dModel = null;
+	let isResourcesReady = false;
+	let isWidgetVisible = false;
+	let resourceLoadPromise = null;
+	let isDragSetup = false;
 
-      // 持久化到 window，Swup 导航后可恢复引用
-      window._live2dApp = live2dApp;
-      window._live2dModel = live2dModel;
+	async function ensureResourcesLoaded() {
+		if (isResourcesReady) {
+			return true;
+		}
+		if (resourceLoadPromise) {
+			return resourceLoadPromise;
+		}
+		resourceLoadPromise = (async () => {
+			try {
+				stateManager = await Live2DStateManager.getInstance();
+				const loaded = await stateManager.ensureLoaded();
+				if (loaded && window.PIXI?.live2d?.Live2DModel) {
+					isResourcesReady = true;
+					return true;
+				}
+				return false;
+			} catch {
+				resourceLoadPromise = null;
+				return false;
+			}
+		})();
+		return resourceLoadPromise;
+	}
 
-      // Click interaction — trigger random motion + expression + message
-      const allMotionGroups = ["Expression", "TapShort", "TapLong", "Other"];
-      let clickMotionGroups = ["Expression", "TapShort"];
-      let currentGroupIndex = 0;
+	async function initLive2D() {
+		if (!config.model || !config.model.path) {
+			return false;
+		}
+		const resourcesReady = await ensureResourcesLoaded();
+		if (!resourcesReady) {
+			handleLoadError();
+			return false;
+		}
+		try {
+			const canvas = document.getElementById("live2d-canvas");
+			if (!canvas) {
+				return false;
+			}
+			const size = config.size || { width: 280, height: 250 };
+			const resolution =
+				config.resolution || Math.min(window.devicePixelRatio || 1, 2);
 
-      live2dModel.on("hit", (_hitAreas) => {
-        if (!window._live2dWasDragging) playRandomMotion();
-        window._live2dWasDragging = false;
-      });
+			if (window._live2dApp) {
+				try {
+					window._live2dApp.destroy(true, { children: true, texture: true, baseTexture: true });
+				} catch {
+					// ignore
+				}
+				window._live2dApp = null;
+				window._live2dModel = null;
+			}
+			live2dApp = null;
+			live2dModel = null;
 
-      canvas.addEventListener("click", () => {
-        if (!window._live2dWasDragging) playRandomMotion();
-        window._live2dWasDragging = false;
-      });
+			live2dApp = new PIXI.Application({
+				view: canvas,
+				width: size.width,
+				height: size.height,
+				backgroundAlpha: 0,
+				antialias: true,
+				resolution: resolution,
+				autoDensity: true,
+			});
 
-      // Toolbar: switch animation group
-      const switchBtn = document.getElementById("toolbar-switch");
-      const groupIndicator = document.getElementById("live2d-group-indicator");
-      let indicatorTimer = null;
+			live2dModel = await PIXI.live2d.Live2DModel.from(modelPathUrl);
+			console.log("[Live2D] Model loaded successfully:", modelPathUrl, "model width:", live2dModel.width, "model height:", live2dModel.height);
 
-      if (switchBtn) {
-        switchBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          currentGroupIndex = (currentGroupIndex + 1) % allMotionGroups.length;
-          clickMotionGroups = [allMotionGroups[currentGroupIndex]];
-          // Show group name indicator
-          if (groupIndicator) {
-            const groupNames = { Expression: "表情", TapShort: "短动画", TapLong: "长动画", Other: "其他" };
-            groupIndicator.textContent = groupNames[allMotionGroups[currentGroupIndex]] || allMotionGroups[currentGroupIndex];
-            groupIndicator.classList.add("show");
-            clearTimeout(indicatorTimer);
-            indicatorTimer = setTimeout(() => groupIndicator.classList.remove("show"), 1500);
-          }
-          // Play a random motion from the new group
-          if (live2dModel) {
-            try {
-              live2dModel.motion(clickMotionGroups[0], undefined, 2);
-              live2dModel.expression();
-            } catch (e) { /* ignore */ }
-          }
-        });
-      }
+			const scaleX = size.width / live2dModel.width;
+			const scaleY = size.height / live2dModel.height;
+			const fitScale = Math.min(scaleX, scaleY);
+			live2dModel.scale.set(fitScale);
+			live2dModel.anchor.set(0.5, 0.5);
+			live2dModel.x = size.width / 2;
+			live2dModel.y = size.height / 2;
 
-      // Toolbar: toggle author info
-      const infoBtn = document.getElementById("toolbar-info");
-      const authorPanel = document.getElementById("live2d-author");
+			live2dApp.stage.addChild(live2dModel);
 
-      if (infoBtn && authorPanel) {
-        infoBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          authorPanel.classList.toggle("visible");
-          infoBtn.classList.toggle("active");
-        });
-      }
+			window._live2dApp = live2dApp;
+			window._live2dModel = live2dModel;
 
-      // Toolbar: drag mode (prevent click-trigger after drag)
-      const dragBtn = document.getElementById("toolbar-drag");
-      if (dragBtn) {
-        dragBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-        });
-      }
+			setupInteractions();
+			scheduleIdleAnimation();
+			return true;
+		} catch (error) {
+			console.error("[Live2D] Initialization failed:", error);
+			handleLoadError();
+			return false;
+		}
+	}
 
-      // Idle animation: play a random motion every 15-30s when idle
-      let idleTimer = null;
-      function scheduleIdle() {
-        clearTimeout(idleTimer);
-        const delay = 15000 + Math.random() * 15000;
-        idleTimer = setTimeout(() => {
-          if (live2dModel) {
-            try {
-              live2dModel.motion("Idle", 0, 1); // IDLE priority
-              live2dModel.expression(); // random expression
-            } catch (e) { /* ignore */ }
-          }
-          scheduleIdle();
-        }, delay);
-      }
-      scheduleIdle();
+	function handleLoadError() {
+		const widget = document.getElementById("live2d-widget");
+		if (widget) {
+			widget.classList.remove("live2d-initial");
+		}
+	}
 
-      function playRandomMotion() {
-        if (!live2dModel) return;
-        clearTimeout(idleTimer);
-        try {
-          const group = clickMotionGroups[Math.floor(Math.random() * clickMotionGroups.length)];
-          live2dModel.motion(group, undefined, 2); // NORMAL priority, random index
-          // Also trigger a random expression
-          live2dModel.expression();
-        } catch (_e) {
-          // Failed to play motion
-        }
-        showMessage();
-        scheduleIdle();
-      }
+	function setupInteractions() {
+		const allMotionGroups = ["Expression", "TapShort", "TapLong", "Other"];
+		let clickMotionGroups = ["Expression", "TapShort"];
+		let currentGroupIndex = 0;
 
-      setupDrag();
-    } catch (_error) {
-      // Failed to load Live2D model
-    }
-  }
+		live2dModel.on("hit", (_hitAreas) => {
+			if (!window._live2dWasDragging) playRandomMotion();
+			window._live2dWasDragging = false;
+		});
 
-  function setupDrag() {
-    const container = document.getElementById("live2d-widget");
-    if (!container) return;
+		const canvas = document.getElementById("live2d-canvas");
+		canvas?.addEventListener("click", () => {
+			if (!window._live2dWasDragging) playRandomMotion();
+			window._live2dWasDragging = false;
+		});
 
-    let isDragging = false;
-    let dragStart = { x: 0, y: 0 };
-    let containerStart = { x: 0, y: 0 };
-    let dragMoved = false;
-    const DRAG_THRESHOLD = 5;
+		const switchBtn = document.getElementById("toolbar-switch");
+		const groupIndicator = document.getElementById("live2d-group-indicator");
+		let indicatorTimer = null;
 
-    container.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return;
-      isDragging = true;
-      dragMoved = false;
-      dragStart = { x: e.clientX, y: e.clientY };
-      const rect = container.getBoundingClientRect();
-      containerStart = { x: rect.left, y: rect.top };
-      container.style.cursor = "grabbing";
-      e.preventDefault();
-    });
+		if (switchBtn) {
+			switchBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				currentGroupIndex = (currentGroupIndex + 1) % allMotionGroups.length;
+				clickMotionGroups = [allMotionGroups[currentGroupIndex]];
+				if (groupIndicator) {
+					const groupNames = {
+						Expression: "表情",
+						TapShort: "短动画",
+						TapLong: "长动画",
+						Other: "其他",
+					};
+					groupIndicator.textContent = groupNames[allMotionGroups[currentGroupIndex]] || allMotionGroups[currentGroupIndex];
+					groupIndicator.classList.add("show");
+					clearTimeout(indicatorTimer);
+					indicatorTimer = setTimeout(() => groupIndicator.classList.remove("show"), 1500);
+				}
+				if (live2dModel) {
+					try {
+						live2dModel.motion(clickMotionGroups[0], undefined, 2);
+						live2dModel.expression();
+					} catch {
+						// ignore
+					}
+				}
+			});
+		}
 
-    document.addEventListener("mousemove", (e) => {
-      if (!isDragging) return;
-      const dx = e.clientX - dragStart.x;
-      const dy = e.clientY - dragStart.y;
-      if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
-        dragMoved = true;
-      }
-      const clampedX = Math.max(0, Math.min(containerStart.x + dx, window.innerWidth - container.offsetWidth));
-      const clampedY = Math.max(0, Math.min(containerStart.y + dy, window.innerHeight - container.offsetHeight));
-      container.style.left = clampedX + "px";
-      container.style.right = "auto";
-      container.style.top = clampedY + "px";
-      container.style.bottom = "auto";
-    });
+		const infoBtn = document.getElementById("toolbar-info");
+		const authorPanel = document.getElementById("live2d-author");
 
-    document.addEventListener("mouseup", () => {
-      if (isDragging) {
-        isDragging = false;
-        if (dragMoved) {
-          window._live2dWasDragging = true;
-        }
-        container.style.cursor = "grab";
-      }
-    });
+		if (infoBtn && authorPanel) {
+			infoBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				authorPanel.classList.toggle("visible");
+				infoBtn.classList.toggle("active");
+			});
+		}
 
-    container.addEventListener("touchstart", (e) => {
-      if (e.touches.length !== 1) return;
-      isDragging = true;
-      dragMoved = false;
-      const touch = e.touches[0];
-      dragStart = { x: touch.clientX, y: touch.clientY };
-      const rect = container.getBoundingClientRect();
-      containerStart = { x: rect.left, y: rect.top };
-      e.preventDefault();
-    });
+		const dragBtn = document.getElementById("toolbar-drag");
+		if (dragBtn) {
+			dragBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+			});
+		}
 
-    document.addEventListener("touchmove", (e) => {
-      if (!isDragging || e.touches.length !== 1) return;
-      const touch = e.touches[0];
-      const dx = touch.clientX - dragStart.x;
-      const dy = touch.clientY - dragStart.y;
-      if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
-        dragMoved = true;
-      }
-      const clampedX = Math.max(0, Math.min(containerStart.x + dx, window.innerWidth - container.offsetWidth));
-      const clampedY = Math.max(0, Math.min(containerStart.y + dy, window.innerHeight - container.offsetHeight));
-      container.style.left = clampedX + "px";
-      container.style.right = "auto";
-      container.style.top = clampedY + "px";
-      container.style.bottom = "auto";
-      e.preventDefault();
-    });
+		const closeBtn = document.getElementById("toolbar-close");
+		if (closeBtn) {
+			closeBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				closeLive2DWidget();
+			});
+		}
 
-    document.addEventListener("touchend", () => {
-      if (isDragging && dragMoved) {
-        window._live2dWasDragging = true;
-      }
-      isDragging = false;
-    });
+		function playRandomMotion() {
+			if (!live2dModel) return;
+			clearTimeout(window._live2dIdleTimer);
+			try {
+				const group = clickMotionGroups[Math.floor(Math.random() * clickMotionGroups.length)];
+				live2dModel.motion(group, undefined, 2);
+				live2dModel.expression();
+			} catch {
+				// ignore
+			}
+			showMessage();
+			scheduleIdleAnimation();
+		}
 
-    container.style.cursor = "grab";
+		setupDrag();
+	}
 
-    window.addEventListener("resize", () => {
-      const rect = container.getBoundingClientRect();
-      const maxX = window.innerWidth - container.offsetWidth;
-      const maxY = window.innerHeight - container.offsetHeight;
-      if (rect.left > maxX) {
-        container.style.left = maxX + "px";
-        container.style.right = "auto";
-      }
-      if (rect.top > maxY) {
-        container.style.top = maxY + "px";
-        container.style.bottom = "auto";
-      }
-    });
-  }
+	function scheduleIdleAnimation() {
+		clearTimeout(window._live2dIdleTimer);
+		const delay = 15000 + Math.random() * 15000;
+		window._live2dIdleTimer = setTimeout(() => {
+			if (live2dModel && isWidgetVisible) {
+				try {
+					live2dModel.motion("Idle", 0, 1);
+					live2dModel.expression();
+				} catch {
+					// ignore
+				}
+			}
+			scheduleIdleAnimation();
+		}, delay);
+	}
 
-  function showMessage() {
-    const messages = config.interactive?.clickMessages || [
-      "你好！",
-      "有什么需要帮助的吗？",
-      "今天天气真不错呢！",
-      "要不要一起玩游戏？",
-      "记得按时休息哦！",
-    ];
-    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-    if (window.showModelMessage) {
-      window.showModelMessage(randomMessage, {
-        containerId: "live2d-widget",
-        displayTime: config.interactive?.messageDisplayTime || 3000
-      });
-    }
-  }
+	function triggerEntryAnimation() {
+		const widget = document.getElementById("live2d-widget");
+		const author = document.getElementById("live2d-author");
+		if (!widget) return;
 
-  function handleResponsive() {
-    const widget = document.getElementById("live2d-widget");
-    if (!widget) return;
-    // 用户手动关闭时不强制覆盖
-    if (localStorage.getItem("live2d-hidden") === "true") return;
-    if (config.responsive?.hideOnMobile) {
-      const breakpoint = config.responsive.mobileBreakpoint || 768;
-      widget.style.display = window.innerWidth <= breakpoint ? "none" : "";
-    }
-  }
+		widget.classList.remove("live2d-initial");
+		widget.classList.add("live2d-entering");
 
-  // 检查是否需要重新初始化（canvas 被替换或 PIXI 引用丢失）
-  function needsReinit() {
-    if (!window.live2dModelInitialized) return true;
-    const canvas = document.getElementById("live2d-canvas");
-    // canvas 被替换（不在 DOM 或 PIXI 引用的 view 不是当前 canvas）
-    if (!canvas || (window._live2dApp && window._live2dApp.renderer.view !== canvas)) {
-      window.live2dModelInitialized = false;
-      window._live2dApp = null;
-      window._live2dModel = null;
-      return true;
-    }
-    return false;
-  }
+		setTimeout(() => {
+			widget.classList.remove("live2d-entering");
+			widget.classList.add("live2d-ready");
+			if (author) {
+				author.classList.add("visible");
+			}
+		}, 600);
+	}
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      if (needsReinit()) {
-        initLive2D();
-        window.live2dModelInitialized = true;
-      }
-      live2dApp = window._live2dApp;
-      live2dModel = window._live2dModel;
-      handleResponsive();
-    });
-  } else {
-    if (needsReinit()) {
-      initLive2D();
-      window.live2dModelInitialized = true;
-    }
-    live2dApp = window._live2dApp;
-    live2dModel = window._live2dModel;
-    handleResponsive();
-  }
+	async function closeLive2DWidget() {
+		const widget = document.getElementById("live2d-widget");
+		if (!widget) return;
 
-  window.addEventListener("resize", handleResponsive);
+		if (window.clearModelMessage) {
+			window.clearModelMessage();
+		}
 
-  if (typeof window.swup !== "undefined" && window.swup.hooks) {
-    window.swup.hooks.on("content:replace", () => {
-      setTimeout(handleResponsive, 100);
-    });
-  } else {
-    document.addEventListener("swup:enable", () => {
-      if (window.swup?.hooks) {
-        window.swup.hooks.on("content:replace", () => {
-          setTimeout(handleResponsive, 100);
-        });
-      }
-    });
-  }
+		const author = document.getElementById("live2d-author");
+		if (author) {
+			author.classList.remove("visible");
+		}
+
+		const rect = widget.getBoundingClientRect();
+		const viewportHeight = window.innerHeight;
+		const distanceToBottom = viewportHeight - rect.bottom;
+
+		widget.style.setProperty("--fall-distance", `${distanceToBottom}px`);
+		widget.classList.add("live2d-falling");
+
+		await sleep(300);
+
+		widget.classList.remove("live2d-falling");
+		widget.classList.add("live2d-exiting");
+
+		await sleep(400);
+
+		widget.style.visibility = "hidden";
+		widget.style.pointerEvents = "none";
+		widget.classList.remove("live2d-exiting");
+		isWidgetVisible = false;
+
+		if (stateManager) {
+			stateManager.setCachedVisibility(false);
+		}
+
+		updateTriggerVisibility(true);
+
+		window.dispatchEvent(
+			new CustomEvent("live2d-visibility-change", {
+				detail: { visible: false },
+			}),
+		);
+	}
+
+	async function showLive2DWidget() {
+		const widget = document.getElementById("live2d-widget");
+		if (!widget) return;
+
+		updateTriggerVisibility(false);
+
+		const resourcesReady = await ensureResourcesLoaded();
+		if (!resourcesReady) {
+			updateTriggerVisibility(true);
+			return;
+		}
+
+		const currentCanvas = document.getElementById("live2d-canvas");
+		const canvasValid = currentCanvas && window._live2dApp?.renderer?.view === currentCanvas;
+		const modelExists = window._live2dApp && window._live2dModel && canvasValid;
+
+		if (modelExists) {
+			widget.style.visibility = "";
+			widget.style.pointerEvents = "";
+			widget.style.opacity = "";
+			widget.style.transform = "";
+			widget.classList.remove("live2d-initial", "live2d-ready", "live2d-exiting", "live2d-falling");
+			isWidgetVisible = true;
+			window._live2dApp?.ticker?.start();
+			window._live2dApp?.render();
+			triggerEntryAnimation();
+		} else {
+			if (window._live2dApp) {
+				try {
+					window._live2dApp.destroy(true, { children: true, texture: true, baseTexture: true });
+				} catch {
+					// ignore
+				}
+				window._live2dApp = null;
+				window._live2dModel = null;
+			}
+			live2dApp = null;
+			live2dModel = null;
+
+			const initialized = await initLive2D();
+			if (initialized) {
+				widget.style.visibility = "";
+				widget.style.pointerEvents = "";
+				widget.style.opacity = "";
+				widget.style.transform = "";
+				widget.classList.remove("live2d-initial", "live2d-ready", "live2d-exiting", "live2d-falling");
+				isWidgetVisible = true;
+				triggerEntryAnimation();
+			} else {
+				updateTriggerVisibility(true);
+				return;
+			}
+		}
+
+		if (stateManager) {
+			stateManager.setCachedVisibility(true);
+		}
+
+		window.dispatchEvent(
+			new CustomEvent("live2d-visibility-change", {
+				detail: { visible: true },
+			}),
+		);
+	}
+
+	function updateTriggerVisibility(show) {
+		const trigger = document.getElementById("live2d-trigger");
+		if (!trigger) return;
+		if (show) {
+			trigger.classList.add("visible");
+		} else {
+			trigger.classList.remove("visible");
+		}
+	}
+
+	function initTrigger() {
+		const trigger = document.getElementById("live2d-trigger");
+		if (!trigger) return;
+
+		trigger.addEventListener("click", () => {
+			showLive2DWidget();
+		});
+
+		const cachedVisibility = stateManager?.getCachedVisibility();
+		if (cachedVisibility === "hidden") {
+			updateTriggerVisibility(true);
+			const widget = document.getElementById("live2d-widget");
+			if (widget) {
+				widget.style.visibility = "hidden";
+				widget.style.pointerEvents = "none";
+			}
+		} else if (cachedVisibility === "visible") {
+			isWidgetVisible = true;
+		}
+	}
+
+	window._showLive2DWidget = showLive2DWidget;
+	window._closeLive2DWidget = closeLive2DWidget;
+
+	function setupDrag() {
+		if (isDragSetup) return;
+		isDragSetup = true;
+		const container = document.getElementById("live2d-widget");
+		if (!container) return;
+
+		let isDragging = false;
+		let dragStart = { x: 0, y: 0 };
+		let containerStart = { x: 0, y: 0 };
+		let dragMoved = false;
+		const DRAG_THRESHOLD = 5;
+		let animFrameId = 0;
+		let pendingMove = false;
+		let moveTarget = { x: 0, y: 0 };
+		let winWidth = window.innerWidth;
+		let winHeight = window.innerHeight;
+		let containerW = container.offsetWidth;
+		let containerH = container.offsetHeight;
+
+		function rafMove() {
+			if (!pendingMove) return;
+			pendingMove = false;
+			container.style.left = moveTarget.x + "px";
+			container.style.top = moveTarget.y + "px";
+		}
+
+		function scheduleMove(x, y) {
+			moveTarget.x = x;
+			moveTarget.y = y;
+			pendingMove = true;
+			if (!animFrameId) {
+				animFrameId = requestAnimationFrame(() => {
+					animFrameId = 0;
+					rafMove();
+				});
+			}
+		}
+
+		container.addEventListener("mousedown", (e) => {
+			if (e.button !== 0) return;
+			isDragging = true;
+			dragMoved = false;
+			dragStart = { x: e.clientX, y: e.clientY };
+			const rect = container.getBoundingClientRect();
+			containerStart = { x: rect.left, y: rect.top };
+			containerW = container.offsetWidth;
+			containerH = container.offsetHeight;
+			container.style.cursor = "grabbing";
+			container.style.willChange = "left, top";
+			e.preventDefault();
+		});
+
+		document.addEventListener("mousemove", (e) => {
+			if (!isDragging) return;
+			const dx = e.clientX - dragStart.x;
+			const dy = e.clientY - dragStart.y;
+			if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+				dragMoved = true;
+			}
+			const clampedX = Math.max(0, Math.min(containerStart.x + dx, winWidth - containerW));
+			const clampedY = Math.max(0, Math.min(containerStart.y + dy, winHeight - containerH));
+			scheduleMove(clampedX, clampedY);
+		});
+
+		document.addEventListener("mouseup", () => {
+			if (isDragging) {
+				isDragging = false;
+				container.style.willChange = "auto";
+				if (animFrameId) {
+					cancelAnimationFrame(animFrameId);
+					animFrameId = 0;
+				}
+				if (pendingMove) rafMove();
+				if (dragMoved) {
+					window._live2dWasDragging = true;
+				}
+				container.style.cursor = "grab";
+			}
+		});
+
+		container.addEventListener("touchstart", (e) => {
+			if (e.touches.length !== 1) return;
+			isDragging = true;
+			dragMoved = false;
+			const touch = e.touches[0];
+			dragStart = { x: touch.clientX, y: touch.clientY };
+			const rect = container.getBoundingClientRect();
+			containerStart = { x: rect.left, y: rect.top };
+			containerW = container.offsetWidth;
+			containerH = container.offsetHeight;
+			container.style.willChange = "left, top";
+			e.preventDefault();
+		});
+
+		document.addEventListener("touchmove", (e) => {
+			if (!isDragging || e.touches.length !== 1) return;
+			const touch = e.touches[0];
+			const dx = touch.clientX - dragStart.x;
+			const dy = touch.clientY - dragStart.y;
+			if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+				dragMoved = true;
+			}
+			const clampedX = Math.max(0, Math.min(containerStart.x + dx, winWidth - containerW));
+			const clampedY = Math.max(0, Math.min(containerStart.y + dy, winHeight - containerH));
+			scheduleMove(clampedX, clampedY);
+			e.preventDefault();
+		});
+
+		document.addEventListener("touchend", () => {
+			if (isDragging) {
+				container.style.willChange = "auto";
+				if (animFrameId) {
+					cancelAnimationFrame(animFrameId);
+					animFrameId = 0;
+				}
+				if (pendingMove) rafMove();
+				if (dragMoved) {
+					window._live2dWasDragging = true;
+				}
+			}
+			isDragging = false;
+		});
+
+		container.style.cursor = "grab";
+
+		window.addEventListener("resize", () => {
+			winWidth = window.innerWidth;
+			winHeight = window.innerHeight;
+			containerW = container.offsetWidth;
+			containerH = container.offsetHeight;
+			const rect = container.getBoundingClientRect();
+			const maxX = winWidth - containerW;
+			const maxY = winHeight - containerH;
+			if (rect.left > maxX) {
+				container.style.left = maxX + "px";
+				container.style.right = "auto";
+			}
+			if (rect.top > maxY) {
+				container.style.top = maxY + "px";
+				container.style.bottom = "auto";
+			}
+		});
+	}
+
+	function showMessage() {
+		const messages = config.interactive?.clickMessages || [
+			"你好！",
+			"有什么需要帮助的吗？",
+			"今天天气真不错呢！",
+			"要不要一起玩游戏？",
+			"记得按时休息哦！",
+		];
+		const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+		if (window.showModelMessage) {
+			window.showModelMessage(randomMessage, {
+				containerId: "live2d-widget",
+				displayTime: config.interactive?.messageDisplayTime || 3000,
+			});
+		}
+	}
+
+	function handleResponsive() {
+		const widget = document.getElementById("live2d-widget");
+		if (!widget) return;
+		const cachedVisibility = stateManager?.getCachedVisibility();
+		if (cachedVisibility === "hidden") return;
+		if (config.responsive?.hideOnMobile) {
+			const breakpoint = config.responsive.mobileBreakpoint || 768;
+			widget.style.visibility = window.innerWidth <= breakpoint ? "hidden" : "";
+			widget.style.pointerEvents = window.innerWidth <= breakpoint ? "none" : "";
+		}
+	}
+
+	async function initialize() {
+		stateManager = await Live2DStateManager.getInstance();
+		initTrigger();
+
+		const cachedVisibility = stateManager.getCachedVisibility();
+		if (cachedVisibility === "hidden") {
+			const widget = document.getElementById("live2d-widget");
+			if (widget) {
+				widget.style.visibility = "hidden";
+				widget.style.pointerEvents = "none";
+			}
+		} else {
+			isWidgetVisible = true;
+			await initLive2D();
+			if (live2dModel) {
+				triggerEntryAnimation();
+			}
+		}
+
+		handleResponsive();
+	}
+
+	if (document.readyState === "loading") {
+		document.addEventListener("DOMContentLoaded", initialize);
+	} else {
+		initialize();
+	}
+
+	window.addEventListener("resize", handleResponsive);
+
+	function sleep(ms) {
+		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
 </script>
 
 <style>
-  .live2d-widget {
-    position: fixed;
-    z-index: 999;
-    pointer-events: auto;
-    cursor: grab;
-  }
+	.live2d-widget {
+		position: fixed;
+		z-index: 999;
+		pointer-events: auto;
+		cursor: grab;
+	}
 
-  #live2d-canvas {
-    pointer-events: auto;
-    cursor: pointer;
-    transition: opacity 0.3s ease;
-    width: 100%;
-    height: 100%;
-  }
+	.live2d-widget.live2d-initial {
+		opacity: 0;
+		transform: translateY(120%);
+		pointer-events: none;
+	}
 
-  .live2d-widget:hover #live2d-canvas {
-    opacity: 1;
-  }
+	.live2d-widget.live2d-entering {
+		animation: live2d-slide-in 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	}
 
-  .live2d-widget:active {
-    cursor: grabbing;
-  }
+	.live2d-widget.live2d-ready {
+		opacity: 1;
+		transform: translateY(0);
+		transition: opacity 0.3s ease, transform 0.3s ease;
+	}
 
-  /* 右侧工具栏 */
-  .live2d-toolbar {
-    position: absolute;
-    right: -34px;
-    top: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    opacity: 0;
-    transition: opacity 0.25s ease;
-    pointer-events: none;
-    z-index: 1000;
-  }
+	@keyframes live2d-slide-in {
+		from {
+			opacity: 0;
+			transform: translateY(120%);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
 
-  /* 透明桥接区域，防止鼠标移到 toolbar 时脱离 hover */
-  .live2d-widget::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: -40px;
-    width: 46px;
-    height: 100%;
-    z-index: 999;
-  }
+	.live2d-widget.live2d-falling {
+		animation: live2d-fall 300ms cubic-bezier(0.55, 0, 1, 1) forwards;
+	}
 
-  .live2d-widget:hover .live2d-toolbar {
-    opacity: 1;
-    pointer-events: auto;
-  }
+	@keyframes live2d-fall {
+		from {
+			transform: translateY(0);
+		}
+		to {
+			transform: translateY(var(--fall-distance, 100px));
+		}
+	}
 
-  .live2d-toolbar-btn {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: oklch(0.95 0 0 / 0.85);
-    border: 1px solid oklch(0.8 0 0);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
-    color: oklch(0.4 0 0);
-    backdrop-filter: blur(4px);
-  }
+	.live2d-widget.live2d-exiting {
+		animation: live2d-slide-out 400ms cubic-bezier(0.7, 0, 0.84, 0) forwards;
+	}
 
-  :root.dark .live2d-toolbar-btn {
-    background: oklch(0.2 0 0 / 0.85);
-    border-color: oklch(0.4 0 0);
-    color: oklch(0.8 0 0);
-  }
+	@keyframes live2d-slide-out {
+		from {
+			opacity: 1;
+			transform: translateY(var(--fall-distance, 0));
+		}
+		to {
+			opacity: 0;
+			transform: translateY(var(--fall-distance, 0)) translateY(100%);
+		}
+	}
 
-  .live2d-toolbar-btn:hover {
-    background: oklch(0.5 0 0 / 0.9);
-    color: oklch(1 0 0);
-  }
+	#live2d-canvas {
+		pointer-events: auto;
+		cursor: pointer;
+		transition: opacity 0.3s ease;
+		width: 100%;
+		height: 100%;
+	}
 
-  :root.dark .live2d-toolbar-btn:hover {
-    background: oklch(0.7 0 0 / 0.9);
-    color: oklch(0.1 0 0);
-  }
+	.live2d-widget:hover #live2d-canvas {
+		opacity: 1;
+	}
 
-  .live2d-toolbar-btn.active {
-    background: oklch(0.4 0 0 / 0.9);
-    color: oklch(1 0 0);
-  }
+	.live2d-widget:active {
+		cursor: grabbing;
+	}
 
-  :root.dark .live2d-toolbar-btn.active {
-    background: oklch(0.7 0 0 / 0.9);
-    color: oklch(0.1 0 0);
-  }
+	.live2d-toolbar {
+		position: absolute;
+		right: -34px;
+		top: 8px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		opacity: 0;
+		transition: opacity 0.25s ease;
+		pointer-events: none;
+		z-index: 1000;
+	}
 
-  /* 作者信息面板 */
-  .live2d-author {
-    position: absolute;
-    top: -28px;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 15px;
-    font-weight: 600;
-    line-height: 1;
-    color: oklch(0.3 0 0);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-    white-space: nowrap;
-    text-shadow: 0 1px 3px oklch(1 0 0 / 0.6);
-    letter-spacing: 0.02em;
-  }
+	.live2d-widget::after {
+		content: "";
+		position: absolute;
+		top: 0;
+		right: -40px;
+		width: 46px;
+		height: 100%;
+		z-index: 999;
+	}
 
-  .live2d-author.visible {
-    opacity: 1;
-    pointer-events: auto;
-  }
+	.live2d-widget:hover .live2d-toolbar {
+		opacity: 1;
+		pointer-events: auto;
+	}
 
-  .live2d-author a {
-    color: oklch(0.25 0 0);
-    text-decoration: none;
-    border-bottom: 2px solid oklch(0.25 0 0);
-    padding-bottom: 1px;
-    transition: color 0.15s ease, border-color 0.15s ease;
-  }
+	.live2d-toolbar-btn {
+		width: 28px;
+		height: 28px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: oklch(0.95 0 0 / 0.85);
+		border: 1px solid oklch(0.8 0 0);
+		border-radius: 4px;
+		cursor: pointer;
+		transition: background 0.15s ease, color 0.15s ease;
+		color: oklch(0.4 0 0);
+		backdrop-filter: blur(4px);
+	}
 
-  .live2d-author a:hover {
-    color: oklch(0.1 0 0);
-    border-color: oklch(0.1 0 0);
-  }
+	:root.dark .live2d-toolbar-btn {
+		background: oklch(0.2 0 0 / 0.85);
+		border-color: oklch(0.4 0 0);
+		color: oklch(0.8 0 0);
+	}
 
-  :root.dark .live2d-author {
-    color: oklch(0.85 0 0);
-    text-shadow: 0 1px 3px oklch(0 0 0 / 0.6);
-  }
+	.live2d-toolbar-btn:hover {
+		background: oklch(0.5 0 0 / 0.9);
+		color: oklch(1 0 0);
+	}
 
-  :root.dark .live2d-author a {
-    color: oklch(0.95 0 0);
-    border-bottom-color: oklch(0.95 0 0);
-  }
+	:root.dark .live2d-toolbar-btn:hover {
+		background: oklch(0.7 0 0 / 0.9);
+		color: oklch(0.1 0 0);
+	}
 
-  :root.dark .live2d-author a:hover {
-    color: oklch(1 0 0);
-    border-color: oklch(1 0 0);
-  }
+	.live2d-toolbar-btn.active {
+		background: oklch(0.4 0 0 / 0.9);
+		color: oklch(1 0 0);
+	}
 
-  /* 动画组指示器 */
-  .live2d-group-indicator {
-    position: absolute;
-    top: -20px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 11px;
-    padding: 2px 8px;
-    background: oklch(0.2 0 0 / 0.7);
-    color: oklch(0.95 0 0);
-    border-radius: 3px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-    white-space: nowrap;
-    backdrop-filter: blur(4px);
-  }
+	:root.dark .live2d-toolbar-btn.active {
+		background: oklch(0.7 0 0 / 0.9);
+		color: oklch(0.1 0 0);
+	}
 
-  :root.dark .live2d-group-indicator {
-    background: oklch(0.9 0 0 / 0.7);
-    color: oklch(0.1 0 0);
-  }
+	.live2d-author {
+		position: absolute;
+		top: -28px;
+		left: 0;
+		right: 0;
+		text-align: center;
+		font-size: 15px;
+		font-weight: 600;
+		line-height: 1;
+		color: oklch(0.3 0 0);
+		opacity: 0;
+		transform: translateY(10px);
+		pointer-events: none;
+		white-space: nowrap;
+		text-shadow: 0 1px 3px oklch(1 0 0 / 0.6);
+		letter-spacing: 0.02em;
+		transition:
+			opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+			transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+	}
 
-  .live2d-group-indicator.show {
-    opacity: 1;
-  }
+	.live2d-author.visible {
+		opacity: 1;
+		transform: translateY(0);
+		pointer-events: auto;
+	}
+
+	.live2d-author a {
+		color: oklch(0.25 0 0);
+		text-decoration: none;
+		border-bottom: 2px solid oklch(0.25 0 0);
+		padding-bottom: 1px;
+		transition: color 0.15s ease, border-color 0.15s ease;
+	}
+
+	.live2d-author a:hover {
+		color: oklch(0.1 0 0);
+		border-color: oklch(0.1 0 0);
+	}
+
+	:root.dark .live2d-author {
+		color: oklch(0.85 0 0);
+		text-shadow: 0 1px 3px oklch(0 0 0 / 0.6);
+	}
+
+	:root.dark .live2d-author a {
+		color: oklch(0.95 0 0);
+		border-bottom-color: oklch(0.95 0 0);
+	}
+
+	:root.dark .live2d-author a:hover {
+		color: oklch(1 0 0);
+		border-color: oklch(1 0 0);
+	}
+
+	.live2d-group-indicator {
+		position: absolute;
+		top: -20px;
+		left: 50%;
+		transform: translateX(-50%);
+		font-size: 11px;
+		padding: 2px 8px;
+		background: oklch(0.2 0 0 / 0.7);
+		color: oklch(0.95 0 0);
+		border-radius: 3px;
+		opacity: 0;
+		transition: opacity 0.3s ease;
+		pointer-events: none;
+		white-space: nowrap;
+		backdrop-filter: blur(4px);
+	}
+
+	:root.dark .live2d-group-indicator {
+		background: oklch(0.9 0 0 / 0.7);
+		color: oklch(0.1 0 0);
+	}
+
+	.live2d-group-indicator.show {
+		opacity: 1;
+	}
+
+	.live2d-trigger {
+		position: fixed;
+		left: 0;
+		bottom: 60px;
+		transform: translateX(-100%);
+		z-index: 998;
+		pointer-events: auto;
+		cursor: pointer;
+		transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	.live2d-trigger.visible {
+		transform: translateX(calc(-100% + 12px));
+	}
+
+	.live2d-trigger.visible:hover {
+		transform: translateX(0);
+	}
+
+	.live2d-trigger-inner {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 10px 14px 10px 10px;
+		background: oklch(0.1 0 0 / 0.9);
+		border: 1px solid oklch(0.3 0 0);
+		border-left: none;
+		border-radius: 0 8px 0 0;
+		color: oklch(0.95 0 0);
+		font-size: 13px;
+		font-weight: 500;
+		white-space: nowrap;
+		backdrop-filter: blur(8px);
+		box-shadow: 2px -2px 12px oklch(0 0 0 / 0.2);
+		transition: background 0.2s ease, box-shadow 0.2s ease;
+	}
+
+	.live2d-trigger:hover .live2d-trigger-inner {
+		background: oklch(0.15 0 0 / 0.95);
+		box-shadow: 2px -4px 16px oklch(0 0 0 / 0.3);
+	}
+
+	.live2d-trigger-text {
+		opacity: 0.8;
+		transition: opacity 0.2s ease;
+	}
+
+	.live2d-trigger:hover .live2d-trigger-text {
+		opacity: 1;
+	}
+
+	:root.dark .live2d-trigger-inner {
+		background: oklch(0.95 0 0 / 0.9);
+		border-color: oklch(0.7 0 0);
+		color: oklch(0.15 0 0);
+		box-shadow: 2px -2px 12px oklch(0 0 0 / 0.15);
+	}
+
+	:root.dark .live2d-trigger:hover .live2d-trigger-inner {
+		background: oklch(0.9 0 0 / 0.95);
+		box-shadow: 2px -4px 16px oklch(0 0 0 / 0.2);
+	}
+
+	@media (max-width: 768px) {
+		.live2d-widget {
+			transform: scale(0.85);
+			transform-origin: bottom left;
+		}
+
+		.live2d-trigger {
+			display: none;
+		}
+	}
 </style>

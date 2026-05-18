@@ -103,7 +103,7 @@ const fontFamilyStyle = generateFontFamilyStyle();
   fontConfig.enable &&
     fontConfig.preload &&
     selectedFonts
-      .filter((font) => !font.src.startsWith("http"))
+      .filter((font) => !font.src.startsWith("http") && !font.src.endsWith(".css"))
       .map((font) => (
         <link
           rel="preload"
