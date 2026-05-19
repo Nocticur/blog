@@ -39,6 +39,28 @@ let activeFilters: ActiveFilter[] = [];
 let primaryFilter: ActiveFilter | null = null;
 let secondaryFilters: ActiveFilter[] = [];
 let filteredPostCount = 0;
+let categoryColors: Map<string, string> = new Map();
+
+const categoryColorPalette = [
+	"text-amber-400",
+	"text-rose-400",
+	"text-emerald-400",
+	"text-blue-400",
+	"text-purple-400",
+	"text-pink-400",
+	"text-teal-400",
+	"text-orange-400",
+	"text-cyan-400",
+	"text-indigo-400",
+	"text-fuchsia-400",
+	"text-lime-400",
+	"text-red-400",
+	"text-violet-400",
+	"text-cyan-500",
+	"text-amber-500",
+	"text-rose-500",
+	"text-emerald-500",
+];
 
 function formatDate(date: Date) {
 	const month = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -67,6 +89,30 @@ function formatFilterSummary(filters: ActiveFilter[]) {
 	return filters
 		.map((filter) => `${i18n(filter.labelKey)}: ${formatFilterValues(filter)}`)
 		.join("  ·  ");
+}
+
+function getCategoryColor(categoryName: string): string {
+	return categoryColors.get(categoryName) || "text-gray-400";
+}
+
+function normalizeCategoryName(name: string): string {
+	return (name || "").trim();
+}
+
+function initializeCategoryColors(posts: Post[]) {
+	const categorySet = new Set<string>();
+	posts.forEach((post) => {
+		const category = normalizeCategoryName(post.data.category) || i18n(I18nKey.uncategorized);
+		categorySet.add(category);
+	});
+
+	const sortedCategories = Array.from(categorySet).sort((a, b) =>
+		a.localeCompare(b, "zh-CN"),
+	);
+
+	sortedCategories.forEach((category, index) => {
+		categoryColors.set(category, categoryColorPalette[index % categoryColorPalette.length]);
+	});
 }
 
 onMount(async () => {
@@ -118,6 +164,8 @@ onMount(async () => {
 		.sort((a, b) => b.data.published.getTime() - a.data.published.getTime());
 
 	filteredPostCount = filteredPosts.length;
+
+	initializeCategoryColors(filteredPosts);
 
 	const grouped = filteredPosts.reduce(
 		(acc, post) => {
@@ -204,13 +252,20 @@ onMount(async () => {
 							></div>
 						</div>
 
-						<!-- post title -->
+						<!-- post title with category -->
 						<div
 								class="w-[70%] md:max-w-[65%] md:w-[65%] text-left font-bold
                      group-hover:translate-x-1 transition-all group-hover:text-(--primary)
-                     text-75 pr-8 whitespace-nowrap text-ellipsis overflow-hidden"
+                     text-75 pr-8 flex items-center gap-3"
 						>
-							{post.data.title}
+							{#if post.data.category || (!post.data.category && categoryColors.has(i18n(I18nKey.uncategorized)))}
+								<span
+										class="shrink-0 text-xs font-bold scale-125 {getCategoryColor(normalizeCategoryName(post.data.category) || i18n(I18nKey.uncategorized))}"
+								>
+									{normalizeCategoryName(post.data.category) || i18n(I18nKey.uncategorized)}
+								</span>
+							{/if}
+							<span class="flex-1">{post.data.title}</span>
 						</div>
 
 						<!-- tag list -->
