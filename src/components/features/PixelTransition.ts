@@ -33,7 +33,6 @@ let blocks: Block[] = [];
 let currentPhase: Phase = "idle";
 let maskEl: HTMLDivElement | null = null;
 let activeTimeline: gsap.core.Timeline | null = null;
-let invasionResolve: (() => void) | null = null;
 
 /**
  * 检测当前主题
@@ -49,9 +48,7 @@ function getThemeColors() {
 	const isDark = detectTheme();
 	return {
 		isDark,
-		blockColors: isDark
-			? ["#e2e8f0", "#262626"]
-			: ["#000000", "#FFFFFF"],
+		blockColors: isDark ? ["#e2e8f0", "#262626"] : ["#000000", "#FFFFFF"],
 		maskBg: isDark ? "#262626" : "#ffffff",
 		textColor: isDark ? "#ffffff" : "#000000",
 		shadow: isDark
@@ -91,7 +88,18 @@ function generateBlocks(): Block[] {
 		else if (min === dTop) startY = -100;
 		else if (min === dBottom) startY = 100;
 
-		arr.push({ id: i, el: null!, w, h, left, top, color, startX, startY, dist });
+		arr.push({
+			id: i,
+			el: null as unknown as HTMLDivElement,
+			w,
+			h,
+			left,
+			top,
+			color,
+			startX,
+			startY,
+			dist,
+		});
 	}
 
 	return arr.sort((a, b) => b.dist - a.dist);
@@ -234,10 +242,12 @@ function createOverlay(): HTMLDivElement {
  */
 function animateInvasion(): Promise<void> {
 	return new Promise((resolve) => {
-		if (!overlay) { resolve(); return; }
+		if (!overlay) {
+			resolve();
+			return;
+		}
 
 		currentPhase = "invasion";
-		invasionResolve = resolve;
 
 		// 覆盖层整体淡入
 		gsap.set(overlay, { opacity: 1 });
@@ -245,7 +255,6 @@ function animateInvasion(): Promise<void> {
 		const tl = gsap.timeline({
 			onComplete: () => {
 				activeTimeline = null;
-				invasionResolve = null;
 				resolve();
 			},
 		});
@@ -302,7 +311,7 @@ function animateLoading(): void {
 
 	// 文字逐个弹入
 	const spans = maskEl.querySelectorAll("span");
-	spans.forEach((span, i) => {
+	spans.forEach((span, _i) => {
 		tl.to(
 			span,
 			{
@@ -314,7 +323,7 @@ function animateLoading(): void {
 				duration: 0.5,
 				ease: "back.out(1.7)",
 			},
-			`>-0.35`,
+			">-0.35",
 		);
 	});
 
@@ -349,7 +358,9 @@ function animateReveal(): Promise<void> {
 
 		// 停止 loading 阶段的呼吸动画
 		const spans = maskEl.querySelectorAll("span");
-		spans.forEach((span) => gsap.killTweensOf(span));
+		spans.forEach((span) => {
+			gsap.killTweensOf(span);
+		});
 
 		const tl = gsap.timeline({
 			onComplete: () => {
@@ -411,7 +422,6 @@ function cleanup() {
 	blocks = [];
 	maskEl = null;
 	currentPhase = "idle";
-	invasionResolve = null;
 }
 
 /**

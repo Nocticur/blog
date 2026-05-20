@@ -14,5 +14,5 @@ const widgetId = `music-widget-${Math.random().toString(36).substring(2, 9)}`;
 ---
 
 <WidgetLayout id={`${widgetId}-layout`} class={className} style={style} name={i18n(I18nKey.music)}>
-    <MusicPlayer id={widgetId} />
+    <MusicPlayer id={widgetId} lazy />
 </WidgetLayout>

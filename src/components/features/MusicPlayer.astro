@@ -8,8 +8,10 @@ interface Props {
 	class?: string;
 	style?: string;
 	id?: string;
+	/** 延迟初始化：不自动触发 mgr.init()，由外部（如工具栏按钮点击）触发 */
+	lazy?: boolean;
 }
-const { class: className, style, id } = Astro.props;
+const { class: className, style, id, lazy = false } = Astro.props;
 
 const config = musicPlayerConfig;
 
@@ -177,9 +179,10 @@ const widgetId =
 </div>
 </template>
 
-<script define:vars={{ viewConfigStr, widgetId }} is:inline>
+<script define:vars={{ viewConfigStr, widgetId, lazy }} is:inline>
 (function () {
     var cfg = JSON.parse(viewConfigStr);
+    var isLazy = !!lazy;
     var widget = document.getElementById(widgetId);
     if (!widget) return;
 
@@ -541,7 +544,15 @@ const widgetId =
     });
 
     // ── Button click delegates ───────────────────────────────
-    ui.btnPlay.addEventListener('click', function () { mgr.togglePlay(); });
+    ui.btnPlay.addEventListener('click', function () {
+        // Lazy 模式下，首次点击播放按钮时触发初始化
+        if (!mgr.getState().initialized) {
+            setLoading(true);
+            mgr.init();
+            return;
+        }
+        mgr.togglePlay();
+    });
     ui.btnNext.addEventListener('click', function () { mgr.playNext(); });
     ui.btnPrev.addEventListener('click', function () { mgr.playPrev(); });
     ui.btnRepeat.addEventListener('click', function () { mgr.cyclePlayMode(); });
@@ -680,11 +691,12 @@ const widgetId =
     if (currentState.initialized) {
         // Manager already initialized (late mount) – sync all UI
         syncAll();
-    } else {
-        // First widget to mount – show loading and trigger init
+    } else if (!isLazy) {
+        // 非 Lazy 模式：立即触发初始化
         setLoading(true);
         mgr.init();
     }
+    // Lazy 模式：不触发 init()，等待外部调用（如工具栏按钮点击）
 })();
 </script>
 

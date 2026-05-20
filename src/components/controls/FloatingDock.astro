@@ -115,7 +115,7 @@ const tags = await getTagList();
 {musicPlayerConfig.showInNavbar !== false && (
 	<div class="dock-drawer dock-drawer-closed" id="dock-drawer-music">
 		<div class="dock-drawer-title">[ {i18n(I18nKey.music)} ]</div>
-		<MusicPlayer />
+		<MusicPlayer lazy />
 	</div>
 )}
 
@@ -299,6 +299,23 @@ const tags = await getTagList();
 				document.getElementById("search-panel")?.classList.add("float-panel-closed");
 			}
 		});
+
+		// 音乐抽屉懒加载：首次打开时触发 MusicManager 初始化
+		const musicDrawerBtn = document.getElementById("dock-music-btn");
+		const musicDrawerEl = document.getElementById("dock-drawer-music");
+		if (musicDrawerBtn && musicDrawerEl) {
+			musicDrawerBtn.addEventListener("click", () => {
+				const mgr = window.__fireflyMusic;
+				if (mgr && !mgr.getState().initialized) {
+					const widget = musicDrawerEl.querySelector(".music-player-widget");
+					const loadingEl = widget?.querySelector(".music-loading");
+					if (loadingEl) {
+						loadingEl.classList.remove("opacity-0", "pointer-events-none");
+					}
+					mgr.init();
+				}
+			});
+		}
 
 		// Spine 显隐切换（简单切换，保持原有行为）
 		function bindSpineToggle(btnId: string, targetId: string, storageKey: string) {
