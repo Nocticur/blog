@@ -73,7 +73,7 @@ export default defineConfig({
 				"#left-sidebar-dynamic",
 				"#right-sidebar-dynamic",
 			],
-			smoothScrolling: false,
+			smoothScrolling: true,
 			cache: true,
 			preload: true,
 			accessibility: true,

@@ -107,7 +107,7 @@ const description =
       <div class="friends-grid">
         {
           items.map((item) => (
-            <div class="friend-card" data-tags={item.tags?.join(",")}>
+            <div class="friend-card" data-tags={item.tags?.join(",")} data-title={item.title}>
               <FriendCard
                 title={item.title}
                 href={item.siteurl}
