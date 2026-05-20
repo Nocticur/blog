@@ -50,10 +50,10 @@ function getThemeColors() {
 	return {
 		isDark,
 		blockColors: isDark
-			? ["#1a1a2e", "#16213e"]
+			? ["#e2e8f0", "#262626"]
 			: ["#000000", "#FFFFFF"],
-		maskBg: isDark ? "#0f172a" : "#ffffff",
-		textColor: isDark ? "#e2e8f0" : "#000000",
+		maskBg: isDark ? "#262626" : "#ffffff",
+		textColor: isDark ? "#ffffff" : "#000000",
 		shadow: isDark
 			? "0 4px 30px rgba(0,0,0,0.4)"
 			: "0 4px 30px rgba(0,0,0,0.15)",
@@ -133,7 +133,7 @@ function createOverlay(): HTMLDivElement {
 	container.style.cssText = `
 		position: fixed;
 		inset: 0;
-		z-index: 9999;
+		z-index: 999999;
 		pointer-events: none;
 		overflow: hidden;
 		display: flex;
@@ -218,7 +218,12 @@ function createOverlay(): HTMLDivElement {
 	container.appendChild(mask);
 	maskEl = mask;
 
+	// 确保插入到 body 最末尾，保证层叠顺序最高
 	document.body.appendChild(container);
+	// 强制将 overlay 移到 body 最末尾（防止其他动态插入的元素覆盖）
+	if (container !== document.body.lastElementChild) {
+		document.body.appendChild(container);
+	}
 	overlay = container;
 
 	return container;
@@ -261,6 +266,19 @@ function animateInvasion(): Promise<void> {
 				i * 0.015,
 			);
 		});
+
+		// 在入侵动画末尾提前启动遮罩淡入，消除停滞感
+		if (maskEl) {
+			tl.to(
+				maskEl,
+				{
+					opacity: 1,
+					duration: 0.3,
+					ease: "power2.in",
+				},
+				"-=0.25",
+			);
+		}
 	});
 }
 
@@ -275,11 +293,11 @@ function animateLoading(): void {
 	const tl = gsap.timeline();
 	activeTimeline = tl;
 
-	// 遮罩淡入
+	// 遮罩确保完全显示（入侵末尾已提前启动淡入，此处补齐到 opacity:1）
 	tl.to(maskEl, {
 		opacity: 1,
-		duration: 0.5,
-		ease: "power2.inOut",
+		duration: 0.2,
+		ease: "power2.out",
 	});
 
 	// 文字逐个弹入

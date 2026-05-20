@@ -264,12 +264,9 @@ const siteLang = lang.replace("_", "-");
     });
   }
 
-  const setup = () => {
-    // 动态导入像素过渡动画
-    let pixelTransitionModule: typeof import("@/components/features/PixelTransition") | null = null;
-    import("@/components/features/PixelTransition").then((mod) => {
-      pixelTransitionModule = mod;
-    });
+  const setup = async () => {
+    // 静态导入像素过渡动画，确保首次点击时模块已就绪
+    const pixelTransitionModule = await import("@/components/features/PixelTransition");
 
     // 追踪是否处于像素过渡中
     let isPixelActive = false;
@@ -290,11 +287,9 @@ const siteLang = lang.replace("_", "-");
       } else {
         document.documentElement.classList.add("is-page-transitioning");
         // 启动像素入侵过渡动画
-        if (pixelTransitionModule) {
-          isPixelActive = true;
-          document.documentElement.classList.add("is-pixel-transitioning");
-          pixelTransitionModule.startInvasion();
-        }
+        isPixelActive = true;
+        document.documentElement.classList.add("is-pixel-transitioning");
+        pixelTransitionModule.startInvasion();
       }
     });
 
@@ -339,7 +334,7 @@ const siteLang = lang.replace("_", "-");
 
     window.swup.hooks.on("visit:start", (visit: any) => {
       // 如果还没启动像素过渡（程序化导航如 navigateToPage），在这里启动
-      if (!isPixelActive && pixelTransitionModule) {
+      if (!isPixelActive) {
         const targetUrl = visit?.to?.url || "";
         const targetPathname = (() => {
           try { return new URL(targetUrl, window.location.href).pathname; } catch { return targetUrl; }
@@ -383,7 +378,7 @@ const siteLang = lang.replace("_", "-");
 
     // 导航失败时取消像素过渡
     window.swup.hooks.on("visit:error", () => {
-      if (pixelTransitionModule && isPixelActive) {
+      if (isPixelActive) {
         pixelTransitionModule.cancelTransition();
       }
       isPixelActive = false;
@@ -404,7 +399,7 @@ const siteLang = lang.replace("_", "-");
       }
 
       // 触发像素退场揭示动画
-      const revealPromise = pixelTransitionModule && isPixelActive
+      const revealPromise = isPixelActive
         ? pixelTransitionModule.triggerReveal()
         : Promise.resolve();
 
