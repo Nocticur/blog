@@ -91,7 +91,6 @@ function getCookie(cookieString, name) {
 // ── 留言板 API ──────────────────────────────────────────
 
 const GB_HEADERS = {
-	"Access-Control-Allow-Origin": "*",
 	"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 	"Access-Control-Allow-Headers": "Content-Type",
 	"Content-Type": "application/json",
@@ -222,9 +221,19 @@ const BLOCKED_KEYWORDS = [
 
 const RATE_LIMIT_WINDOW = 60;
 const RATE_LIMIT_MAX = 5;
+const AI_RATE_LIMIT_WINDOW = 60;
+const AI_RATE_LIMIT_MAX = 10;
+const VOTE_RATE_LIMIT_WINDOW = 60;
+const VOTE_RATE_LIMIT_MAX = 30;
 
-async function checkRateLimit(env, ip) {
-	const key = `guestbook:ratelimit:${ip}`;
+async function checkRateLimit(
+	env,
+	ip,
+	scope = "guestbook",
+	max = RATE_LIMIT_MAX,
+	windowSeconds = RATE_LIMIT_WINDOW,
+) {
+	const key = `${scope}:ratelimit:${ip}`;
 	const record = await env.VISITOR_KV.get(key);
 
 	if (record) {
@@ -232,28 +241,28 @@ async function checkRateLimit(env, ip) {
 		const now = Date.now();
 		const elapsed = (now - data.timestamp) / 1000;
 
-		if (elapsed < RATE_LIMIT_WINDOW) {
-			if (data.count >= RATE_LIMIT_MAX) {
+		if (elapsed < windowSeconds) {
+			if (data.count >= max) {
 				return {
 					allowed: false,
 					remaining: 0,
-					retryAfter: Math.ceil(RATE_LIMIT_WINDOW - elapsed),
+					retryAfter: Math.ceil(windowSeconds - elapsed),
 				};
 			}
 			data.count++;
 			await env.VISITOR_KV.put(key, JSON.stringify(data), {
-				expirationTtl: RATE_LIMIT_WINDOW,
+				expirationTtl: windowSeconds,
 			});
-			return { allowed: true, remaining: RATE_LIMIT_MAX - data.count };
+			return { allowed: true, remaining: max - data.count };
 		}
 	}
 
 	await env.VISITOR_KV.put(
 		key,
 		JSON.stringify({ count: 1, timestamp: Date.now() }),
-		{ expirationTtl: RATE_LIMIT_WINDOW },
+		{ expirationTtl: windowSeconds },
 	);
-	return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
+	return { allowed: true, remaining: max - 1 };
 }
 
 function validateInput(author, content) {
@@ -343,6 +352,27 @@ async function handleCreateMessage(env, request) {
 }
 
 async function handleVote(env, id, request) {
+	const ip =
+		request.headers.get("CF-Connecting-IP") ||
+		request.headers.get("X-Forwarded-For") ||
+		"unknown";
+	const rateLimit = await checkRateLimit(
+		env,
+		ip,
+		"guestbook:vote",
+		VOTE_RATE_LIMIT_MAX,
+		VOTE_RATE_LIMIT_WINDOW,
+	);
+	if (!rateLimit.allowed) {
+		return Response.json(
+			{ error: "Too many requests, please try again later" },
+			{
+				status: 429,
+				headers: { ...GB_HEADERS, "Retry-After": String(rateLimit.retryAfter) },
+			},
+		);
+	}
+
 	const body = await request.json().catch(() => ({}));
 	const type = body.type; // "agree" | "disagree" | "neutral"
 
@@ -371,10 +401,36 @@ async function handleVote(env, id, request) {
 // ── AI 搜索 API ──────────────────────────────────────
 
 const AI_HEADERS = {
-	"Access-Control-Allow-Origin": "*",
 	"Access-Control-Allow-Methods": "POST, OPTIONS",
 	"Access-Control-Allow-Headers": "Content-Type",
 };
+
+function getClientIp(request) {
+	return (
+		request.headers.get("CF-Connecting-IP") ||
+		request.headers.get("X-Forwarded-For") ||
+		"unknown"
+	);
+}
+
+function getAllowedOrigins(env, request) {
+	const url = new URL(request.url);
+	const configured = String(env.ALLOWED_ORIGINS || env.PUBLIC_SITE_URL || "")
+		.split(",")
+		.map((item) => item.trim())
+		.filter(Boolean);
+	return new Set([url.origin, ...configured]);
+}
+
+function getAIHeaders(request, env) {
+	const headers = { ...AI_HEADERS };
+	const origin = request.headers.get("Origin");
+	if (!origin) return headers;
+	if (!getAllowedOrigins(env, request).has(origin)) return null;
+	headers["Access-Control-Allow-Origin"] = origin;
+	headers.Vary = "Origin";
+	return headers;
+}
 
 // 获取配置：非敏感项从 aiSearchConfig 读取，仅 API Key 从环境变量读取
 function getAiConfig(env) {
@@ -496,25 +552,54 @@ async function* readWorkersAIStream(stream) {
 }
 
 async function handleAIChat(request, env) {
+	const headers = getAIHeaders(request, env);
+	if (!headers) {
+		return Response.json({ error: "Origin not allowed" }, { status: 403 });
+	}
+
 	if (request.method === "OPTIONS") {
-		return new Response(null, { headers: AI_HEADERS });
+		return new Response(null, { headers });
 	}
 	if (request.method !== "POST") {
 		return new Response("Method Not Allowed", {
 			status: 405,
-			headers: AI_HEADERS,
+			headers,
 		});
 	}
 
 	try {
+		const rateLimit = await checkRateLimit(
+			env,
+			getClientIp(request),
+			"ai-chat",
+			AI_RATE_LIMIT_MAX,
+			AI_RATE_LIMIT_WINDOW,
+		);
+		if (!rateLimit.allowed) {
+			return Response.json(
+				{ error: "Too many requests, please try again later" },
+				{
+					status: 429,
+					headers: { ...headers, "Retry-After": String(rateLimit.retryAfter) },
+				},
+			);
+		}
+
 		const body = await request.json().catch(() => ({}));
 		const question = (body.question || "").trim();
-		const history = body.history || [];
+		const history = Array.isArray(body.history) ? body.history : [];
 
 		if (!question) {
 			return Response.json(
 				{ error: "question is required" },
-				{ status: 400, headers: AI_HEADERS },
+				{ status: 400, headers },
+			);
+		}
+
+		if (question.length > 1000) {
+			return Response.json(
+				{ error: "question is too long" },
+				{ status: 400, headers },
 			);
 		}
 
@@ -640,7 +725,14 @@ async function handleAIChat(request, env) {
 博客内容：
 ${context || "（未检索到相关内容）"}`;
 
-		const safeHistory = history.filter((m) => m.role !== "system").slice(-6);
+		const safeHistory = history
+			.filter(
+				(m) =>
+					(m.role === "user" || m.role === "assistant") &&
+					typeof m.content === "string",
+			)
+			.slice(-6)
+			.map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
 
 		const messages = [
 			{ role: "system", content: systemPrompt },
@@ -656,7 +748,7 @@ ${context || "（未检索到相关内容）"}`;
 			console.error("AI generation error:", err);
 			return Response.json(
 				{ error: `AI generation failed: ${err.message}` },
-				{ status: 500, headers: AI_HEADERS },
+				{ status: 500, headers },
 			);
 		}
 
@@ -721,7 +813,7 @@ ${context || "（未检索到相关内容）"}`;
 
 		return new Response(readable, {
 			headers: {
-				...AI_HEADERS,
+				...headers,
 				"Content-Type": "text/event-stream",
 				"Cache-Control": "no-cache",
 				Connection: "keep-alive",
@@ -731,7 +823,7 @@ ${context || "（未检索到相关内容）"}`;
 		console.error("AI Chat error:", err);
 		return Response.json(
 			{ error: err.message || "Internal server error" },
-			{ status: 500, headers: AI_HEADERS },
+			{ status: 500, headers },
 		);
 	}
 }

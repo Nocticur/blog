@@ -91,24 +91,94 @@ const labels = {
   var errorEl = document.getElementById('password-error');
   var contentEl = document.getElementById('decrypted-content');
 
+  function isSafeUrl(value) {
+    // biome-ignore lint/complexity/useRegexLiterals: avoids control-character ranges in regex literals.
+    var trimmed = value
+      .trim()
+      .replace(new RegExp('[\\u0000-\\u001F\\u007F\\s]+', 'g'), '');
+    return /^(https?:|mailto:|tel:|\/|#|\.\/|\.\.\/|\?)/i.test(trimmed);
+  }
+
+  function sanitizeDecryptedHtml(html) {
+    var template = document.createElement('template');
+    template.innerHTML = html;
+
+    var blockedTags = {
+      script: true,
+      style: true,
+      iframe: true,
+      object: true,
+      embed: true,
+      link: true,
+      meta: true,
+      form: true,
+      input: true,
+      button: true,
+      svg: true,
+      math: true
+    };
+    var allowedAttrs = {
+      href: true,
+      src: true,
+      alt: true,
+      title: true,
+      class: true,
+      id: true,
+      target: true,
+      rel: true,
+      role: true,
+      'aria-label': true,
+      'aria-hidden': true,
+      'data-mermaid-code': true,
+      'data-fancybox': true,
+      'data-caption': true
+    };
+
+    var elements = template.content.querySelectorAll('*');
+    for (var i = 0; i < elements.length; i++) {
+      var el = elements[i];
+      var tagName = el.tagName.toLowerCase();
+      if (blockedTags[tagName]) {
+        el.remove();
+        continue;
+      }
+
+      for (var j = el.attributes.length - 1; j >= 0; j--) {
+        var attr = el.attributes[j];
+        var name = attr.name.toLowerCase();
+        var value = attr.value;
+
+        if (name.indexOf('on') === 0 || name === 'style' || name === 'srcdoc') {
+          el.removeAttribute(attr.name);
+          continue;
+        }
+
+        if (!allowedAttrs[name] && name.indexOf('data-') !== 0) {
+          el.removeAttribute(attr.name);
+          continue;
+        }
+
+        if ((name === 'href' || name === 'src') && !isSafeUrl(value)) {
+          el.removeAttribute(attr.name);
+        }
+      }
+
+      if (tagName === 'a' && el.getAttribute('target') === '_blank') {
+        el.setAttribute('rel', 'noopener noreferrer');
+      }
+    }
+
+    return template.innerHTML;
+  }
+
   function showContent(html) {
-    contentEl.innerHTML = html;
+    contentEl.innerHTML = sanitizeDecryptedHtml(html);
     contentEl.classList.remove('hidden');
     ui.classList.add('hidden');
     // Scripts injected via innerHTML are inert — re-create them so they execute
     // Reset mermaid singleton so its render script re-initializes after decryption
     if (typeof window.mermaidInitialized !== 'undefined') {
       window.mermaidInitialized = false;
-    }
-    var scripts = contentEl.querySelectorAll('script');
-    for (var i = 0; i < scripts.length; i++) {
-      var old = scripts[i];
-      var ns = document.createElement('script');
-      for (var j = 0; j < old.attributes.length; j++) {
-        ns.setAttribute(old.attributes[j].name, old.attributes[j].value);
-      }
-      ns.textContent = old.textContent;
-      old.parentNode.replaceChild(ns, old);
     }
     // Re-init TOC after content is in DOM
     setTimeout(function() {

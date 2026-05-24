@@ -158,11 +158,100 @@ function scrollToBottom() {
 	});
 }
 
+function escapeHtml(text: string): string {
+	return text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#039;");
+}
+
+function isSafeUrl(value: string): boolean {
+	const trimmed = value
+		.trim()
+		// biome-ignore lint/complexity/useRegexLiterals: avoids control-character ranges in regex literals.
+		.replace(new RegExp("[\\u0000-\\u001F\\u007F\\s]+", "g"), "");
+	return /^(https?:|mailto:|tel:|\/|#|\.\/|\.\.\/|\?)/i.test(trimmed);
+}
+
+function sanitizeHtml(html: string): string {
+	if (typeof document === "undefined") return escapeHtml(html);
+
+	const blockedTags = new Set([
+		"script",
+		"style",
+		"iframe",
+		"object",
+		"embed",
+		"link",
+		"meta",
+		"form",
+		"input",
+		"button",
+		"svg",
+		"math",
+	]);
+	const allowedAttrs = new Set([
+		"href",
+		"src",
+		"alt",
+		"title",
+		"class",
+		"id",
+		"target",
+		"rel",
+		"role",
+		"aria-label",
+		"aria-hidden",
+	]);
+
+	const template = document.createElement("template");
+	template.innerHTML = html;
+	const elements = Array.from(template.content.querySelectorAll("*"));
+
+	for (const el of elements) {
+		if (blockedTags.has(el.tagName.toLowerCase())) {
+			el.remove();
+			continue;
+		}
+
+		for (const attr of Array.from(el.attributes)) {
+			const name = attr.name.toLowerCase();
+			const value = attr.value;
+			const isDataAttr = name.startsWith("data-");
+
+			if (name.startsWith("on") || name === "style" || name === "srcdoc") {
+				el.removeAttribute(attr.name);
+				continue;
+			}
+
+			if (!allowedAttrs.has(name) && !isDataAttr) {
+				el.removeAttribute(attr.name);
+				continue;
+			}
+
+			if ((name === "href" || name === "src") && !isSafeUrl(value)) {
+				el.removeAttribute(attr.name);
+			}
+		}
+
+		if (
+			el.tagName.toLowerCase() === "a" &&
+			el.getAttribute("target") === "_blank"
+		) {
+			el.setAttribute("rel", "noopener noreferrer");
+		}
+	}
+
+	return template.innerHTML;
+}
+
 function renderMd(text: string): string {
 	try {
-		return marked.parse(text, { breaks: true }) as string;
+		return sanitizeHtml(marked.parse(text, { breaks: true }) as string);
 	} catch {
-		return text;
+		return escapeHtml(text);
 	}
 }
 

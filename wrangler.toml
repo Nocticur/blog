@@ -11,6 +11,8 @@ NODE_VERSION = "22"
 # 敏感信息（API Key）请在 Cloudflare Dashboard → Workers & Pages →
 # 你的 Worker → Settings → Variables and Secrets 中添加 Secret：
 # AI_API_KEY
+# 可选变量：
+# ALLOWED_ORIGINS = "https://your-domain.example"
 
 [[kv_namespaces]]
 binding = "VISITOR_KV"
