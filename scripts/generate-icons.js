@@ -67,6 +67,8 @@ function extractIconNames(content) {
 	const patterns = [
 		// icon="xxx:yyy" 或 icon='xxx:yyy' (HTML 属性)
 		/icon=["']([a-z0-9-]+:[a-z0-9-]+)["']/gi,
+		// <Icon name="xxx:yyy" /> 或 <Icon name='xxx:yyy' />
+		/<Icon\b[^>]*\sname=["']([a-z0-9-]+:[a-z0-9-]+)["']/gi,
 		// icon: "xxx:yyy" 或 icon: 'xxx:yyy' (JS/TS 对象属性)
 		/icon:\s*["']([a-z0-9-]+:[a-z0-9-]+)["']/gi,
 		// icon={`xxx:yyy`}
