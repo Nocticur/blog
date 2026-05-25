@@ -104,11 +104,12 @@ onMount(() => {
     background: var(--card-bg, rgba(255, 255, 255, 0.1));
     border-radius: 0.75rem;
     padding: 0.25rem;
-    border: 1px solid var(--line-divider, rgba(0, 0, 0, 0.1));
+    border: 2px solid #000;
     box-shadow: 0 1px 3px oklch(0.5 0 0 / 0.08);
   }
 
   :root.dark .animated-tabs {
+    border-color: #fff;
     box-shadow: 0 1px 3px oklch(0 0 0 / 0.2);
   }
 
@@ -149,10 +150,6 @@ onMount(() => {
 
   .tab-button.active {
     color: #fff;
-  }
-
-  :root.dark .animated-tabs {
-    border-color: #fff;
   }
 
   :root.dark .tab-indicator {

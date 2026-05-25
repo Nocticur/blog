@@ -54,7 +54,7 @@ const categories = collectionsApiConfig.categories?.length
                   <span class="text-lg font-bold text-neutral-900 dark:text-neutral-100">{cat}</span>
                 </div>
                 <span class="text-xs text-neutral-400 dark:text-neutral-500">{catApis.length}</span>
-                <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
+                <div class="flex-1 h-[2px] bg-black dark:bg-white" />
               </div>
 
               <!-- 分类下的 API 卡片 -->
@@ -154,29 +154,31 @@ const categories = collectionsApiConfig.categories?.length
     flex-direction: column;
     padding: 1.25rem;
     border-radius: var(--radius-large, 0.75rem);
-    border: 1px solid oklch(0.85 0 0);
-    background: transparent;
+    border: 2px solid #000;
+    background: #fff;
     text-decoration: none;
     overflow: hidden;
     opacity: 0;
     transform: translateY(20px);
     animation: cardSlideIn 0.5s ease-out forwards;
-    transition: border-color 300ms ease, box-shadow 300ms ease, transform 300ms ease;
+    transition: border-color 300ms ease, box-shadow 300ms ease, transform 300ms ease, background-color 300ms ease;
   }
 
   :root.dark .api-card {
-    border-color: oklch(0.25 0 0);
+    border-color: #fff;
+    background: #000;
   }
 
   .api-card:hover {
-    border-color: oklch(0.5 0 0);
-    box-shadow: 0 4px 20px oklch(0.5 0 0 / 0.08);
+    border-color: #000;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     transform: translateY(-2px);
   }
 
   :root.dark .api-card:hover {
-    border-color: oklch(0.5 0 0);
-    box-shadow: 0 4px 20px oklch(0 0 0 / 0.15);
+    border-color: #fff;
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
   }
 
   /* 右上角跳转图标 */

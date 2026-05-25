@@ -33,16 +33,16 @@ const size = config.size || { width: 280, height: 250 };
 
 	<div class="live2d-toolbar">
 		<button class="live2d-toolbar-btn" id="toolbar-drag" title="移动">
-			<Icon name="material-symbols:drag-indicator" class="text-base" />
+			<Icon name="material-symbols:drag-indicator" class="text-lg" />
 		</button>
 		<button class="live2d-toolbar-btn" id="toolbar-switch" title="切换动画组">
-			<Icon name="material-symbols:swap-horiz" class="text-base" />
+			<Icon name="material-symbols:swap-horiz" class="text-lg" />
 		</button>
 		<button class="live2d-toolbar-btn active" id="toolbar-info" title="作者信息">
-			<Icon name="material-symbols:info" class="text-base" />
+			<Icon name="material-symbols:info" class="text-lg" />
 		</button>
 		<button class="live2d-toolbar-btn" id="toolbar-close" title="关闭">
-			<Icon name="material-symbols:close" class="text-base" />
+			<Icon name="material-symbols:close" class="text-lg" />
 		</button>
 	</div>
 
@@ -1243,11 +1243,11 @@ function initTrigger() {
 
 	.live2d-toolbar {
 		position: absolute;
-		right: -34px;
+		right: -2.5rem;
 		top: 8px;
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
+		gap: 0.375rem;
 		opacity: 0;
 		transition: opacity 0.25s ease;
 		pointer-events: none;
@@ -1258,8 +1258,8 @@ function initTrigger() {
 		content: "";
 		position: absolute;
 		top: 0;
-		right: -40px;
-		width: 46px;
+		right: -2.75rem;
+		width: 3rem;
 		height: 100%;
 		z-index: 999;
 	}
@@ -1270,44 +1270,46 @@ function initTrigger() {
 	}
 
 	.live2d-toolbar-btn {
-		width: 30px;
-		height: 30px;
+		width: 2.125rem;
+		height: 2.125rem;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background: oklch(1 0 0);
-		border: 2px solid oklch(0 0 0);
-		border-radius: 50%;
+		background: #fff;
+		border: 2px solid #000;
+		border-radius: 0.5rem;
 		cursor: pointer;
-		transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-		color: oklch(0 0 0);
+		transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+		color: #000;
 		backdrop-filter: blur(4px);
 	}
 
 	:root.dark .live2d-toolbar-btn {
-		background: oklch(0 0 0);
-		border-color: oklch(1 0 0);
-		color: oklch(1 0 0);
+		background: #000;
+		border-color: #fff;
+		color: #fff;
 	}
 
 	.live2d-toolbar-btn:hover {
-		background: oklch(0.85 0 0);
-		color: oklch(0 0 0);
+		background: #000;
+		color: #fff;
+		border-color: #fff;
 	}
 
 	:root.dark .live2d-toolbar-btn:hover {
-		background: oklch(0.2 0 0);
-		color: oklch(1 0 0);
+		background: #fff;
+		color: #000;
+		border-color: #000;
 	}
 
 	.live2d-toolbar-btn.active {
-		background: oklch(0 0 0);
-		color: oklch(1 0 0);
+		background: #000;
+		color: #fff;
 	}
 
 	:root.dark .live2d-toolbar-btn.active {
-		background: oklch(1 0 0);
-		color: oklch(0 0 0);
+		background: #fff;
+		color: #000;
 	}
 
 	.live2d-author {

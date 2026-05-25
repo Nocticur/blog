@@ -73,7 +73,7 @@ const getPageUrl = (p: number) => {
       aria-disabled={page.url.prev === undefined ? "true" : "false"}
       tabindex={page.url.prev === undefined ? "-1" : "0"}
       class:list={[
-        "border border-(--line-divider) rounded-none text-(--primary) w-11 h-11 flex items-center justify-center transition-colors duration-150 hover:bg-(--btn-card-bg-hover)",
+        "pagination-btn w-11 h-11 flex items-center justify-center",
         { disabled: page.url.prev == undefined },
       ]}
     >
@@ -84,7 +84,7 @@ const getPageUrl = (p: number) => {
       />
     </a>
     <div
-      class="flex flex-row rounded-lg items-center text-(--text-secondary) font-bold"
+      class="pagination-group flex flex-row items-center"
     >
       {
         pages.map((p) => {
@@ -93,8 +93,7 @@ const getPageUrl = (p: number) => {
           if (p == page.currentPage)
             return (
               <div
-                class="h-11 w-11 rounded-lg bg-(--primary) flex items-center justify-center
-                        font-bold text-white dark:text-black/70"
+                class="pagination-current h-11 w-11 flex items-center justify-center"
                 aria-current="page"
               >
                 {p}
@@ -104,7 +103,7 @@ const getPageUrl = (p: number) => {
             <a
               href={url(getPageUrl(p))}
               aria-label={`${i18n(I18nKey.paginationPage)} ${p}`}
-              class="border border-(--line-divider) w-11 h-11 rounded-lg flex items-center justify-center transition-colors duration-150 hover:bg-(--btn-card-bg-hover) active:scale-[0.85]"
+              class="pagination-page w-11 h-11 flex items-center justify-center active:scale-[0.85]"
             >
               {p}
             </a>
@@ -118,7 +117,7 @@ const getPageUrl = (p: number) => {
       aria-disabled={page.url.next === undefined ? "true" : "false"}
       tabindex={page.url.next === undefined ? "-1" : "0"}
       class:list={[
-        "border border-(--line-divider) rounded-lg text-(--primary) w-11 h-11 flex items-center justify-center transition-colors duration-150 hover:bg-(--btn-card-bg-hover)",
+        "pagination-btn w-11 h-11 flex items-center justify-center",
         { disabled: page.url.next == undefined },
       ]}
     >

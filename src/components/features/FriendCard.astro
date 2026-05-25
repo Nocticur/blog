@@ -85,26 +85,28 @@ const typeColor = typeColors[primaryTag] || typeColors.Blog;
     gap: 0.875rem;
     padding: 0.875rem 1rem;
     border-radius: var(--radius-large, 0.75rem);
-    background: transparent;
-    border: 1px solid oklch(0.3 0 0);
+    background: #fff;
+    border: 2px solid #000;
     text-decoration: none;
-    transition: border-color 200ms, box-shadow 200ms;
+    transition: border-color 200ms, box-shadow 200ms, background-color 200ms;
     height: 100%;
     position: relative;
     overflow: hidden;
   }
 
-  :root:not(.dark) .friend-card-link {
-    background: transparent;
-    border-color: oklch(0.75 0 0);
+  :root.dark .friend-card-link {
+    background: #000;
+    border-color: #fff;
   }
 
   .friend-card-link:hover {
-    border-color: oklch(0.5 0 0);
+    border-color: #000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 
-  :root:not(.dark) .friend-card-link:hover {
-    border-color: oklch(0.4 0 0);
+  :root.dark .friend-card-link:hover {
+    border-color: #fff;
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
   }
 
   /* 左上角类型标签 */

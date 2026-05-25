@@ -26,12 +26,14 @@ const tags = await getTagList();
 
 <div class="floating-dock" id="floating-dock">
 	<button class="dock-btn dock-btn-ai-search" id="dock-ai-search-btn" aria-label="AI 搜索" type="button" data-tooltip="AI 搜索">
-		<Icon name="material-symbols:smart-toy-outline" class="text-xl" />
+		<span class="dock-btn-icon"><Icon name="material-symbols:smart-toy-outline" class="text-3xl" /></span>
+		<span class="dock-btn-label">AI 搜索</span>
 	</button>
 
 	{musicPlayerConfig.showInNavbar !== false && (
 		<button class="dock-btn dock-btn-music" id="dock-music-btn" aria-label={i18n(I18nKey.music)} type="button" data-tooltip={i18n(I18nKey.music)}>
-			<Icon name="material-symbols:music-note-rounded" class="text-xl" />
+			<span class="dock-btn-icon"><Icon name="material-symbols:music-note-rounded" class="text-3xl" /></span>
+			<span class="dock-btn-label">{i18n(I18nKey.music)}</span>
 		</button>
 	)}
 
@@ -39,51 +41,67 @@ const tags = await getTagList();
 		<div class="dock-buttons">
 			{announcementConfig.content && (
 				<button class="dock-btn" id="dock-announcement-btn" aria-label="Announcement" type="button" data-tooltip="公告">
-					<Icon name="material-symbols:notifications-outline-rounded" class="text-xl" />
+					<span class="dock-btn-icon"><Icon name="material-symbols:notifications-outline-rounded" class="text-3xl" /></span>
+					<span class="dock-btn-label">公告</span>
 				</button>
 			)}
 
 			<button class="dock-btn" id="dock-theme-btn" aria-label="Theme" type="button" data-tooltip="切换暗色" data-theme-state="light">
-				<Icon name="material-symbols:wb-sunny-outline-rounded" class="text-xl dock-theme-icon-light" />
-				<Icon name="material-symbols:dark-mode-outline-rounded" class="text-xl dock-theme-icon-dark hidden" />
+				<span class="dock-btn-icon">
+					<Icon name="material-symbols:wb-sunny-outline-rounded" class="text-3xl dock-theme-icon-light" />
+					<Icon name="material-symbols:dark-mode-outline-rounded" class="text-3xl dock-theme-icon-dark hidden" />
+				</span>
+				<span class="dock-btn-label dock-theme-label-light">切换暗色</span>
+				<span class="dock-btn-label dock-theme-label-dark hidden">切换亮色</span>
 			</button>
 
 			<button class="dock-btn" id="dock-search-btn" aria-label={i18n(I18nKey.search)} type="button" data-tooltip={i18n(I18nKey.search)}>
-				<Icon name="material-symbols:search" class="text-xl" />
+				<span class="dock-btn-icon"><Icon name="material-symbols:search" class="text-3xl" /></span>
+				<span class="dock-btn-label">{i18n(I18nKey.search)}</span>
 			</button>
 
 			<button class="dock-btn" id="dock-tags-btn" aria-label={i18n(I18nKey.tags)} type="button" data-tooltip={i18n(I18nKey.tags)}>
-				<Icon name="material-symbols:label-outline" class="text-xl" />
+				<span class="dock-btn-icon"><Icon name="material-symbols:label-outline" class="text-3xl" /></span>
+				<span class="dock-btn-label">{i18n(I18nKey.tags)}</span>
 			</button>
 
 			{spineModelConfig?.enable && (
 				<button class="dock-btn" id="dock-spine-btn" aria-label="Spine" type="button" data-active="true" data-tooltip="Spine 模型">
-					<Icon name="material-symbols:image-outline" class="text-xl" />
+					<span class="dock-btn-icon"><Icon name="material-symbols:image-outline" class="text-3xl" /></span>
+					<span class="dock-btn-label">Spine</span>
 				</button>
 			)}
 
 			<button class="dock-btn dock-btn-toc hide" id="dock-toc-btn" aria-label="Table of Contents" type="button" data-tooltip="目录">
-				<Icon name="material-symbols:format-list-bulleted" class="text-xl" />
+				<span class="dock-btn-icon"><Icon name="material-symbols:format-list-bulleted" class="text-3xl" /></span>
+				<span class="dock-btn-label">目录</span>
 			</button>
 
 			<button class="dock-btn dock-btn-comment hide" id="dock-comment-btn" aria-label="Comments" type="button" data-tooltip="跳到评论">
-				<Icon name="mingcute:comment-line" class="text-xl" />
+				<span class="dock-btn-icon"><Icon name="mingcute:comment-line" class="text-3xl" /></span>
+				<span class="dock-btn-label">评论</span>
 			</button>
 
 			<button class="dock-btn dock-btn-home hide" id="dock-home-btn" aria-label={i18n(I18nKey.home)} type="button" data-tooltip={i18n(I18nKey.home)}>
-				<Icon name="material-symbols:home-outline-rounded" class="text-xl" />
+				<span class="dock-btn-icon"><Icon name="material-symbols:home-outline-rounded" class="text-3xl" /></span>
+				<span class="dock-btn-label">{i18n(I18nKey.home)}</span>
 			</button>
 
 		</div>
 
 		<button class="dock-btn dock-toggle" id="dock-toggle-btn" aria-label="Toggle dock" type="button" data-tooltip="工具坞">
-			<Icon name="material-symbols:more-horiz" class="text-xl dock-icon-collapsed" />
-			<Icon name="material-symbols:close" class="text-xl dock-icon-expanded hidden" />
+			<span class="dock-btn-icon">
+				<Icon name="material-symbols:more-horiz" class="text-3xl dock-icon-collapsed" />
+				<Icon name="material-symbols:close" class="text-3xl dock-icon-expanded hidden" />
+			</span>
+			<span class="dock-btn-label dock-toggle-label-collapsed">展开</span>
+			<span class="dock-btn-label dock-toggle-label-expanded hidden">收起</span>
 		</button>
 	</div>
 
 	<button class="dock-btn dock-btn-top hide" id="dock-top-btn" aria-label="Back to Top" type="button" data-tooltip="回到顶部">
-		<Icon name="material-symbols:keyboard-arrow-up-rounded" class="text-xl" />
+		<span class="dock-btn-icon"><Icon name="material-symbols:keyboard-arrow-up-rounded" class="text-3xl" /></span>
+		<span class="dock-btn-label">顶部</span>
 	</button>
 </div>
 
@@ -141,12 +159,12 @@ const tags = await getTagList();
 		display: flex;
 		flex-direction: column;
 		align-items: flex-end;
-		gap: 0.5rem;
+		gap: 0.75rem;
 	}
 	.dock-buttons {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.75rem;
 		max-height: 0;
 		clip-path: inset(0 0 100% 0);
 		opacity: 0;
@@ -155,43 +173,14 @@ const tags = await getTagList();
 		transition: max-height 0.25s ease, opacity 0.2s ease, transform 0.25s ease, clip-path 0.25s ease;
 	}
 	.dock-stack[data-expanded="true"] .dock-buttons {
-		max-height: 40rem;
+		max-height: 50rem;
 		clip-path: inset(0);
 		opacity: 1;
 		pointer-events: auto;
 		transform: translateY(0);
 	}
-	.dock-btn.hide { display: none; }
-
-	/* tooltip：hover 时在按钮左侧弹出文字 */
-	.dock-btn { position: relative; }
-	.dock-btn[data-tooltip]::after {
-		content: attr(data-tooltip);
-		position: absolute;
-		right: calc(100% + 0.625rem);
-		top: 50%;
-		transform: translateY(-50%) translateX(0.25rem);
-		white-space: nowrap;
-		padding: 0.3rem 0.625rem;
-		font-size: 0.75rem;
-		line-height: 1;
-		background: var(--page-bg);
-		color: var(--deep-text);
-		border: 1px solid var(--line-divider);
-		opacity: 0;
-		pointer-events: none;
-		transition: opacity 0.15s ease, transform 0.15s ease;
-		font-family: ui-monospace, SFMono-Regular, monospace;
-		letter-spacing: 0.02em;
-		z-index: 80;
-	}
-	.dock-btn[data-tooltip]:hover::after,
-	.dock-btn[data-tooltip]:focus-visible::after {
-		opacity: 1;
-		transform: translateY(-50%) translateX(0);
-	}
-	@media (max-width: 768px) {
-		.dock-btn[data-tooltip]::after { display: none; }
+	.dock-btn.hide {
+		display: none !important;
 	}
 
 	.dock-drawer { z-index: 70; }
@@ -246,6 +235,8 @@ const tags = await getTagList();
 		const toggleBtn = document.getElementById("dock-toggle-btn");
 		const collapsedIcon = toggleBtn?.querySelector(".dock-icon-collapsed");
 		const expandedIcon = toggleBtn?.querySelector(".dock-icon-expanded");
+		const collapsedLabel = toggleBtn?.querySelector(".dock-toggle-label-collapsed");
+		const expandedLabel = toggleBtn?.querySelector(".dock-toggle-label-expanded");
 
 		if (!stack || !toggleBtn) return;
 
@@ -255,6 +246,8 @@ const tags = await getTagList();
 			stack.setAttribute("data-expanded", expanded ? "false" : "true");
 			collapsedIcon?.classList.toggle("hidden", !expanded);
 			expandedIcon?.classList.toggle("hidden", expanded);
+			collapsedLabel?.classList.toggle("hidden", !expanded);
+			expandedLabel?.classList.toggle("hidden", expanded);
 		});
 
 		const drawers: Record<string, string> = {
@@ -346,10 +339,15 @@ const tags = await getTagList();
 			const lightIcon = themeBtn.querySelector(".dock-theme-icon-light");
 			const darkIcon = themeBtn.querySelector(".dock-theme-icon-dark");
 
+			const lightLabel = themeBtn.querySelector(".dock-theme-label-light");
+			const darkLabel = themeBtn.querySelector(".dock-theme-label-dark");
+
 			function updateThemeIcon() {
 				const isDark = document.documentElement.classList.contains("dark");
 				lightIcon?.classList.toggle("hidden", isDark);
 				darkIcon?.classList.toggle("hidden", !isDark);
+				lightLabel?.classList.toggle("hidden", isDark);
+				darkLabel?.classList.toggle("hidden", !isDark);
 				themeBtn.setAttribute("data-tooltip", isDark ? "切换亮色" : "切换暗色");
 			}
 
@@ -407,12 +405,12 @@ const tags = await getTagList();
 		updateScrollDependent();
 		updatePathDependent();
 		window.addEventListener("scroll", updateScrollDependent, { passive: true });
-		document.addEventListener("swup:contentReplaced", () => {
+		document.addEventListener("astro:page-load", () => {
 			closeAllDrawers();
 			collapseDock();
-			setTimeout(updatePathDependent, 100);
+			updatePathDependent();
+			updateScrollDependent();
 		});
-		document.addEventListener("astro:page-load", updatePathDependent);
 
 		// TOC
 		const tocBtn = document.getElementById("dock-toc-btn");

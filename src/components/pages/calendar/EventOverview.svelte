@@ -254,10 +254,8 @@ function openPostOrSelect(ev: CalendarEvent) {
 						{@const cd = countdowns[`${ev.title}-${ev.date}`] ?? { days: 0, hours: 0, minutes: 0, seconds: 0, isOngoing: false }}
 						<button
 							type="button"
-							class="nearest-card group relative text-left px-4 py-3 rounded-[1.25rem] border hover:shadow-md transition-all
-								{cd.isOngoing
-								? 'border-red-500 dark:border-red-400 bg-red-50/60 dark:bg-red-500/10 hover:border-red-600 dark:hover:border-red-300'
-								: 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-neutral-400 dark:hover:border-neutral-600'}"
+							class="nearest-card group relative text-left px-4 py-3 hover:shadow-md transition-all
+								{cd.isOngoing ? 'event-ongoing' : ''}"
 							onclick={() => openPostOrSelect(ev)}
 						>
 							<!-- 第一层：事件类型 -->

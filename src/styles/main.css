@@ -232,13 +232,72 @@ html {
     }
     .floating-dock > * { pointer-events: auto; }
     .dock-btn {
-        @apply w-11 h-11 inline-flex items-center justify-center
-               rounded-full border border-(--line-divider) bg-(--page-bg)
-               text-(--deep-text) transition-colors duration-150
-               hover:border-(--deep-text);
+        width: 3.125rem;
+        height: 3.125rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.75rem;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+        overflow: hidden;
+        position: relative;
+        flex-shrink: 0;
+        cursor: pointer;
+    }
+    .dock-btn:hover {
+        background: #000;
+        color: #fff;
+        border-color: #fff;
     }
     :root.dark .dock-btn {
-        @apply text-white/85 hover:border-white;
+        border-color: #fff;
+        background: #000;
+        color: #fff;
+    }
+    :root.dark .dock-btn:hover {
+        background: #fff;
+        color: #000;
+        border-color: #000;
+    }
+    .dock-btn .dock-btn-icon {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 200ms ease-out, opacity 200ms ease-out;
+    }
+    .dock-btn .dock-btn-label {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8125rem;
+        font-weight: 700;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        letter-spacing: 0.02em;
+        line-height: 1.1;
+        text-align: center;
+        padding: 0.125rem;
+        opacity: 0;
+        transform: translateY(8px);
+        transition: transform 200ms ease-out 30ms, opacity 200ms ease-out 30ms;
+        pointer-events: none;
+        word-break: break-word;
+    }
+    .dock-btn:hover .dock-btn-icon,
+    .dock-btn:focus-visible .dock-btn-icon {
+        transform: translateY(-6px);
+        opacity: 0;
+    }
+    .dock-btn:hover .dock-btn-label,
+    .dock-btn:focus-visible .dock-btn-label {
+        transform: translateY(0);
+        opacity: 1;
     }
     .dock-drawer {
         position: fixed;
@@ -612,4 +671,158 @@ html {
 /* 分页信息样式 */
 .pagination-info {
   @apply text-sm text-(--text-secondary) text-center mb-2;
+}
+
+/* ============================================
+   首页文章卡片边框 - 全局样式（避免 Swup 缓存导致样式失效）
+   ============================================ */
+
+/* 网格/瀑布流模式卡片外边框 */
+.post-card-wrapper {
+  border: 2px solid #000 !important;
+}
+
+:root.dark .post-card-wrapper {
+  border-color: #fff !important;
+}
+
+/* 列表模式卡片间分隔线 */
+.list-mode .post-card-item {
+  border-bottom: 2px solid #000 !important;
+}
+
+:root.dark .list-mode .post-card-item {
+  border-bottom-color: #fff !important;
+}
+
+/* 布局切换 tabs 边框 */
+.animated-tabs {
+  border: 2px solid #000 !important;
+}
+
+:root.dark .animated-tabs {
+  border-color: #fff !important;
+}
+
+/* ============================================
+   分页控件样式 - 黑白粗边框、圆角、加粗字体
+   ============================================ */
+
+/* 分页按钮基础样式 */
+.pagination-btn,
+.pagination-page {
+  border: 2px solid #000 !important;
+  border-radius: 0.75rem !important;
+  font-weight: 700 !important;
+  font-size: 1.125rem !important;
+  background: #fff !important;
+  color: #000 !important;
+  transition: background-color 150ms ease, color 150ms ease !important;
+}
+
+/* 分页按钮悬停 */
+.pagination-btn:hover,
+.pagination-page:hover {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* 当前页码 */
+.pagination-current {
+  border: 2px solid #000 !important;
+  border-radius: 0.75rem !important;
+  font-weight: 700 !important;
+  font-size: 1.125rem !important;
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* 禁用状态 */
+.pagination-btn.disabled,
+.pagination-btn[disabled] {
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+}
+
+/* 暗黑模式 */
+:root.dark .pagination-btn,
+:root.dark .pagination-page {
+  border-color: #fff !important;
+  background: #000 !important;
+  color: #fff !important;
+}
+
+:root.dark .pagination-btn:hover,
+:root.dark .pagination-page:hover {
+  background: #fff !important;
+  color: #000 !important;
+}
+
+:root.dark .pagination-current {
+  border-color: #fff !important;
+  background: #fff !important;
+  color: #000 !important;
+}
+
+/* ============================================
+   日历事件卡片样式 - 黑白粗边框（红色卡片只加粗边框）
+   ============================================ */
+
+/* 普通事件卡片 */
+.nearest-card {
+  border: 2px solid #000 !important;
+  border-radius: 1.25rem !important;
+  background: #fff !important;
+}
+
+:root.dark .nearest-card {
+  border-color: #fff !important;
+  background: #000 !important;
+}
+
+/* 进行中的事件卡片 - 只加粗边框，保留红色 */
+.nearest-card.event-ongoing {
+  border: 2px solid #ef4444 !important;
+  border-radius: 1.25rem !important;
+  background: #fef2f2 !important;
+}
+
+:root.dark .nearest-card.event-ongoing {
+  border-color: #f87171 !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* ============================================
+   日历详情面板样式 - 全局样式（避免 Swup 缓存导致样式失效）
+   ============================================ */
+
+/* 日期标题分界线 */
+.detail-panel header {
+  border-bottom: 2px solid #000 !important;
+}
+
+:root.dark .detail-panel header {
+  border-bottom-color: #fff !important;
+}
+
+/* 事件卡片 */
+.event-card {
+  background: #fff !important;
+  border: 2px solid #000 !important;
+  border-radius: 0.625rem !important;
+  transition: border-color 0.15s ease, transform 0.15s ease, background-color 0.15s ease !important;
+}
+
+:root.dark .event-card {
+  background: #000 !important;
+  border-color: #fff !important;
+}
+
+.event-card.is-clickable:hover {
+  border-color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+:root.dark .event-card.is-clickable:hover {
+  border-color: #fff !important;
 }

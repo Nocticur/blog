@@ -111,7 +111,7 @@ onDestroy(() => {
 
 <section class="detail-panel">
 	<!-- 日期标题 -->
-	<header class="flex items-center justify-between mb-4 pb-3 border-b border-neutral-200 dark:border-neutral-800">
+	<header class="flex items-center justify-between mb-4 pb-3 border-b-2 border-black dark:border-white">
 		<div>
 			<div class="text-xl font-bold text-neutral-900 dark:text-neutral-100">
 				{displayDate.dateStr}
@@ -221,39 +221,6 @@ onDestroy(() => {
 		align-items: center;
 		justify-content: center;
 		padding: 2.5rem 1rem;
-	}
-
-	.event-card {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.75rem;
-		width: 100%;
-		padding: 0.75rem;
-		background: white;
-		border: 1px solid rgb(229 229 229);
-		border-radius: 0.625rem;
-		position: relative;
-		text-align: left;
-		transition: border-color 0.15s ease, transform 0.15s ease;
-		overflow: hidden;
-	}
-
-	:global(.dark) .event-card {
-		background: rgb(23 23 23);
-		border-color: rgb(38 38 38);
-	}
-
-	.event-card.is-clickable {
-		cursor: pointer;
-	}
-
-	.event-card.is-clickable:hover {
-		border-color: rgb(23 23 23);
-		transform: translateY(-1px);
-	}
-
-	:global(.dark) .event-card.is-clickable:hover {
-		border-color: rgb(245 245 245);
 	}
 
 	.card-bar {
