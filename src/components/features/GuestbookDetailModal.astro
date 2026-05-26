@@ -63,6 +63,7 @@
 		}
 
 		window.addEventListener('guestbook:open-detail', (e) => {
+			if (!modal.isConnected) return;
 			const card = (e as CustomEvent).detail;
 			if (!card) return;
 

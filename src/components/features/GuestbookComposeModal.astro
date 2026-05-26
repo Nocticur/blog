@@ -119,6 +119,7 @@
 
 		// 监听打开事件
 		window.addEventListener('guestbook:open-compose', () => {
+			if (!modal.isConnected) return;
 			modal.showModal();
 			document.body.style.overflow = 'hidden';
 			(authorInput as HTMLInputElement).value = '';
