@@ -17,9 +17,26 @@ const config = {
 <!-- Waline -->
 <div class="relative w-full">
   <div id="waline"></div>
-  <link rel="stylesheet" href="https://unpkg.com/@waline/client@v3/dist/waline.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@waline/client@3/dist/waline.css" />
   <script type="module" is:inline define:vars={{ config }}>
-    import { init } from 'https://unpkg.com/@waline/client@v3/dist/waline.js';
-    init(config);
+    const cdnUrls = [
+      'https://unpkg.com/@waline/client@3/dist/waline.js',
+      'https://cdn.jsdelivr.net/npm/@waline/client@3/dist/waline.js'
+    ];
+    
+    async function loadWaline(urls) {
+      for (const url of urls) {
+        try {
+          const { init } = await import(url);
+          init(config);
+          return;
+        } catch (error) {
+          console.warn(`Failed to load Waline from ${url}:`, error);
+        }
+      }
+      console.error('Failed to load Waline from all CDN sources');
+    }
+    
+    loadWaline(cdnUrls);
   </script>
 </div>
