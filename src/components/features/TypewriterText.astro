@@ -25,10 +25,12 @@ const textData = Array.isArray(text) ? JSON.stringify(text) : text;
   data-pause-time={pauseTime}></span>
 
 <script>
-  class TypewriterEffect {
-    private element: HTMLElement;
-    private texts: string[];
-    private currentTextIndex: number = 0;
+ class TypewriterEffect {
+	private static segmenter: Intl.Segmenter | null = null;
+
+	private element: HTMLElement;
+	private texts: string[];
+	private currentTextIndex: number = 0;
     private speed: number;
     private deleteSpeed: number;
     private pauseTime: number;
@@ -136,10 +138,12 @@ const textData = Array.isArray(text) ? JSON.stringify(text) : text;
       }
     }
 
-    private segmentText(text: string): string[] {
-      const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-      return Array.from(segmenter.segment(text), s => s.segment);
-    }
+	private segmentText(text: string): string[] {
+		if (!TypewriterEffect.segmenter) {
+			TypewriterEffect.segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+		}
+		return Array.from(TypewriterEffect.segmenter.segment(text), s => s.segment);
+	}
 
   }
 

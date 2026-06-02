@@ -146,9 +146,22 @@ const revealLine1 = `${i18n(I18nKey.siteStatsPostCount)} ${postCount}`;
 		});
 	}
 
+	var animateStarsRunning = false;
 	function animateStars() {
 		if (isMobile) return;
+		if (animateStarsRunning) return;
+		animateStarsRunning = true;
+		// Cache container dimensions for percentage-to-pixel conversion
+		var firstStar = document.querySelector('.star');
+		var containerEl = firstStar ? firstStar.parentElement : null;
+		var cw = containerEl ? containerEl.clientWidth : 0;
+		var ch = containerEl ? containerEl.clientHeight : 0;
+		function tick() {
 		var stars = document.querySelectorAll('.star');
+		if (containerEl) {
+			cw = containerEl.clientWidth;
+			ch = containerEl.clientHeight;
+		}
 		var now = Date.now() / 1000;
 		stars.forEach(function(star) {
 			var startX = parseFloat(star.dataset.startX || '0');
@@ -164,11 +177,15 @@ const revealLine1 = `${i18n(I18nKey.siteStatsPostCount)} ${postCount}`;
 			var minOpacity = isDark ? 0.2 : 0.4;
 			var maxOpacity = isDark ? 0.6 : 1.0;
 			var opacity = minOpacity + (maxOpacity - minOpacity) * Math.abs(Math.sin(t * Math.PI * 2));
-			star.style.left = x + '%';
-			star.style.top = y + '%';
+			// Use transform instead of left/top to avoid layout thrashing
+			var dx = (x - startX) / 100 * cw;
+			var dy = (y - startY) / 100 * ch;
+			star.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
 			star.style.opacity = String(opacity);
 		});
-		requestAnimationFrame(animateStars);
+		requestAnimationFrame(tick);
+		}
+		tick();
 	}
 
 	// ========== Text Reveal Card ==========

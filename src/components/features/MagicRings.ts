@@ -239,9 +239,23 @@ export function initMagicRings(
 		attributeFilter: ["class"],
 	});
 
-	let frameId: number;
+	// ── Render loop: IO visibility gating + 30fps cap ──
+	const FRAME_INTERVAL = 1000 / 30;
+	let frameId = 0;
+	let loopRunning = false;
+	let lastTimestamp = 0;
+	let accumulatedTime = 0;
+
 	const animate = (t: number) => {
 		frameId = requestAnimationFrame(animate);
+
+		// Skip frames beyond the 30fps target
+		const delta = t - lastTimestamp;
+		if (delta < FRAME_INTERVAL) return;
+		lastTimestamp = t - (delta % FRAME_INTERVAL);
+
+		// Accumulate elapsed time so pausing via IO doesn't cause a time jump
+		accumulatedTime += delta * 0.001;
 
 		smoothMouseRef[0] += (mouseRef[0] - smoothMouseRef[0]) * 0.08;
 		smoothMouseRef[1] += (mouseRef[1] - smoothMouseRef[1]) * 0.08;
@@ -249,7 +263,7 @@ export function initMagicRings(
 		burst *= 0.95;
 		if (burst < 0.001) burst = 0;
 
-		uniforms.uTime.value = t * 0.001 * opts.speed;
+		uniforms.uTime.value = accumulatedTime * opts.speed;
 		uniforms.uAttenuation.value = opts.attenuation;
 		uniforms.uColor.value.set(opts.color);
 		uniforms.uColorTwo.value.set(opts.colorTwo);
@@ -273,11 +287,36 @@ export function initMagicRings(
 
 		renderer.render(scene, camera);
 	};
-	frameId = requestAnimationFrame(animate);
+
+	function startLoop() {
+		if (loopRunning) return;
+		loopRunning = true;
+		lastTimestamp = performance.now();
+		frameId = requestAnimationFrame(animate);
+	}
+
+	function stopLoop() {
+		loopRunning = false;
+		if (frameId) {
+			cancelAnimationFrame(frameId);
+			frameId = 0;
+		}
+	}
+
+	// Pause rendering when the container scrolls out of the viewport
+	const io = new IntersectionObserver(
+		(entries) => {
+			if (entries[0]?.isIntersecting) startLoop();
+			else stopLoop();
+		},
+		{ threshold: 0 },
+	);
+	io.observe(container);
 
 	return {
 		destroy() {
-			cancelAnimationFrame(frameId);
+			stopLoop();
+			io.disconnect();
 			themeObserver.disconnect();
 			window.removeEventListener("resize", resize);
 			ro.disconnect();
