@@ -1,12 +1,12 @@
 import {
-	WebGLRenderer,
-	ShaderMaterial,
+	Color,
+	Mesh,
+	OrthographicCamera,
 	PlaneGeometry,
 	Scene,
-	OrthographicCamera,
-	Color,
+	ShaderMaterial,
 	Vector2,
-	Mesh,
+	WebGLRenderer,
 } from "three";
 
 const vertexShader = `
