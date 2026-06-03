@@ -4,6 +4,7 @@ import La51Analytics from "@components/analytics/La51Analytics.astro";
 import MicrosoftClarity from "@components/analytics/MicrosoftClarity.astro";
 import UmamiAnalytics from "@components/analytics/UmamiAnalytics.astro";
 import FancyboxManager from "@components/features/FancyboxManager.astro";
+import FloatingLyrics from "@components/features/FloatingLyrics.astro";
 import FontManager from "@components/features/FontManager.astro";
 import MusicManager from "@components/features/MusicManager.astro";
 import ConfigCarrier from "@components/layout/ConfigCarrier.astro";
@@ -197,6 +198,7 @@ const siteLang = lang.replace("_", "-");
     <div id="progress-bar"></div>
     <ConfigCarrier />
     <MusicManager />
+    <FloatingLyrics />
     <slot />
     <FancyboxManager />
   </body>

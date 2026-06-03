@@ -56,10 +56,13 @@ const widgetId =
                     {i18n(I18nKey.music)}
                 </h3>
             </div>
-            <!-- Top Right: Lyric Toggle -->
-            <button class={`btn-lrc-toggle hover:text-(--primary) transition-all duration-300 p-0.5 pr-2 transform active:scale-95 text-neutral-400 shrink-0 ${!config.showLyrics ? 'hidden' : ''}`} title={i18n(I18nKey.musicLyrics)} aria-label={i18n(I18nKey.musicLyrics)}>
+            <!-- Top Right: Lyric Toggle + Floating Lyric Toggle -->
+            <button class={`btn-lrc-toggle hover:text-(--primary) transition-all duration-300 p-0.5 transform active:scale-95 text-neutral-400 shrink-0 ${!config.showLyrics ? 'hidden' : ''}`} title={i18n(I18nKey.musicLyrics)} aria-label={i18n(I18nKey.musicLyrics)}>
                 <Icon name="material-symbols:subtitles-off-outline-rounded" class="icon-lrc-off text-xl" aria-hidden="true" />
                 <Icon name="material-symbols:subtitles-outline-rounded" class="icon-lrc-on text-xl hidden" aria-hidden="true" />
+            </button>
+            <button class={`btn-floating-lrc-toggle hover:text-(--primary) transition-all duration-300 p-0.5 pr-2 transform active:scale-95 text-neutral-400 shrink-0 ${!config.showLyrics ? 'hidden' : ''}`} title={i18n(I18nKey.musicFloatingLyrics)} aria-label={i18n(I18nKey.musicFloatingLyrics)}>
+                <Icon name="material-symbols:lyrics-outline-rounded" class="text-xl" aria-hidden="true" />
             </button>
         </div>
 
@@ -223,6 +226,7 @@ const widgetId =
         volContainer: widget.querySelector('.vol-container'),
         volBar: widget.querySelector('.vol-bar'),
         btnLrc: widget.querySelector('.btn-lrc-toggle'),
+        btnFloatingLrc: widget.querySelector('.btn-floating-lrc-toggle'),
         iconLrcOn: widget.querySelector('.icon-lrc-on'),
         iconLrcOff: widget.querySelector('.icon-lrc-off'),
         lrcDrawer: widget.querySelector('.lrc-drawer'),
@@ -644,6 +648,13 @@ const widgetId =
             ui.iconLrcOff.classList.add('hidden');
         }
     });
+
+    // Floating lyrics toggle
+    if (ui.btnFloatingLrc) {
+        ui.btnFloatingLrc.addEventListener('click', function () {
+            window.dispatchEvent(new CustomEvent('fm:toggle-floating-lyrics'));
+        });
+    }
 
     ui.btnDrawer.addEventListener('click', function () {
         var isOpen = ui.playlistDrawer.style.gridTemplateRows === '1fr';

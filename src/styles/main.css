@@ -307,10 +307,13 @@ html {
         max-height: 70vh;
         overflow: auto;
         background: var(--page-bg);
-        border: 1px solid var(--line-divider);
+        border: 2px solid #000;
         padding: 1.25rem;
         z-index: 60;
         transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    :root.dark .dock-drawer {
+        border-color: #fff;
     }
     #dock-drawer-search {
         overflow: visible;
@@ -331,6 +334,7 @@ html {
             border-left: 0;
             border-right: 0;
             border-bottom: 0;
+            border-top-width: 2px;
         }
         .dock-tags-list {
             gap: 0.25rem;
