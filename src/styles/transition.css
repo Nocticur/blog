@@ -18,6 +18,60 @@
 }
 
 /* --------------------------------------------------------------------------
+   2. Swup Page Transition — Blur Fade
+   -------------------------------------------------------------------------- */
+
+/* 离开动画：模糊 + 淡出 + 上移 */
+@keyframes blur-fade-out {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-6px);
+        filter: blur(6px);
+    }
+}
+
+/* 进入动画：从模糊 + 淡入 + 下移到清晰 */
+@keyframes blur-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+        filter: blur(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
+/* Swup 离开阶段：is-leaving 在 animatePageOut 时添加，content:replace 时移除 */
+html.is-leaving .transition-swup-leaving,
+html.is-leaving .transition-swup-main {
+    animation: blur-fade-out 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Swup 进入阶段：is-rendering 在 content:replace 后添加，animatePageIn 完成时移除 */
+html.is-rendering .transition-swup-leaving,
+html.is-rendering .transition-swup-main {
+    animation: blur-fade-in 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* 无障碍：减少动画 */
+@media (prefers-reduced-motion: reduce) {
+    html.is-leaving .transition-swup-leaving,
+    html.is-leaving .transition-swup-main,
+    html.is-rendering .transition-swup-leaving,
+    html.is-rendering .transition-swup-main {
+        animation: none;
+    }
+}
+
+/* --------------------------------------------------------------------------
    3. Onload Animations
    -------------------------------------------------------------------------- */
 
