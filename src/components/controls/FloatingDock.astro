@@ -2,11 +2,10 @@
 import Icon from "@components/common/Icon.astro";
 /**
  * 极简悬浮坞 — 替代原 FloatingControls。
- * 所有重组件（Search / Theme / DisplaySettings / Music / Live2D / Spine / Calendar / TOC / BackToTop / BackToHome / BackToComment / Tags）
+ * 所有重组件（Theme / DisplaySettings / Music / Live2D / Spine / Calendar / TOC / BackToTop / BackToHome / BackToComment / Tags）
  * 全部以图标按钮 + 抽屉/浮层形式集中在右下角。
  */
 import type { MarkdownHeading } from "astro";
-import Search from "@/components/controls/Search.svelte";
 import MusicPlayer from "@/components/features/MusicPlayer.astro";
 import { announcementConfig, spineModelConfig } from "@/config";
 import { musicPlayerConfig } from "@/config/musicConfig";
@@ -55,11 +54,6 @@ const tags = await getTagList();
 				<span class="dock-btn-label dock-theme-label-dark hidden">切换亮色</span>
 			</button>
 
-			<button class="dock-btn" id="dock-search-btn" aria-label={i18n(I18nKey.search)} type="button" data-tooltip={i18n(I18nKey.search)}>
-				<span class="dock-btn-icon"><Icon name="material-symbols:search" class="text-3xl" /></span>
-				<span class="dock-btn-label">{i18n(I18nKey.search)}</span>
-			</button>
-
 			<button class="dock-btn" id="dock-tags-btn" aria-label={i18n(I18nKey.tags)} type="button" data-tooltip={i18n(I18nKey.tags)}>
 				<span class="dock-btn-icon"><Icon name="material-symbols:label-outline" class="text-3xl" /></span>
 				<span class="dock-btn-label">{i18n(I18nKey.tags)}</span>
@@ -106,11 +100,6 @@ const tags = await getTagList();
 </div>
 
 {/* 抽屉容器（独立于 dock-stack） */}
-<div class="dock-drawer dock-drawer-closed" id="dock-drawer-search">
-	<div class="dock-drawer-title">[ {i18n(I18nKey.search)} ]</div>
-	<Search client:load />
-</div>
-
 
 {announcementConfig.content && (
 	<div class="dock-drawer dock-drawer-closed" id="dock-drawer-announcement">
@@ -251,7 +240,6 @@ const tags = await getTagList();
 		});
 
 		const drawers: Record<string, string> = {
-			"dock-search-btn": "dock-drawer-search",
 			"dock-music-btn": "dock-drawer-music",
 			"dock-toc-btn": "dock-drawer-toc",
 			"dock-announcement-btn": "dock-drawer-announcement",
@@ -285,11 +273,9 @@ const tags = await getTagList();
 			if (!target) return;
 			const isInDrawer = document.querySelector(".dock-drawer:not(.dock-drawer-closed)")?.contains(target);
 			const isInDock = document.getElementById("floating-dock")?.contains(target);
-			const isInSearchPanel = document.getElementById("search-panel")?.contains(target);
-			if (!isInDrawer && !isInDock && !isInSearchPanel) {
+			if (!isInDrawer && !isInDock) {
 				closeAllDrawers();
 				collapseDock();
-				document.getElementById("search-panel")?.classList.add("float-panel-closed");
 			}
 		});
 

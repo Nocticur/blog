@@ -4,7 +4,6 @@ import * as path from "node:path";
 import Icon from "@components/common/Icon.astro";
 import type { ImageMetadata } from "astro";
 import GlassSurface from "@/components/common/GlassSurface.svelte";
-import LightDarkSwitch from "@/components/controls/LightDarkSwitch.svelte";
 import { navBarConfig, siteConfig } from "@/config";
 import { LinkPresets } from "@/constants/link-presets";
 import { getFallbackFormat, getImageFormats } from "@/utils/image-utils";
@@ -94,7 +93,9 @@ if (isLocalSrcLogo) {
             </div>
 
             <div class="navbar-right flex items-center gap-1">
-                <LightDarkSwitch client:load />
+                <button aria-label="Search" name="Search" class="btn-plain h-11 w-11" id="nav-search-btn">
+                    <Icon name="material-symbols:search-rounded" is:inline class="text-[1.65rem]" style="font-variation-settings: 'wght' 700"></Icon>
+                </button>
                 <button aria-label="Menu" name="Nav Menu" class="btn-plain h-11 w-11 lg:hidden!" id="nav-menu-switch">
                     <Icon name="material-symbols:menu-rounded" is:inline class="text-[1.25rem]"></Icon>
                 </button>
@@ -410,6 +411,12 @@ initHoverSlider();
 
 document.addEventListener("swup:page:view", () => {
     initHoverSlider();
+});
+
+// Navbar search button → open search modal
+document.getElementById("nav-search-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    window.dispatchEvent(new CustomEvent("toggle-search-modal"));
 });
 </script>
 

@@ -316,10 +316,6 @@ html {
     :root.dark .dock-drawer {
         border-color: #fff;
     }
-    #dock-drawer-search {
-        overflow: visible;
-        max-height: none;
-    }
     .dock-drawer.dock-drawer-closed {
         opacity: 0;
         transform: translateX(0.5rem);
