@@ -168,6 +168,8 @@ const textData = Array.isArray(text) ? JSON.stringify(text) : text;
 
   // Use astro:page-load which fires on both initial load and navigation
   document.addEventListener("astro:page-load", runInitWithDelay);
+  // 直接调用一次，避免模块脚本 deferred 执行错过初始事件
+  runInitWithDelay();
 </script>
 
 <!-- 样式已迁移至 src/styles/components/typewriter.css -->
