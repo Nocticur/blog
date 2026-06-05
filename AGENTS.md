@@ -55,7 +55,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 Cloudflare Workers 入口 `src/worker.js` 提供三个 API 端点，通过 wrangler 自动 bundle 依赖发布为单文件。
 
 - `src/worker.js` — 入口：根据 URL pathname 路由分发，无业务逻辑。
-- `src/workers/count.js` — 计数 API（`/api/count`）：PV/UV 统计，cookie 去重。
+- `src/workers/count.js` — 计数 API（`/api/count`）：从 Umami API 获取 PV/UV，KV 缓存（5 分钟）。
 - `src/workers/guestbook.js` — 留言板 API（`/api/guestbook`）：CRUD + 投票，含输入校验和 XSS 过滤。
 - `src/workers/ai-chat.js` — AI 聊天 API（`/api/ai-chat`）：embedding 向量检索 + SSE 流式生成，含猫娘人设 prompt。
 - `src/workers/utils/rate-limit.js` — KV 限流（`checkRateLimit`），被 guestbook 和 ai-chat 共用。

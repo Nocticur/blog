@@ -133,10 +133,33 @@ npx wrangler deploy
 |--------|------|
 | 托管平台 | 支持任何静态托管：Cloudflare Pages、Vercel、Netlify、GitHub Pages、Nginx 等 |
 | 评论服务 | 若启用评论，需自行部署对应后端（Waline / Twikoo / Artalk 等） |
-| KV 存储 | 若启用统计，需配置 KV 存储空间 |
-| 统计服务 | 若启用统计，需配置 Umami 等分析工具 |
+| KV 存储 | 留言板、限流、统计数据缓存需要 KV 存储空间 |
+| 统计服务 | 需自建 Umami 实例，Worker 通过 Umami API 获取 PV/UV 数据 |
 | AI 搜索 | 需 Cloudflare Vectorize 索引 + Workers AI / 第三方 API（魔搭社区默认。如果没配置API会使用cf workers ai） |
 | 图床（可选）| 项目没引用图床，无需配置，但是我建议配置一个图床，用于存储文章中的图片 |
+
+### 站点统计（PV/UV）数据流
+
+首页的站点统计（访问量 PV / 访客数 UV）数据来自 Umami，流程如下：
+
+```
+用户访问页面
+  │
+  ├─① Umami 追踪脚本自动记录访问 → 存入 Umami 数据库（Neon PostgreSQL）
+  │
+  └─② 浏览器 GET /api/count → Cloudflare Worker
+        │
+        ├─ KV 缓存命中（5 分钟内）→ 直接返回缓存数据
+        │
+        └─ KV 缓存未命中
+              │
+              ├─ 从 KV 读取缓存的 Umami JWT Token
+              │   └─ 未命中 → 用账号密码登录 Umami 获取新 Token（缓存 23 小时）
+              │
+              └─ 调用 Umami API 获取全站 PV/UV → 缓存到 KV → 返回
+```
+
+**KV 消耗**：每次页面访问最多 1 次 KV 读取（缓存命中时），每 5 分钟才写入 1 次缓存。
 
 ### Cloudflare Pages 部署方案
 
@@ -152,21 +175,28 @@ npx wrangler deploy
 4. 点击「保存并部署」，首次构建约 2-5 分钟
 5. 添加在 Pages 环境变量中：
    - **AI_API_KEY**：Cloudflare Vectorize API 密钥，用于 AI 搜索功能。请在 Cloudflare Dashboard → Workers & Pages → Settings → Variables and Secrets 中以 **Secret** 形式添加。（目前项目默认指定使用魔搭社区，若需使用其他社区，请在 `aiSearchConfig.ts` 中修改）
-6. 配置KV存储，项目统计信息和留言数据，需要到 Cloudflare KV 中创建一个存储空间。详细步骤是：
+6. 配置 KV 存储，留言数据和统计缓存需要 KV 存储空间：
    - 登录 Cloudflare Dashboard → KV → 创建存储空间
-   - 使用 `wrangler kv create` 创建 KV 存储空间，指定存储空间ID和名称（建议与项目名称一致）
-   - 不用担心这个ID是否敏感，因为 Cloudflare KV 存储空间ID 是随机生成的，不会泄露任何个人信息，ID也只能你自己访问。
-   - 点击「保存并部署」，首次构建约 2-5 分钟
-7. 设置好后重启pages，等待部署成功。
-8. 构建AI搜索索引，需要在 Cloudflare Vectorize 中创建一个索引，指定索引名称（建议与项目名称一致）。使用指令加上索引名称，例如 `wrangler kv create --name blog-ai-search`。
+   - 使用 `wrangler kv create` 创建 KV 存储空间，指定存储空间 ID 和名称（建议与项目名称一致）
+   - 不用担心这个 ID 是否敏感，因为 Cloudflare KV 存储空间 ID 是随机生成的，不会泄露任何个人信息，ID 也只能你自己访问
+   - 将 KV namespace ID 填入 `wrangler.toml` 的 `[[kv_namespaces]]` 中
+7. 配置 Umami 统计（站点 PV/UV 展示依赖）：
+   - 需要自建 Umami 实例（推荐 Vercel + Neon 部署，参考项目内文档 `src/content/posts/other/9001_000_Umami接入方案.md`）
+   - 在 Cloudflare Dashboard → Workers & Pages → my-blog → Settings → Variables and Secrets 中添加两个 **Secret**：
+     - **UMAMI_USERNAME**：Umami 登录用户名
+     - **UMAMI_PASSWORD**：Umami 登录密码
+   - 在 `src/config/siteConfig.ts` 中配置 `analytics.umamiAnalytics` 的 `websiteId` 和 `scriptUrl`
+8. 设置好后重启 Pages，等待部署成功。
+9. 构建 AI 搜索索引，需要在 Cloudflare Vectorize 中创建一个索引，指定索引名称（建议与项目名称一致）。使用指令加上索引名称，例如 `wrangler vectorize create blog-ai-search --dimensions=384 --metric=cosine`。
 
 ### 你需要更改的配置文件
 
 - `src/config/aiSearchConfig.ts`：AI 搜索配置（模型、Embedding、向量索引）
 - `src/config/commentConfig.ts`：评论系统配置（更换地址）
 - `src/config/profileConfig.ts`：首页信息：头像、昵称、签名、社交链接
-- `src/config/siteConfig.ts`：网站配置：上下班时间、网站设置、bangumi配置、Umami配置、导航栏配置
-- `wrangler.toml`：Cloudflare KV 存储空间配置
+- `src/config/siteConfig.ts`：网站配置：上下班时间、网站设置、bangumi 配置、Umami 配置（websiteId、scriptUrl）
+- `wrangler.toml`：Cloudflare KV 存储空间 ID 配置
+- Cloudflare Worker Secrets：`UMAMI_USERNAME`、`UMAMI_PASSWORD`、`AI_API_KEY`
 
 下方可选配置文件
 

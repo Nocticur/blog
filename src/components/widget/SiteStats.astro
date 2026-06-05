@@ -270,11 +270,7 @@ const revealLine1 = `${i18n(I18nKey.siteStatsPostCount)} ${postCount}`;
 		var textLine1 = document.getElementById('text-line-1');
 		var textLine2 = document.getElementById('text-line-2');
 
-		fetch('/api/count', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ path: location.pathname }),
-		})
+		fetch('/api/count')
 		.then(function(r) { return r.json(); })
 		.then(function(data) {
 			var uv = data.uv != null ? Number(data.uv).toLocaleString() : '--';
