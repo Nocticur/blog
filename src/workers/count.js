@@ -1,7 +1,3 @@
-// Umami API 配置（与 siteConfig.ts 保持一致）
-const UMAMI_API_URL = "https://stats.mmzhiku.xyz";
-const UMAMI_WEBSITE_ID = "5907656e-d254-4c9e-ad73-5ce40bf184bb";
-
 // KV 缓存
 const CACHE_KEY = "umami:site-stats";
 const CACHE_TTL = 300; // 5 分钟（秒）
@@ -15,24 +11,48 @@ const corsHeaders = {
 
 /**
  * 获取 Umami 全站统计
- * @param {string} token - Umami Bearer token
+ * @param {object} env - Worker 环境变量
  * @returns {Promise<{pv: number, uv: number}>}
  */
-async function fetchSiteStats(token) {
+async function fetchSiteStats(env) {
+	const apiUrl = env.UMAMI_API_URL;
+	const websiteId = env.UMAMI_WEBSITE_ID;
+	const token = env.UMAMI_TOKEN;
+
 	const now = Date.now();
 	const params = new URLSearchParams({
 		startAt: "0",
 		endAt: String(now),
 	});
 
-	const url = `${UMAMI_API_URL}/api/websites/${UMAMI_WEBSITE_ID}/stats?${params}`;
+	const url = `${apiUrl}/api/websites/${websiteId}/stats?${params}`;
 
 	const resp = await fetch(url, {
+		redirect: "manual",
 		headers: {
 			Authorization: `Bearer ${token}`,
 			"Content-Type": "application/json",
 		},
 	});
+
+	// 手动处理重定向（Vercel 托管的 Umami 可能触发重定向循环）
+	if (resp.status >= 300 && resp.status < 400) {
+		const location = resp.headers.get("Location");
+		if (location) {
+			const redirectResp = await fetch(location, {
+				redirect: "follow",
+				headers: {
+					Authorization: `Bearer ${token}`,
+					"Content-Type": "application/json",
+				},
+			});
+			if (!redirectResp.ok) {
+				const text = await redirectResp.text();
+				throw new Error(`Umami redirect error ${redirectResp.status}: ${text}`);
+			}
+			return redirectResp.json();
+		}
+	}
 
 	if (!resp.ok) {
 		const text = await resp.text();
@@ -48,8 +68,7 @@ export async function handleCount(request, env) {
 		return new Response(null, { headers: corsHeaders });
 	}
 
-	const token = env.UMAMI_TOKEN;
-	if (!token) {
+	if (!env.UMAMI_TOKEN) {
 		return Response.json(
 			{ error: "UMAMI_TOKEN not configured" },
 			{ status: 500, headers: corsHeaders },
@@ -65,7 +84,7 @@ export async function handleCount(request, env) {
 				return Response.json(cached, { headers: corsHeaders });
 			}
 
-			const result = await fetchSiteStats(token);
+			const result = await fetchSiteStats(env);
 
 			// 写缓存
 			await env.VISITOR_KV.put(CACHE_KEY, JSON.stringify(result), {
@@ -81,5 +100,8 @@ export async function handleCount(request, env) {
 		}
 	}
 
-	return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
+	return new Response("Method Not Allowed", {
+		status: 405,
+		headers: corsHeaders,
+	});
 }

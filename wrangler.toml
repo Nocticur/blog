@@ -7,10 +7,14 @@ directory = "./dist"
 
 [vars]
 NODE_VERSION = "22"
+# Umami 统计配置
+UMAMI_API_URL = "https://stats.mmzhiku.xyz"
+UMAMI_WEBSITE_ID = "5907656e-d254-4c9e-ad73-5ce40bf184bb"
 
-# 敏感信息（API Key）请在 Cloudflare Dashboard → Workers & Pages →
+# 敏感信息请在 Cloudflare Dashboard → Workers & Pages →
 # 你的 Worker → Settings → Variables and Secrets 中添加 Secret：
 # AI_API_KEY
+# UMAMI_TOKEN
 # 可选变量：
 # ALLOWED_ORIGINS = "https://your-domain.example"
 

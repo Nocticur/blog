@@ -134,7 +134,7 @@ npx wrangler deploy
 | 托管平台 | 支持任何静态托管：Cloudflare Pages、Vercel、Netlify、GitHub Pages、Nginx 等 |
 | 评论服务 | 若启用评论，需自行部署对应后端（Waline / Twikoo / Artalk 等） |
 | KV 存储 | 若启用统计，需配置 KV 存储空间 |
-| 统计服务 | 若启用统计，需配置 Umami 等分析工具 |
+| 统计服务 | 若启用统计，需配置 Umami（`siteConfig.ts` 中配置 `analytics.umamiAnalytics`，Worker 中配置 `UMAMI_TOKEN` Secret） |
 | AI 搜索 | 需 Cloudflare Vectorize 索引 + Workers AI / 第三方 API（魔搭社区默认。如果没配置API会使用cf workers ai） |
 | 图床（可选）| 项目没引用图床，无需配置，但是我建议配置一个图床，用于存储文章中的图片 |
 
@@ -152,6 +152,7 @@ npx wrangler deploy
 4. 点击「保存并部署」，首次构建约 2-5 分钟
 5. 添加在 Pages 环境变量中：
    - **AI_API_KEY**：Cloudflare Vectorize API 密钥，用于 AI 搜索功能。请在 Cloudflare Dashboard → Workers & Pages → Settings → Variables and Secrets 中以 **Secret** 形式添加。（目前项目默认指定使用魔搭社区，若需使用其他社区，请在 `aiSearchConfig.ts` 中修改）
+   - **UMAMI_TOKEN**：Umami 统计 API Token，用于全站访问量统计。获取方式：`curl -X POST https://你的Umami地址/api/auth/login -H "Content-Type: application/json" -d '{"username":"用户名","password":"密码"}'`，取返回的 `token` 字段。在 Cloudflare Dashboard → Workers & Pages → Settings → Variables and Secrets 中以 **Secret** 形式添加。
 6. 配置KV存储，项目统计信息和留言数据，需要到 Cloudflare KV 中创建一个存储空间。详细步骤是：
    - 登录 Cloudflare Dashboard → KV → 创建存储空间
    - 使用 `wrangler kv create` 创建 KV 存储空间，指定存储空间ID和名称（建议与项目名称一致）
