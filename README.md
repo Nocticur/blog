@@ -47,7 +47,7 @@ pnpm build
 pnpm preview
 
 ## 开发测试
-# 构建AI索引1
+# 构建AI索引
 pnpm build-index
 
 # 登录Cloudflare Workers AI
