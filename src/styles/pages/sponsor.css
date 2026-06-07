@@ -262,6 +262,13 @@ body.wallpaper-transparent .usage-info-box {
 	color: var(--primary, #4f46e5);
 }
 
+.sponsor-avatar__img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: 50%;
+}
+
 .sponsor-info {
 	flex: 1;
 	min-width: 0;

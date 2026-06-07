@@ -134,9 +134,18 @@ const showSponsorsList = sponsorConfig.showSponsorsList !== false;
           <div class="sponsor-list">
             {sponsors.map((sponsor) => (
               <div class="sponsor-row group">
-                {/* 头像占位 */}
+                {/* 头像 */}
                 <div class="sponsor-avatar">
-                  <span>{sponsor.name.charAt(0)}</span>
+                  {sponsor.avatar ? (
+                    <img
+                      src={sponsor.avatar}
+                      alt={sponsor.name}
+                      class="sponsor-avatar__img"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span>{sponsor.name.charAt(0)}</span>
+                  )}
                 </div>
 
                 {/* 信息 */}

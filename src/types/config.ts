@@ -792,6 +792,7 @@ export type SponsorItem = {
 	name: string; // 赞助者名称，如果想显示匿名，可以直接设置为"匿名"或使用 i18n
 	amount?: string; // 赞助金额（可选）
 	date?: string; // 赞助日期（可选，ISO 格式）
+	avatar?: string; // 头像图片URL或路径（可选）
 };
 
 // 赞助配置

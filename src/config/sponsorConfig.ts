@@ -56,9 +56,11 @@ export const sponsorConfig: SponsorConfig = {
 		},
 		// 示例：匿名赞助者
 		{
-			name: "哈基敦",
+			name: "哈基墩",
 			amount: "¥0.01",
 			date: "2026-01-01",
+			avatar:
+				"https://i.stardots.io/784774835/StarDots-2026060803504474780.png",
 		},
 	],
 };
