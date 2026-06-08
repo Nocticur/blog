@@ -130,7 +130,7 @@ html {
         0% { opacity: 0; }
         100% { opacity: 1; }
     }
-    
+
     /* 确保边框和分隔线元素在主题切换时有更明确的过渡时长 */
     .transition,
     [class*="border"],
@@ -201,6 +201,20 @@ html {
     .is-theme-transitioning:not(.use-view-transition) body:has(#wallpaper-wrapper) #navbar[data-transparent-mode] > div {
         transition: none !important;
         backdrop-filter: none !important;
+    }
+
+    /* View Transition 模式下，页头跟随 root 截图同步淡化，仅禁用自身延迟过渡和玻璃阴影 */
+    .is-theme-transitioning.use-view-transition #top-row,
+    .is-theme-transitioning.use-view-transition #navbar-wrapper,
+    .is-theme-transitioning.use-view-transition #navbar,
+    .is-theme-transitioning.use-view-transition #navbar > div,
+    .is-theme-transitioning.use-view-transition .navbar-pill,
+    .is-theme-transitioning.use-view-transition .navbar-glass-layer {
+        transition: none !important;
+        animation: none !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
     }
     
     /* 导航栏相关浮动面板的过渡禁用 */
@@ -345,6 +359,7 @@ html {
         opacity: 1;
     }
     .dock-drawer {
+        --dock-drawer-radius: 1rem;
         position: fixed;
         right: 5rem;
         bottom: 1.25rem;
@@ -353,6 +368,7 @@ html {
         overflow: auto;
         background: var(--page-bg);
         border: 2px solid #000;
+        border-radius: var(--dock-drawer-radius);
         padding: 1.25rem;
         z-index: 60;
         transition: opacity 0.15s ease, transform 0.15s ease;
@@ -376,6 +392,7 @@ html {
             border-right: 0;
             border-bottom: 0;
             border-top-width: 2px;
+            border-radius: var(--dock-drawer-radius) var(--dock-drawer-radius) 0 0;
         }
         .dock-tags-list {
             gap: 0.25rem;

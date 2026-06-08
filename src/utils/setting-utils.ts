@@ -19,6 +19,85 @@ declare global {
 	}
 }
 
+type ViewTransitionHandle = {
+	finished?: Promise<unknown>;
+};
+
+const THEME_TRANSITION_TIMEOUT_MS = 500;
+let activeThemeTransitionId = 0;
+
+function startThemeTransition(useViewTransition: boolean): () => void {
+	const root = document.documentElement;
+	const transitionId = ++activeThemeTransitionId;
+	let cleaned = false;
+
+	root.classList.add("is-theme-transitioning");
+	root.classList.toggle("use-view-transition", useViewTransition);
+
+	const cleanupTimer =
+		typeof window !== "undefined"
+			? window.setTimeout(cleanup, THEME_TRANSITION_TIMEOUT_MS)
+			: undefined;
+
+	function cleanup() {
+		if (cleaned || transitionId !== activeThemeTransitionId) {
+			return;
+		}
+		cleaned = true;
+		if (cleanupTimer !== undefined && typeof window !== "undefined") {
+			window.clearTimeout(cleanupTimer);
+		}
+		root.classList.remove("is-theme-transitioning", "use-view-transition");
+	}
+
+	return cleanup;
+}
+
+function queueThemeTransitionCleanup(cleanup: () => void): void {
+	if (
+		typeof window !== "undefined" &&
+		typeof window.requestAnimationFrame === "function"
+	) {
+		window.requestAnimationFrame(cleanup);
+		return;
+	}
+	cleanup();
+}
+
+function runThemeMutation(
+	update: () => void,
+	preferViewTransition: boolean,
+): void {
+	const startViewTransition = preferViewTransition
+		? document.startViewTransition
+		: undefined;
+	const canUseViewTransition = typeof startViewTransition === "function";
+	const cleanupThemeTransition = startThemeTransition(canUseViewTransition);
+
+	if (canUseViewTransition) {
+		try {
+			const transition = startViewTransition.call(
+				document,
+				update,
+			) as unknown as ViewTransitionHandle;
+			if (transition?.finished) {
+				void transition.finished.finally(cleanupThemeTransition);
+			} else {
+				queueThemeTransitionCleanup(cleanupThemeTransition);
+			}
+		} catch {
+			cleanupThemeTransition();
+			const fallbackCleanup = startThemeTransition(false);
+			update();
+			queueThemeTransitionCleanup(fallbackCleanup);
+		}
+		return;
+	}
+
+	update();
+	queueThemeTransitionCleanup(cleanupThemeTransition);
+}
+
 export function getDefaultHue(): number {
 	const fallback = "250";
 	// 检查是否在浏览器环境中
@@ -135,12 +214,7 @@ export function applyThemeToDocument(theme: LIGHT_DARK_MODE): void {
 		}
 	};
 
-	// 使用 View Transitions API 实现平滑的交叉淡化
-	if (needsThemeChange && "startViewTransition" in document) {
-		document.startViewTransition?.(doApply);
-	} else {
-		doApply();
-	}
+	runThemeMutation(doApply, needsThemeChange);
 }
 
 // 系统主题监听器引用
@@ -206,11 +280,7 @@ export function setupSystemThemeListener(): void {
 			document.documentElement.setAttribute("data-theme", expressiveTheme);
 		};
 
-		if ("startViewTransition" in document) {
-			document.startViewTransition?.(applySystemTheme);
-		} else {
-			applySystemTheme();
-		}
+		runThemeMutation(applySystemTheme, true);
 
 		// 触发自定义事件通知其他组件（仅在真正切换时触发）
 		window.dispatchEvent(new CustomEvent("theme-change"));

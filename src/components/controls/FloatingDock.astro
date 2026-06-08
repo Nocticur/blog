@@ -103,7 +103,10 @@ const tags = await getTagList();
 
 {announcementConfig.content && (
 	<div class="dock-drawer dock-drawer-closed" id="dock-drawer-announcement">
-		<div class="dock-drawer-title">[ {announcementConfig.title || "公告"} ]</div>
+		<div class="dock-drawer-title">
+			<Icon name="material-symbols:notifications-outline-rounded" class="dock-drawer-title-icon" />
+			<span>{announcementConfig.title || "公告"}</span>
+		</div>
 		<p class="text-(--deep-text) leading-relaxed mb-4 text-sm">{announcementConfig.content}</p>
 		{announcementConfig.link?.enable !== false && announcementConfig.link?.url && (
 			<a
@@ -121,13 +124,19 @@ const tags = await getTagList();
 
 {musicPlayerConfig.showInNavbar !== false && (
 	<div class="dock-drawer dock-drawer-closed" id="dock-drawer-music">
-		<div class="dock-drawer-title">[ {i18n(I18nKey.music)} ]</div>
+		<div class="dock-drawer-title">
+			<Icon name="material-symbols:music-note-rounded" class="dock-drawer-title-icon" />
+			<span>{i18n(I18nKey.music)}</span>
+		</div>
 		<MusicPlayer lazy />
 	</div>
 )}
 
 <div class="dock-drawer dock-drawer-closed" id="dock-drawer-tags">
-	<div class="dock-drawer-title">[ {i18n(I18nKey.tags)} ]</div>
+	<div class="dock-drawer-title">
+		<Icon name="material-symbols:label-outline" class="dock-drawer-title-icon" />
+		<span>{i18n(I18nKey.tags)}</span>
+	</div>
 	<div class="dock-tags-list">
 		{tags.map((t) => (
 			<a href={getTagUrl(t.name)} class="dock-tag-item">
@@ -139,7 +148,10 @@ const tags = await getTagList();
 </div>
 
 <div class="dock-drawer dock-drawer-closed" id="dock-drawer-toc">
-	<div class="dock-drawer-title">[ contents ]</div>
+	<div class="dock-drawer-title">
+		<Icon name="material-symbols:format-list-bulleted" class="dock-drawer-title-icon" />
+		<span>{i18n(I18nKey.tableOfContents)}</span>
+	</div>
 	<div id="dock-toc-content" class="text-sm leading-relaxed"></div>
 </div>
 
