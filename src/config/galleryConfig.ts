@@ -16,7 +16,7 @@ export const galleryConfig: GalleryConfig = {
 		{
 			id: "ai-2026",
 			name: "祖国人",
-			description: "神人生图，收录各种逆天的AI生图",
+			description: "逆天AI生图",
 			location: "沃特公司",
 			date: "2026-05-06",
 			tags: ["AI", "祖国人"],
@@ -36,14 +36,6 @@ export const galleryConfig: GalleryConfig = {
 			location: "鸣潮",
 			date: "2026-05-11",
 			tags: ["鸣潮"],
-		},
-		{
-			id: "other-2026",
-			name: "其他",
-			description: "其他相册",
-			location: "all around the world",
-			date: "2026-05-06",
-			tags: ["大杂烩"],
 		},
 		{
 			id: "bl-ll-2026",
