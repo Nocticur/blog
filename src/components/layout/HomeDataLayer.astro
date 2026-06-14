@@ -48,7 +48,9 @@ const socialItems = profileConfig.links.map((link) => ({
 const skillItems = normalizeSkillItems({ items: skillsConfig.items });
 
 const umamiConfig = siteConfig.analytics?.umamiAnalytics;
-const statsBaseUrl = umamiConfig?.scriptUrl ? new URL(umamiConfig.scriptUrl).origin : "";
+const statsBaseUrl = umamiConfig?.scriptUrl
+	? new URL(umamiConfig.scriptUrl).origin
+	: "";
 const statsShareId = umamiConfig?.shareId ?? "";
 ---
 
