@@ -6,31 +6,32 @@
 
 ```
 src/config/
-├── index.ts              # 配置索引文件 - 统一导出
-├── siteConfig.ts         # 站点基础配置
-├── backgroundWallpaper.ts # 背景壁纸配置
-├── profileConfig.ts      # 用户资料配置
-├── musicConfig.ts        # 音乐播放器配置
-├── sakuraConfig.ts       # 樱花特效配置
-├── commentConfig.ts      # 评论系统配置
-├── announcementConfig.ts # 公告配置
-├── licenseConfig.ts      # 许可证配置
-├── footerConfig.ts       # 页脚配置
-├── expressiveCodeConfig.ts # 代码高亮配置
-├── fontConfig.ts         # 字体配置
-├── sidebarConfig.ts      # 侧边栏配置
-├── navBarConfig.ts       # 导航栏配置
-├── pioConfig.ts          # 看板娘模型配置（Spine / Live2D）
-├── adConfig.ts           # 广告配置
-├── friendsConfig.ts      # 友链配置
-├── galleryConfig.ts      # 相册配置
-├── sponsorConfig.ts      # 赞助配置
-├── coverImageConfig.ts   # 封面图配置
-├── calendarConfig.ts     # 日历配置
-├── aiSearchConfig.ts     # AI 搜索配置
-├── collectionsApiConfig.ts # 收藏 API 配置
-├── plantumlConfig.ts     # PlantUML 图表配置
-└── README.md             # 本文件
+├── index.ts                   # 配置索引文件 - 统一导出
+├── siteConfig.ts              # 站点基础配置
+├── backgroundWallpaper.ts     # 背景壁纸配置
+├── profileConfig.ts           # 用户资料配置
+├── musicConfig.ts             # 音乐播放器配置
+├── commentConfig.ts           # 评论系统配置
+├── announcementConfig.ts      # 公告配置
+├── licenseConfig.ts           # 许可证配置
+├── footerConfig.ts            # 页脚配置
+├── expressiveCodeConfig.ts    # 代码高亮配置
+├── fontConfig.ts              # 字体配置
+├── sidebarConfig.ts           # 侧边栏配置
+├── navBarConfig.ts            # 导航栏配置
+├── pioConfig.ts               # 看板娘模型配置（Spine / Live2D）
+├── adConfig.ts                # 广告配置
+├── friendsConfig.ts           # 友链配置
+├── galleryConfig.ts           # 相册配置
+├── sponsorConfig.ts           # 赞助配置
+├── coverImageConfig.ts        # 封面图配置
+├── calendarConfig.ts          # 日历配置
+├── homePortfolioShutterConfig.ts # 首页作品百叶窗配置
+├── skillsConfig.ts            # 技能标签配置
+├── aiSearchConfig.ts          # AI 搜索配置
+├── collectionsApiConfig.ts    # 收藏 API 配置
+├── plantumlConfig.ts          # PlantUML 图表配置
+└── README.md                  # 本文件
 ```
 
 ## 🚀 使用方式
@@ -52,8 +53,7 @@ import { profileConfig } from '../config/profileConfig';
 - `backgroundWallpaper.ts` - 背景壁纸配置（壁纸模式、图片、横幅文字等）
 - `profileConfig.ts` - 用户资料配置（头像、姓名、社交链接等）
 - `musicConfig.ts` - 音乐播放器配置（导出 `musicPlayerConfig`）
-- `sakuraConfig.ts` - 樱花特效配置（数量、速度、尺寸等）
-- `commentConfig.ts` - 评论系统配置（Twikoo 评论和文章访问量统计）
+- `commentConfig.ts` - 评论系统配置（Waline / Twikoo / Giscus / Artalk / Disqus）
 - `announcementConfig.ts` - 公告配置（标题、内容、链接等）
 - `licenseConfig.ts` - 许可证配置（CC 协议等）
 - `footerConfig.ts` - 页脚配置（HTML 注入等）
@@ -67,7 +67,9 @@ import { profileConfig } from '../config/profileConfig';
 - `galleryConfig.ts` - 相册配置
 - `sponsorConfig.ts` - 赞助配置（赞助方式、二维码等）
 - `coverImageConfig.ts` - 封面图配置（随机封面图列表等）
-- `calendarConfig.ts` - 日历配置
+- `calendarConfig.ts` - 日历页面配置
+- `homePortfolioShutterConfig.ts` - 首页作品百叶窗配置
+- `skillsConfig.ts` - 技能标签配置
 - `aiSearchConfig.ts` - AI 搜索配置
 - `collectionsApiConfig.ts` - 收藏 API 配置
 - `plantumlConfig.ts` - PlantUML 图表配置

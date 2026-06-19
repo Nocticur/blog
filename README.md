@@ -13,7 +13,7 @@
 
 Firefly-Mod 是从 [Firefly](https://github.com/CuteLeaf/Firefly) 分支出的个性化魔改版本，已脱离原分支独立演进。基于 Astro 6.x SSG 静态站点生成，搭配 Svelte 5 组件和 Tailwind CSS 4 样式系统，构建为纯静态博客。
 
-核心特性：双侧边栏组件化布局、上下班状态感知、Live2D/Spine 看板娘、Bangumi 追番集成、相册系统、收藏 API、Waline/Twikoo/Giscus 等多评论系统支持、Swup 页面过渡动画、Pagefind 客户端全文搜索。
+核心特性：双侧边栏组件化布局、上下班状态感知、Live2D/Spine 看板娘、相册系统、收藏 API、Waline/Twikoo/Giscus/Artalk/Disqus 多评论系统支持、Swup 页面过渡动画、Pagefind 客户端全文搜索、基于 Cloudflare Vectorize 的 AI 语义搜索（RAG）、留言板、日历页面、首页作品百叶窗、文章分享海报、密码加密文章。
 
 ## 技术栈
 
@@ -44,14 +44,22 @@ pnpm build
 # 预览构建产物
 pnpm preview
 
-## 开发测试
-# 构建AI索引
+# 类型检查
+pnpm type-check
+
+# 重新生成图标
+pnpm icons
+
+# 构建/更新 AI 搜索向量索引（增量）
 pnpm build-index
 
-# 登录Cloudflare Workers AI
+# 强制全量重建 AI 搜索向量索引
+pnpm build-index -- --force
+
+# 登录 Cloudflare（部署 Workers 前）
 npx wrangler login
 
-# 构建到cf测试
+# 部署到 Cloudflare
 npx wrangler deploy
 ```
 
@@ -64,11 +72,13 @@ npx wrangler deploy
 | 开发服务器 | `pnpm dev` |
 | 构建 | `pnpm build` |
 | 预览构建产物 | `pnpm preview` |
-| 类型检查 | `pnpm check` 或 `pnpm type-check` |
+| Astro 类型检查 | `pnpm check` |
+| TypeScript 类型检查 | `pnpm type-check` |
 | 格式化代码 | `pnpm format` |
 | Lint + 自动修复 | `pnpm lint` |
 | 新建博客文章 | `pnpm new-post <filename>` |
 | 重新生成图标 | `pnpm icons` |
+| 构建/更新 AI 向量索引 | `pnpm build-index` |
 
 强制使用 pnpm（`preinstall` 脚本限制）。
 
@@ -89,7 +99,9 @@ npx wrangler deploy
 | `galleryConfig.ts` | 相册配置 |
 | `friendsConfig.ts` | 友链配置 |
 | `sponsorConfig.ts` | 赞助页配置 |
-| `sakuraConfig.ts` | 樱花特效配置 |
+| `calendarConfig.ts` | 日历页面配置 |
+| `homePortfolioShutterConfig.ts` | 首页作品百叶窗配置 |
+| `skillsConfig.ts` | 技能标签配置 |
 | `backgroundWallpaper.ts` | 壁纸配置 |
 | `adConfig.ts` | 广告栏配置 |
 | `announcementConfig.ts` | 公告栏配置 |
@@ -118,7 +130,8 @@ npx wrangler deploy
 | `ci.yml` | push/PR 到 master | Astro 类型检查 + Biome Lint 代码质量检查 |
 | `cron-check.yml` | 每日 08:00 + 手动触发 | 友链可达性巡检，使用 Playwright 逐个访问，异常自动创建 Issue 报告 |
 | `friend-link-checker.yml` | Issue 创建/评论 | 通过 Issue 自动处理友链申请，提取信息并提交 PR |
-| `claude.yml` / `claude-review.yml` | Issue/PR 评论 | AI 辅助代码审查和问题响应 |
+| `claude.yml` | Issue/PR 评论、Issue 创建、PR Review | 提及 `@claude` 时触发 AI 响应 |
+| `claude-review.yml` | PR 创建/更新 | 自动进行 AI 代码审查 |
 
 注意：建议在 GitHub 仓库设置中关闭邮箱订阅，避免 CI 工作流频繁触发邮件通知。
 
@@ -131,9 +144,9 @@ npx wrangler deploy
 |--------|------|
 | 托管平台 | 支持任何静态托管：Cloudflare Pages、Vercel、Netlify、GitHub Pages、Nginx 等 |
 | 评论服务 | 若启用评论，需自行部署对应后端（Waline / Twikoo / Artalk 等） |
-| KV 存储 | 若启用统计，需配置 KV 存储空间 |
-| 统计服务 | 若启用统计，需配置 Umami（`siteConfig.ts` 中配置 `analytics.umamiAnalytics`，Worker 中配置 `UMAMI_TOKEN` Secret） |
-| AI 搜索 | 需 Cloudflare Vectorize 索引 + Workers AI / 第三方 API（魔搭社区默认。如果没配置API会使用cf workers ai） |
+| KV 存储 | 若启用留言板，需配置 KV 存储空间 |
+| 统计服务 | 站点访问统计通过 Umami 获取（`siteConfig.ts` 中配置 `analytics.umamiAnalytics`，Worker 中配置 `UMAMI_TOKEN` Secret） |
+| AI 搜索 | 需 Cloudflare Vectorize 索引；构建索引需 `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`；LLM/Embedding 默认走 Workers AI，也可在 `aiSearchConfig.ts` 中配置第三方 API（如魔搭社区）并设置 `AI_API_KEY` |
 | 图床（可选）| 项目没引用图床，无需配置，但是我建议配置一个图床，用于存储文章中的图片 |
 
 ### Cloudflare Pages 部署方案
@@ -148,24 +161,24 @@ npx wrangler deploy
    - **构建命令**：`pnpm build`
    - **构建输出目录**：`dist`
 4. 点击「保存并部署」，首次构建约 2-5 分钟
-5. 添加在 Pages 环境变量中：
-   - **AI_API_KEY**：Cloudflare Vectorize API 密钥，用于 AI 搜索功能。请在 Cloudflare Dashboard → Workers & Pages → Settings → Variables and Secrets 中以 **Secret** 形式添加。（目前项目默认指定使用魔搭社区，若需使用其他社区，请在 `aiSearchConfig.ts` 中修改）
-   - **UMAMI_TOKEN**：Umami 统计 API Token，用于全站访问量统计。获取方式：`curl -X POST https://你的Umami地址/api/auth/login -H "Content-Type: application/json" -d '{"username":"用户名","password":"密码"}'`，取返回的 `token` 字段。在 Cloudflare Dashboard → Workers & Pages → Settings → Variables and Secrets 中以 **Secret** 形式添加。
-6. 配置KV存储，项目统计信息和留言数据，需要到 Cloudflare KV 中创建一个存储空间。详细步骤是：
-   - 登录 Cloudflare Dashboard → KV → 创建存储空间
-   - 使用 `wrangler kv create` 创建 KV 存储空间，指定存储空间ID和名称（建议与项目名称一致）
-   - 不用担心这个ID是否敏感，因为 Cloudflare KV 存储空间ID 是随机生成的，不会泄露任何个人信息，ID也只能你自己访问。
-   - 点击「保存并部署」，首次构建约 2-5 分钟
-7. 设置好后重启pages，等待部署成功。
-8. 构建AI搜索索引，需要在 Cloudflare Vectorize 中创建一个索引，指定索引名称（建议与项目名称一致）。使用指令加上索引名称，例如 `wrangler kv create --name blog-ai-search`。
+5. 添加 Pages 环境变量（Dashboard → Workers & Pages → Settings → Variables and Secrets）：
+   - **AI_API_KEY**：第三方 LLM/Embedding API 密钥（默认魔搭社区）。若完全使用 Cloudflare Workers AI，则无需配置。
+   - 如需 Umami 统计，添加 **UMAMI_TOKEN** Secret。
+6. 配置 KV 存储（用于留言板等 Worker 状态数据）：
+   - 登录 Cloudflare Dashboard → KV → 创建命名空间
+   - 使用 `wrangler kv namespace create "VISITOR_KV"` 创建，并在 `wrangler.toml` 中同步 `id`
+7. 设置好后重启 Pages，等待部署成功。
+8. 创建 AI 搜索向量索引：
+   - 索引名称需与 `src/config/aiSearchConfig.ts` 中的 `indexName` 一致（默认 `blog-ai-search`）
+   - 使用 wrangler 创建：`wrangler vectorize create --name blog-ai-search --dimensions 1024 --metric cosine`
 
 ### 你需要更改的配置文件
 
 - `src/config/aiSearchConfig.ts`：AI 搜索配置（模型、Embedding、向量索引）
 - `src/config/commentConfig.ts`：评论系统配置（更换地址）
 - `src/config/profileConfig.ts`：首页信息：头像、昵称、签名、社交链接
-- `src/config/siteConfig.ts`：网站配置：上下班时间、网站设置、bangumi配置、Umami配置、导航栏配置
-- `wrangler.toml`：Cloudflare KV 存储空间配置
+- `src/config/siteConfig.ts`：网站配置：上下班时间、网站设置、页面开关、Umami 统计、导航栏配置
+- `wrangler.toml`：Cloudflare KV / Vectorize / AI 绑定配置
 
 下方可选配置文件
 
@@ -175,27 +188,41 @@ npx wrangler deploy
 - `src/config/collectionsApiConfig.ts`：收藏 API 配置
 - `src/config/announcementConfig.ts`：公告栏配置
 - `src/config/friendsConfig.ts`：友链配置
+- `src/config/galleryConfig.ts`：相册配置
+- `src/config/calendarConfig.ts`：日历页面配置
+- `src/config/sponsorConfig.ts`：赞助页配置
+- `src/config/coverImageConfig.ts`：封面图配置
+- `src/config/homePortfolioShutterConfig.ts`：首页作品百叶窗配置
+- `src/config/skillsConfig.ts`：技能标签配置
+- `src/config/backgroundWallpaper.ts`：背景壁纸配置
 
 ## 文章存储位置
 
-- `src/posts/`：Markdown 文章存储目录，文章内格式必须包含
+- `src/content/posts/`：Markdown / MDX 文章存储目录，文章内格式必须包含
   - 标题：`title: 文章标题`
-  - 日期：`date: 2023-01-01`
-  - 分类：`categories: [分类1, 分类2]`
+  - 发布日期：`published: 2023-01-01`
+  - 分类：`category: 分类`
   - 标签：`tags: [标签1, 标签2]`
-  - 内容：`<!-- more -->` 之后的内容
+- 常用可选 frontmatter：
+  - 更新日期：`updated: 2023-01-02`
+  - 描述：`description: 文章描述`（未填写时默认取正文第一段作为摘要）
+  - 草稿：`draft: true`
+  - 置顶：`pinned: true`
+  - 封面图：`image: /assets/images/cover.webp`
+  - 密码：`password: 你的密码`（配合 `passwordHint` 使用）
+  - 作者、转载链接、许可证等：`author`, `sourceLink`, `licenseName`, `licenseUrl`
 
-详细参考 [fuwari 文档](https://fuwari.vercel.app/docs/).
+- `src/content/spec/`：特殊页面内容目录，包含关于、友链、留言板、隐私政策等页面
 
 ## 相册存储位置
 
-- `src/assets/gallery/`：相册图片存储目录
+- `public/gallery/`：相册图片存储目录，子目录名需与 `src/config/galleryConfig.ts` 中的相册 `id` 对应
+- 每个相册目录下放图片，可手动放置 `cover.*` 作为封面；无封面时默认使用第一张图片
 
-详细参考 [fuwari 文档](https://fuwari.vercel.app/docs/).
+## Live2D / Spine 模型存储位置
 
-## live2d 存储位置
-
-- `src/assets/live2d/`：Live2D 模型存储目录
+- `public/pio/models/live2d/`：Live2D 模型存储目录
+- `public/pio/models/spine/`：Spine 模型存储目录
 
 ## Live2D 版权声明
 
