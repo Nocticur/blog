@@ -230,6 +230,15 @@ export const friendsConfig: FriendLink[] = [
 		weight: 5,
 		enabled: true,
 	},
+	{
+		title: "阿的宝藏之地",
+		imgurl: "https://bu.dusays.com/2026/06/20/6a361fc5c68ff.jpg",
+		desc: "记录项目、数学思考与杂谈。",
+		siteurl: "https://nothing-new.icu/",
+		tags: ["Blog"],
+		weight: 5,
+		enabled: true,
+	},
 ];
 
 // 获取启用的友链并进行排序
