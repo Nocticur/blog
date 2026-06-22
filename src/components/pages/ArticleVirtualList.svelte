@@ -37,10 +37,13 @@ let { posts, defaultView = "list", postsPerPage = 10 }: Props = $props();
 let containerRef = $state<HTMLElement | null>(null);
 let view = $state<ArticleListView>("list");
 let selectedIndex = $state(0);
+let displayedIndex = $state(0);
+let phase = $state<"idle" | "leaving" | "entering">("idle");
 let gridColumnCount = $state(2);
 let currentPage = $state(1);
 
 const gridBreakpoint = 720;
+const fadeDuration = 200;
 
 const totalPages = $derived(
 	Math.max(1, Math.ceil(posts.length / postsPerPage)),
@@ -48,7 +51,7 @@ const totalPages = $derived(
 const paginatedPosts = $derived(
 	posts.slice((currentPage - 1) * postsPerPage, currentPage * postsPerPage),
 );
-const selectedPost = $derived(posts[selectedIndex] ?? posts[0]);
+const displayedPost = $derived(posts[displayedIndex] ?? posts[0]);
 const gridRows = $derived(
 	Array.from(
 		{ length: Math.ceil(paginatedPosts.length / Math.max(1, gridColumnCount)) },
@@ -97,8 +100,30 @@ function handleLayoutChange(event: Event) {
 	updateGridColumns();
 }
 
+function startTransition() {
+	if (phase !== "idle") return;
+	if (selectedIndex === displayedIndex) return;
+	phase = "leaving";
+	setTimeout(() => {
+		displayedIndex = selectedIndex;
+		phase = "entering";
+		setTimeout(() => {
+			phase = "idle";
+			if (selectedIndex !== displayedIndex) {
+				startTransition();
+			}
+		}, fadeDuration);
+	}, fadeDuration);
+}
+
 function selectPost(index: number) {
 	selectedIndex = index;
+}
+
+function selectPostWithTransition(index: number) {
+	if (index === selectedIndex) return;
+	selectedIndex = index;
+	startTransition();
 }
 
 function goToPage(page: number) {
@@ -107,6 +132,7 @@ function goToPage(page: number) {
 	if (containerRef) {
 		containerRef.scrollIntoView({ behavior: "smooth", block: "start" });
 	}
+	startTransition();
 }
 
 function handleDetailImageError(event: Event, apiUrls: string[]) {
@@ -255,9 +281,7 @@ $effect(() => {
 							type="button"
 							class="article-list-row__button"
 							aria-pressed={(currentPage - 1) * postsPerPage + index === selectedIndex}
-							onclick={() => selectPost((currentPage - 1) * postsPerPage + index)}
-							onmouseenter={() => selectPost((currentPage - 1) * postsPerPage + index)}
-							onfocus={() => selectPost((currentPage - 1) * postsPerPage + index)}
+							onclick={() => selectPostWithTransition((currentPage - 1) * postsPerPage + index)}
 						>
 							<span class="article-list-row__title">
 								{post.pinned ? "PIN · " : ""}{post.title}
@@ -267,6 +291,22 @@ $effect(() => {
 								<span class="article-list-row__divider" aria-hidden="true">/</span>
 								<span>{post.category}</span>
 							</span>
+							<span class="article-list-row__tags">
+								{#if post.tags.length > 0}
+									{#each post.tags.slice(0, 3) as tag (tag.name)}
+										<span class="article-list-row__tag">
+											#{tag.name}
+										</span>
+									{/each}
+									{#if post.tags.length > 3}
+										<span class="article-list-row__tags-more" aria-label={`还有 ${post.tags.length - 3} 个标签`}>
+											+{post.tags.length - 3}
+										</span>
+									{/if}
+								{:else}
+									<span class="article-list-row__no-tags">#无标签</span>
+								{/if}
+							</span>
 						</button>
 					</article>
 				{/each}
@@ -274,15 +314,17 @@ $effect(() => {
 
 			<aside class="article-list-virtual__right" aria-live="polite">
 				<a
-					href={selectedPost.url}
+					href={displayedPost.url}
 					class="post-card-wrapper article-detail-card"
-					aria-label={`查看文章：${selectedPost.title}`}
+					class:is-leaving={phase === "leaving"}
+					class:is-entering={phase === "entering"}
+					aria-label={`查看文章：${displayedPost.title}`}
 				>
 					<div class="article-detail-card__heading">
 						<span class="article-detail-card__title">
-							<span class="article-detail-card__title-text">{selectedPost.title}</span>
+							<span class="article-detail-card__title-text">{displayedPost.title}</span>
 						</span>
-						{#if selectedPost.password}
+						{#if displayedPost.password}
 							<span class="article-detail-card__lock" aria-label="加密文章">
 								<Icon icon="material-symbols:lock-outline" size="xl" />
 							</span>
@@ -291,17 +333,17 @@ $effect(() => {
 
 					<div class="article-detail-card__meta">
 						<span class="article-detail-card__category">
-							{selectedPost.category}
+							{displayedPost.category}
 						</span>
 						<span class="article-detail-card__separator" aria-hidden="true">|</span>
-						<time class="article-detail-card__time" datetime={selectedPost.publishedIso}>
-							{selectedPost.publishedText}
+						<time class="article-detail-card__time" datetime={displayedPost.publishedIso}>
+							{displayedPost.publishedText}
 						</time>
 					</div>
 
 					<div class="article-detail-card__tags" aria-label="标签集合">
-						{#if selectedPost.tags.length > 0}
-							{#each selectedPost.tags as tag (tag.name)}
+						{#if displayedPost.tags.length > 0}
+							{#each displayedPost.tags as tag (tag.name)}
 								<span class="post-tag-square article-detail-card__tag">
 									#{tag.name}
 								</span>
@@ -312,22 +354,22 @@ $effect(() => {
 					</div>
 
 					<span class="article-detail-card__description">
-						{selectedPost.description}
+						{displayedPost.description}
 					</span>
 
-					{#if selectedPost.imageUrl}
-						{#key selectedPost.id}
+					{#if displayedPost.imageUrl}
+						{#key displayedPost.id}
 							<span class="article-detail-card__cover">
 								<img
 									class="article-detail-card__image"
-									src={selectedPost.imageUrl}
-									alt={`文章配图：${selectedPost.title}`}
+									src={displayedPost.imageUrl}
+									alt={`文章配图：${displayedPost.title}`}
 									loading="lazy"
 									decoding="async"
 									data-api-index="0"
-									referrerpolicy={selectedPost.imageReferrerPolicy || undefined}
+									referrerpolicy={displayedPost.imageReferrerPolicy || undefined}
 									onerror={(event) =>
-										handleDetailImageError(event, selectedPost.imageApiUrls)}
+										handleDetailImageError(event, displayedPost.imageApiUrls)}
 								/>
 							</span>
 						{/key}
