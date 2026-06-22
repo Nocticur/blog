@@ -1,6 +1,6 @@
 <script lang="ts">
 import QRCode from "qrcode";
-import { onMount } from "svelte";
+import { onMount, onDestroy } from "svelte";
 import Icon from "@/components/common/Icon.svelte";
 import I18nKey from "../../i18n/i18nKey";
 import { i18n } from "../../i18n/translation";
@@ -31,6 +31,19 @@ onMount(() => {
 	if (computedColor) {
 		themeColor = computedColor;
 	}
+});
+
+function handlePageTransition() {
+	showModal = false;
+}
+
+onMount(() => {
+	document.addEventListener("astro:page-load", handlePageTransition);
+});
+
+onDestroy(() => {
+	showModal = false;
+	document.removeEventListener("astro:page-load", handlePageTransition);
 });
 
 function loadImage(src: string): Promise<HTMLImageElement | null> {
@@ -480,7 +493,7 @@ function portal(node: HTMLElement) {
 
 <!-- Trigger Button -->
 <button 
-  class="btn-regular rounded-lg h-12 px-6 gap-2 hover:scale-105 active:scale-95 whitespace-nowrap"
+  class="flex items-center gap-1.5 text-50 text-sm font-medium hover:text-(--primary) dark:hover:text-(--primary) transition cursor-pointer"
   on:click={generatePoster}
   aria-label="Generate Share Poster"
 >
@@ -494,23 +507,23 @@ function portal(node: HTMLElement) {
 {#if showModal}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div use:portal class="fixed inset-0 z-9999 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 transition-opacity" on:click={closeModal}>
-    <div class="bg-white dark:bg-gray-800 rounded-2xl max-w-[440px] w-full max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl transform transition-all" on:click={(e) => e.stopPropagation()}>
+  <div use:portal class="fixed inset-0 z-9999 flex items-center justify-center bg-black/80 p-4 transition-opacity" on:click={closeModal}>
+    <div class="bg-white dark:bg-[oklch(0.12_0_0)] rounded-2xl max-w-[440px] w-full max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl transform transition-all" on:click={(e) => e.stopPropagation()}>
       
-      <div class="p-6 flex justify-center bg-gray-50 dark:bg-gray-900 min-h-[200px] items-center">
+      <div class="p-6 flex justify-center bg-gray-50 dark:bg-[oklch(0.08_0_0)] min-h-[200px] items-center">
         {#if posterImage}
           <img src={posterImage} alt="Poster" class="max-w-full h-auto shadow-lg rounded-lg" />
         {:else}
            <div class="flex flex-col items-center gap-3">
-             <div class="w-8 h-8 border-2 border-gray-200 rounded-full animate-spin" style="border-top-color: {themeColor}"></div>
-             <span class="text-sm text-gray-500">{i18n(I18nKey.generatingPoster)}</span>
+             <div class="w-8 h-8 border-2 border-gray-300 dark:border-gray-700 rounded-full animate-spin" style="border-top-color: {themeColor}"></div>
+             <span class="text-sm text-gray-500 dark:text-gray-400">{i18n(I18nKey.generatingPoster)}</span>
            </div>
         {/if}
       </div>
       
-      <div class="p-4 border-t border-gray-100 dark:border-gray-700 grid grid-cols-2 gap-3">
+      <div class="p-4 border-t border-gray-200 dark:border-gray-700 grid grid-cols-2 gap-3">
         <button 
-          class="py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          class="py-3 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           on:click={copyLink}
         >
           {#if copied}
@@ -522,7 +535,7 @@ function portal(node: HTMLElement) {
           {/if}
         </button>
         <button 
-          class="py-3 text-white rounded-xl font-medium active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-90"
+          class="py-3 text-white dark:text-black rounded-xl font-medium active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-90"
           style="background-color: {themeColor};"
           on:click={downloadPoster}
           disabled={!posterImage}

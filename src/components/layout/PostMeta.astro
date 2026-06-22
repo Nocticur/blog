@@ -1,10 +1,13 @@
 ---
 import Icon from "@components/common/Icon.astro";
 import VisitorCount from "@components/common/VisitorCount.astro";
+import SharePoster from "@components/misc/SharePoster.svelte";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import { formatDateToYYYYMMDD } from "@/utils/date-utils";
 import { getCategoryUrl, getTagUrl } from "@/utils/url-utils";
+import { profileConfig } from "@/config/profileConfig";
+import { siteConfig } from "@/config/siteConfig";
 
 export interface Props {
 	published: Date;
@@ -22,6 +25,11 @@ export interface Props {
 	customPath?: string;
 	pinned?: boolean;
 	password?: boolean;
+	posterTitle?: string;
+	posterDescription?: string;
+	posterCoverUrl?: string;
+	posterAvatarUrl?: string | null;
+	posterUrl?: string;
 }
 
 const {
@@ -37,6 +45,11 @@ const {
 	showTags = true,
 	customPath,
 	pinned,
+	posterTitle,
+	posterDescription,
+	posterCoverUrl,
+	posterAvatarUrl,
+	posterUrl,
 } = Astro.props;
 
 const path = customPath || (id ? `/posts/${id}` : "");
@@ -129,4 +142,21 @@ const path = customPath || (id ? `/posts/${id}` : "");
 
   <!-- 访问量统计 -->
   <VisitorCount isHome={isHome} id={id} path={path} />
+
+  <!-- 分享按钮 -->
+  {!isHome && siteConfig.sharePoster && posterTitle && (
+    <div class="flex items-center">
+      <SharePoster
+        client:only="svelte"
+        title={posterTitle}
+        author={profileConfig.name}
+        description={posterDescription || posterTitle}
+        pubDate={formatDateToYYYYMMDD(published)}
+        coverImage={posterCoverUrl}
+        url={posterUrl ?? ""}
+        siteTitle={siteConfig.title}
+        avatar={posterAvatarUrl}
+      />
+    </div>
+  )}
 </div>

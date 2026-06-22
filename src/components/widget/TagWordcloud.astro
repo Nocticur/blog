@@ -252,7 +252,11 @@ const chartData = topTags.map((t, i) => ({
       var my = e.clientY - rect.top;
       var idx = hitTest(mx, my);
       if (idx >= 0 && sorted[idx] && sorted[idx].url) {
-        window.location.href = sorted[idx].url;
+        if (window.navigateToPage) {
+          window.navigateToPage(sorted[idx].url);
+        } else {
+          window.location.href = sorted[idx].url;
+        }
       }
     };
   }

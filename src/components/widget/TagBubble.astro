@@ -168,7 +168,11 @@ const chartData = tags.map((t) => ({
       // 点击跳转
       chart.on("click", function(params) {
         if (params.data && params.data.url) {
-          window.location.href = params.data.url;
+          if (window.navigateToPage) {
+            window.navigateToPage(params.data.url);
+          } else {
+            window.location.href = params.data.url;
+          }
         }
       });
 

@@ -260,7 +260,13 @@ const chartData = {
 
       chart.on("click", function(params) {
         if (params.dataType !== "node" || !params.data) return;
-        if (params.data.url) window.location.href = params.data.url;
+        if (params.data.url) {
+          if (window.navigateToPage) {
+            window.navigateToPage(params.data.url);
+          } else {
+            window.location.href = params.data.url;
+          }
+        }
       });
 
       window.addEventListener("resize", state.resizeHandler);
