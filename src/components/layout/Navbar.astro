@@ -97,7 +97,8 @@ if (isLocalSrcLogo) {
             </div>
 
             <div class="navbar-right flex items-center gap-1">
-                <button aria-label="Search" name="Search" class="btn-plain h-11 w-11" id="nav-search-btn">
+                <button aria-label="Search" name="Search" class="btn-plain h-11 nav-search-btn" id="nav-search-btn">
+                    <span class="nav-search-btn__shortcut" data-shortcut>⌘ K</span>
                     <Icon name="material-symbols:search-rounded" is:inline class="text-[1.65rem]" style="font-variation-settings: 'wght' 700"></Icon>
                 </button>
                 <button aria-label="Menu" name="Nav Menu" class="btn-plain h-11 w-11 lg:hidden!" id="nav-menu-switch">
@@ -238,8 +239,17 @@ initHoverSlider();
     handleScroll();
 })();
 
+function initSearchShortcut() {
+    const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+    const text = isMac ? "⌘K" : "Ctrl K";
+    document.querySelectorAll("[data-shortcut]").forEach((el) => {
+        el.textContent = text;
+    });
+}
+
 document.addEventListener("astro:page-load", () => {
     initHoverSlider();
+    initSearchShortcut();
 });
 
 // Navbar search button → open search modal

@@ -150,12 +150,6 @@ export type SiteConfig = {
 		workDays?: number[];
 	};
 
-	// 备案号配置（留空则不显示）
-	beian?: string;
-
-	// 公安网备号配置（留空则不显示）
-	policeBeian?: string;
-
 	// 热力图配置
 	heatmap?: {
 		github?: {
@@ -426,9 +420,32 @@ export type FontConfig = {
 	preload?: boolean; // 是否预加载字体文件以提高性能
 };
 
+export type FooterSocialLink = {
+	label: string; // 显示文字
+	href: string; // 链接（mailto:/tel: 等也支持）
+	icon: string; // 图标名
+};
+
+export type FooterBeianConfig = {
+	icp: string; // ICP 备案号，留空则不显示
+	police: string; // 公安网备号，留空则不显示
+	policeIcon: string; // 公安备案图标路径
+	icpUrl: string; // ICP 备案查询链接
+	policeUrl: string; // 公安备案查询链接
+};
+
+export type FooterPoweredByItem = {
+	label: string; // 前缀文字，如"框架""主题"
+	name: string; // 名称，如"Astro""Firefly"
+	href: string; // 链接
+};
+
 export type FooterConfig = {
 	enable: boolean; // 是否启用Footer HTML注入功能
 	customHtml?: string; // 自定义HTML内容，用于添加备案号等信息
+	socialLinks: FooterSocialLink[]; // 社交链接
+	beian: FooterBeianConfig; // 备案信息
+	poweredBy: FooterPoweredByItem[]; // Powered by 信息
 };
 
 export type CoverImageConfig = {

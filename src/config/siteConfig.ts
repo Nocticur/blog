@@ -292,10 +292,4 @@ export const siteConfig: SiteConfig = {
 
 	// 站点语言，在本配置文件顶部SITE_LANG定义
 	lang: SITE_LANG,
-
-	// 备案号配置，留空则不显示
-	beian: "粤ICP备2026073665号-1",
-
-	// 公安网备号配置，留空则不显示
-	policeBeian: "粤公网安备44060602003342号",
 };

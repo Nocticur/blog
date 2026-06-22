@@ -196,6 +196,57 @@
 	background-color: transparent !important;
 }
 
+/* ── 搜索按钮 + 快捷键徽章 ── */
+.nav-search-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	padding-inline: 0.625rem;
+}
+
+.nav-search-btn__shortcut {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.5rem;
+	height: 1.25rem;
+	padding: 0 0.375rem;
+	font-size: 0.7rem;
+	font-weight: 600;
+	line-height: 1;
+	color: var(--deep-text);
+	background: color-mix(in oklch, var(--deep-text) 6%, transparent);
+	border: 1px solid var(--line-divider);
+	border-radius: 0.375rem;
+	opacity: 0.75;
+	white-space: nowrap;
+	overflow: hidden;
+	transition:
+		max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+		opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+		transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+		padding-inline 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+		border-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 收缩状态：只保留图标 */
+#navbar.scrolled .nav-search-btn__shortcut {
+	max-width: 0;
+	min-width: 0;
+	opacity: 0;
+	transform: translateX(-8px);
+	padding-inline: 0;
+	border-width: 0;
+	pointer-events: none;
+}
+
+/* 移动端：徽章始终隐藏（空间紧凑） */
+@media (max-width: 768px) {
+	.nav-search-btn__shortcut {
+		display: none;
+	}
+}
+
 /* ── hover 滑动边框指示器 ── */
 .navbar-hover-border {
 	position: absolute;

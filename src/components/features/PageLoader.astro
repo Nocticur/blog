@@ -1,9 +1,14 @@
+---
+const pathname = Astro.url.pathname;
+const isHome = pathname === "/" || pathname === "";
+---
 <div
 	id="page-loader"
-	class="page-loader page-loader--visible"
+	class:list={["page-loader", isHome ? "page-loader--visible" : "page-loader--hidden"]}
 	role="status"
 	aria-live="polite"
 	aria-label="Page loading"
+	hidden={!isHome}
 >
 	<div
 		aria-label="Running animation"

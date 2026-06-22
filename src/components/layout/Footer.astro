@@ -1,6 +1,6 @@
 ---
 import Icon from "@components/common/Icon.astro";
-import { profileConfig, siteConfig } from "@/config";
+import { footerConfig, profileConfig, siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import { getSortedPosts } from "@/utils/content-utils";
@@ -10,8 +10,7 @@ const currentYear = new Date().getFullYear();
 
 // 从配置中获取站点开始日期
 const siteStartDate = siteConfig.siteStartDate || "2025-01-01";
-const beian = siteConfig.beian || "";
-const policeBeian = siteConfig.policeBeian || "";
+const { socialLinks, beian, poweredBy } = footerConfig;
 
 // 获取最新文章日期（用于计算最后活动时间）
 const posts = await getSortedPosts();
@@ -27,6 +26,9 @@ const lastPostDate = latestPost
 const runningDaysText = i18n(I18nKey.footerRunningDays);
 const lastUpdateText = i18n(I18nKey.footerLastUpdate);
 const todayText = i18n(I18nKey.today);
+
+// mailto:/tel: 链接不在新标签打开
+const isExternalLink = (href: string) => !/^(mailto:|tel:)/i.test(href);
 ---
 
 <div
@@ -35,40 +37,21 @@ const todayText = i18n(I18nKey.today);
 	<div class="transition text-50 text-base text-center wrap flex flex-col gap-2">
 		{/* 第一层：社交链接 */}
 		<div class="flex items-center justify-center gap-3 text-neutral-500 dark:text-neutral-400 text-sm flex-wrap">
-			<a
-				class="transition text-(--primary) font-bold hover:scale-105 inline-flex items-center gap-1"
-				target="_blank"
-				href="https://github.com/MmzMing"
-			>
-				<Icon name="fa7-brands:github" is:inline class="text-base" />
-				<span>GitHub</span>
-			</a>
-			<span class="text-neutral-300 dark:text-neutral-600">|</span>
-			<a
-				class="transition text-(--primary) font-bold hover:scale-105 inline-flex items-center gap-1"
-				target="_blank"
-				href="https://qm.qq.com/q/2R07cjGTZ0"
-			>
-				<Icon name="fa7-brands:qq" is:inline class="text-base" />
-				<span>QQ</span>
-			</a>
-			<span class="text-neutral-300 dark:text-neutral-600">|</span>
-			<a
-				class="transition text-(--primary) font-bold hover:scale-105 inline-flex items-center gap-1"
-				target="_blank"
-				href="https://space.bilibili.com/15446538"
-			>
-				<Icon name="fa7-brands:bilibili" is:inline class="text-base" />
-				<span>B站</span>
-			</a>
-			<span class="text-neutral-300 dark:text-neutral-600">|</span>
-			<a
-				class="transition text-(--primary) font-bold hover:scale-105 inline-flex items-center gap-1"
-				href="mailto:784774835@qq.com"
-			>
-				<Icon name="material-symbols:mail" is:inline class="text-base" />
-				<span>邮箱</span>
-			</a>
+			{socialLinks.map((link, index) => (
+				<>
+					<a
+						class="transition text-(--primary) font-bold hover:scale-105 inline-flex items-center gap-1"
+						target={isExternalLink(link.href) ? "_blank" : undefined}
+						href={link.href}
+					>
+						<Icon name={link.icon} is:inline class="text-base" />
+						<span>{link.label}</span>
+					</a>
+					{index < socialLinks.length - 1 && (
+						<span class="text-neutral-300 dark:text-neutral-600">|</span>
+					)}
+				</>
+			))}
 		</div>
 
 		{/* 第二层：RSS | 隐私政策 */}
@@ -111,29 +94,29 @@ const todayText = i18n(I18nKey.today);
 		</div>
 
 		{/* 第五层：备案信息 */}
-		{(beian || policeBeian) && (
+		{(beian.icp || beian.police) && (
 			<div class="flex items-center justify-center gap-2 text-neutral-500 dark:text-neutral-400 text-sm flex-wrap">
-				{beian && (
+				{beian.icp && (
 					<a
 						class="transition text-(--primary) font-bold hover:scale-105 inline-flex items-center gap-1"
 						target="_blank"
-						href="https://beian.miit.gov.cn/#/Integrated/index"
+						href={beian.icpUrl}
 					>
-						<span>{beian}</span>
+						<span>{beian.icp}</span>
 					</a>
 				)}
-				{beian && policeBeian && (
+				{beian.icp && beian.police && (
 					<span class="text-neutral-300 dark:text-neutral-600">|</span>
 				)}
-				{policeBeian && (
+				{beian.police && (
 					<a
 						class="transition text-(--primary) font-bold hover:scale-105 inline-flex items-center gap-1"
 						target="_blank"
 						rel="noreferrer"
-						href="https://beian.mps.gov.cn/#/query/webSearch?code=44060602003342"
+						href={beian.policeUrl}
 					>
-						<img src="/assets/images/备案图标.png" alt="公安网备" class="w-4 h-4 inline-block" />
-						<span>{policeBeian}</span>
+						<img src={beian.policeIcon} alt="公安网备" class="w-4 h-4 inline-block" />
+						<span>{beian.police}</span>
 					</a>
 				)}
 			</div>
@@ -141,23 +124,21 @@ const todayText = i18n(I18nKey.today);
 
 		{/* 第六层：Powered by */}
 		<div class="flex items-center justify-center gap-1 text-neutral-500 dark:text-neutral-400 text-sm">
-			<span>框架</span>
-			<a
-				class="transition text-(--primary) font-bold hover:scale-105"
-				target="_blank"
-				href="https://astro.build"
-			>
-				Astro
-			</a>
-			<span>|</span>
-			<span>主题</span>
-			<a
-				class="transition text-(--primary) font-bold hover:scale-105"
-				target="_blank"
-				href="https://github.com/CuteLeaf/Firefly"
-			>
-				Firefly
-			</a>
+			{poweredBy.map((item, index) => (
+				<>
+					<span>{item.label}</span>
+					<a
+						class="transition text-(--primary) font-bold hover:scale-105"
+						target="_blank"
+						href={item.href}
+					>
+						{item.name}
+					</a>
+					{index < poweredBy.length - 1 && (
+						<span class="text-neutral-300 dark:text-neutral-600">|</span>
+					)}
+				</>
+			))}
 		</div>
 	</div>
 </div>
