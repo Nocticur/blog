@@ -10,6 +10,7 @@ draft: false
 
 # openSpec + superpowers | 学习文档
 
+> [!NOTE] 提示
 > 本文面向使用 AI 辅助编程的开发者，系统整理 OpenSpec 与 Superpowers 两个工具的核心能力、配置方法与协同流程。核心目标：建立"规范驱动规划 + 流程驱动执行"的 AI 工程化闭环，降低需求偏差与代码回归风险。
 
 ---

@@ -9,6 +9,9 @@ draft: false
 
 # skill | 收集 | 学习文档
 
+> [!NOTE] 提示
+> 在拿到陌生的SKILL时候，一定要让AI先解释一下，再开始使用。否则很有可能染上赛博花柳。
+
 ## superpowers — 工程化开发工作流
 
 - **地址**: [obra/superpowers](https://github.com/obra/superpowers)

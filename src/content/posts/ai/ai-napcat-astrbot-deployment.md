@@ -24,7 +24,8 @@ draft: false
 - NapCat 基于 NTQQ 协议，比老版 go-cqhttp 更稳定、更安全
 - 两者通过 OneBot 11 HTTP/WebSocket 标准协议通信，解耦清晰，方便独立升级
 
-注：2026年06月12日，截至napcat风控比较严重的可以尝试底部LLBOT部署方案
+> [!CAUTION] 注意
+> 2026年06月12日，截至napcat风控比较严重的可以尝试底部LLBOT部署方案
 
 ## 部署环境要求
 
@@ -36,11 +37,8 @@ draft: false
 | 磁盘 | ≥ 2GB 可用空间 |
 | QQ 账号 | 一个正常使用的 QQ 号 |
 
-## 本地 Docker Desktop 部署
 
-省流：安装 Docker Desktop 后，直接使用 Docker Compose 一键部署即可。
-
-### 目录结构
+## 目录结构
 
 ```
 astrbot-napcat/
@@ -50,7 +48,7 @@ astrbot-napcat/
 └── ntqq/                # QQ 登录态数据
 ```
 
-### docker-compose.yml
+## docker-compose.yml
 
 ```yaml
 services:
@@ -99,9 +97,10 @@ networks:
   astrbot-network:
     driver: bridge
 ```
-
+> [!NOTE] 提示
 > **镜像说明**：`docker.1ms.run` 和 `m.daocloud.io` 是国内 Docker 镜像加速地址，如果你的服务器能直接访问 Docker Hub，可以替换为 `mlikiowa/napcat-docker:latest` 和 `soulter/astrbot:latest`。（2026年06月12日这些镜像都比较慢，可以在百度上找B站找找，因为博主更新可能没这些镜像快，这里不提供了）
 
+> [!NOTE] 提示
 > **MODE=astrbot**：设置后 NapCat 会自动以 AstrBot 联动模式启动，省去手动配置反向 WebSocket 的步骤。
 
 ### 启动
@@ -123,9 +122,18 @@ docker compose logs napcat
 
 或者直接访问 NapCat WebUI：`http://你的IP:6099`，在页面上扫码登录。
 
-> **注意**：NapCat 和 AstrBot 共享同一个 `./data` 目录，这样 AstrBot 可以直接读取 NapCat 的配置。不要随意修改挂载路径。
+> [!CAUTION] 注意
+> NapCat 和 AstrBot 共享同一个 `./data` 目录，这样 AstrBot 可以直接读取 NapCat 的配置。不要随意修改挂载路径。
+
+## 本地 Docker Desktop 部署
+
+省流：安装 Docker Desktop 后，找到一个合适的目录存放compose文件，使用 Docker Compose 一键部署即可。
+
 
 ## 服务器部署
+
+> [!NOTE] 提示
+> 这里采用 1Panel 作为演示，你可以根据需求选择其他面板。
 
 ### 建目录
 ![](./image/ai-napcat-astrbot-deployment.assets/ai-napcat-astrbot-deployment-20260529001508.png)
@@ -168,10 +176,13 @@ docker-compose 中设置了 `MODE=astrbot`，NapCat 启动后会 **自动连接 
 1. 进入 NapCat WebUI → **网络配置**
 2. 添加一个 **WebSocket 客户端**：
    - 名称：`astrbot-rws`
-   - URL：`ws://astrbot:6199/onebot/v11/ws` （注意，如果你是本地docker搭建，你最好看看你的host是否配置了xxx.xxx.xxx.xxx host.docker.internal，如果是的话这里要把astrbot改成host.docker.internal）
+   - URL：`ws://astrbot:6199/onebot/v11/ws`
    - 消息格式：`array`
    - Enable：`true`
-1. 保存后 NapCat 自动重载
+3. 保存后 NapCat 自动重载
+
+> [!CAUTION] 注意
+> 如果你是本地docker搭建，你最好看看你的host是否配置了`xxx.xxx.xxx.xxx host.docker.internal`，如果是的话这里要把URL中的`astrbot`改成`host.docker.internal`。
 
 ### NapCat 环境变量说明（部署忽略，这里只是补充说明）
 
@@ -225,16 +236,19 @@ docker-compose 中设置了 `MODE=astrbot`，NapCat 启动后会 **自动连接 
 
 ### 如何白嫖免费大模型？（Agnes 或 魔搭社区）
 
+> [!TIP] 建议
+> 使用这个完全免费的模型，很大程度出现限额速率问题，站长还是建议使用 **deepseek v4 flash** 模型，缓存好，命中高，小站长部署到3个群聊里面一个月过去一杯蜜雪冰城柠檬茶钱还没用完。
+
 #### Agnes
 
 ![](./image/ai-napcat-astrbot-deployment.assets/ai-napcat-astrbot-deployment-20260612031123.png)
 
-从数据上看可以发现完全不弱！还是免费！！因为是新模型博主还没体验怎么样，感兴趣可以试试
+从数据上看可以发现完全不弱！还是免费！！因为是新模型博主还没体验怎么样，感兴趣可以试试，小小尝试了速度非常慢
 
 跳转地址：[Agnes](https://platform.agnes-ai.com)
 
 
-#### 魔搭社区
+#### 魔搭社区（推荐）
 
 [概览 · 魔搭社区](https://www.modelscope.cn/my/overview)
 
@@ -250,7 +264,6 @@ docker-compose 中设置了 `MODE=astrbot`，NapCat 启动后会 **自动连接 
 ![](./image/ai-napcat-astrbot-deployment.assets/ai-napcat-astrbot-deployment-20260513003757.png)
 
 ![](./image/ai-napcat-astrbot-deployment.assets/ai-napcat-astrbot-deployment-20260513003940.png)
-
 
 
 ### 普通设置
@@ -436,12 +449,6 @@ npx skills add alchaincyf/nuwa-skill
 如果你不会用，只会越用效果越差，用了记忆你会发现他经常胡言乱语，设置好一次就行了
 ## 常见问题
 
-### NapCat 扫码后掉线
-
-- 检查 QQ 版本兼容性，NapCat 跟随 NTQQ 更新
-- 确保服务器网络稳定
-- 查看日志：`docker compose logs napcat`
-
 ### AstrBot 连不上 NapCat
 
 - 确认 NapCat 已扫码登录成功（WebUI 显示"已连接"）
@@ -453,7 +460,8 @@ npx skills add alchaincyf/nuwa-skill
 
 实打实的踩坑记录
 
-编写url时候，如果你是本地docker搭建，你最好看看你的host是否配置了`xxx.xxx.xxx.xxx host.docker.internal`，如果是的话这里要把`ws://astrbot:6199/onebot/v11/ws`中的astrbot改成host.docker.internal
+> [!CAUTION] 注意
+> 编写url时候，如果你是本地docker搭建，你最好看看你的host是否配置了`xxx.xxx.xxx.xxx host.docker.internal`，如果是的话这里要把`ws://astrbot:6199/onebot/v11/ws`中的astrbot改成host.docker.internal。还有注意是否共用一个网络，如果不是，你需要在docker compose.yml中配置网络。
 
 ### QQ 号被风控 / 账号掉线
 

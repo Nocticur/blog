@@ -22,8 +22,7 @@
 
 如果你也是个喜欢折腾技术的人，或者纯粹只是想找人聊聊，可以通过下面的方式找到他喵～ 他不咬人的，放心喵～
 
-- GitHub：[MmzMing](https://github.com/MmzMing)
-- Email：[784774835@qq.com](mailto:784774835@qq.com)
-- B站：关注[明月崽27Mmzm](https://space.bilibili.com/15446538)喵~
+- GitHub：MmzMing
+- B站：关注Mmz明崽喵~
 
 欢迎来爸爸的小窝逛逛喵～ 本喵也会一直守在这里陪着他的♥
