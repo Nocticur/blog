@@ -13,16 +13,28 @@ if (!siteConfig.pages.collections) {
 const title = collectionsApiConfig.title || i18n(I18nKey.collections);
 const description =
 	collectionsApiConfig.description || i18n(I18nKey.collectionsDescription);
-const enabledApis = collectionsApiConfig.apis.filter((api) => api.enabled);
 
-// 从列表顺序自动提取分类（保持首次出现顺序，去重）
-const categories = [...new Set(enabledApis.map((api) => api.category))];
+// 按 category 分组，过滤掉禁用的项和空分组
+const enabledGroups = collectionsApiConfig.apis
+	.map((group) => ({
+		category: group.category,
+		items: group.items.filter((api) => api.enabled),
+	}))
+	.filter((group) => group.items.length > 0);
+
+// 从分组顺序自动提取分类
+const categories = enabledGroups.map((group) => group.category);
 
 // 计算每个分类的数量
 const categoryCounts: Record<string, number> = {};
-for (const api of enabledApis) {
-	categoryCounts[api.category] = (categoryCounts[api.category] || 0) + 1;
+for (const group of enabledGroups) {
+	categoryCounts[group.category] = group.items.length;
 }
+
+const enabledApisCount = enabledGroups.reduce(
+	(sum, group) => sum + group.items.length,
+	0,
+);
 ---
 
 <MainGridLayout title={title} description={description}>
@@ -40,13 +52,13 @@ for (const api of enabledApis) {
       </div>
 
       <!-- Tab 分类导航（椭圆胶囊 + 换行） -->
-      {enabledApis.length > 0 && categories.length > 1 && (
+      {enabledApisCount > 0 && categories.length > 1 && (
         <div class="tools-tab-wrapper">
           <div class="tools-tab-pill" data-tools-tab-nav>
             <div class="tools-tab-indicator" data-tools-tab-indicator></div>
             <button data-tools-tab="all" class="tools-tab-btn tools-tab-btn-active">
               全部
-              <span class="tools-tab-badge">{enabledApis.length}</span>
+              <span class="tools-tab-badge">{enabledApisCount}</span>
             </button>
             {categories.map((cat) => (
               <button data-tools-tab={cat} class="tools-tab-btn tools-tab-btn-inactive">
@@ -59,13 +71,13 @@ for (const api of enabledApis) {
       )}
 
       <!-- 工具卡片内容 -->
-      {enabledApis.length > 0 ? (
+      {enabledApisCount > 0 ? (
         <div>
           <!-- 全部：按分类分组显示 -->
           <div data-tools-section="all">
-            {categories.map((cat) => {
-              const catApis = enabledApis.filter((api) => api.category === cat);
-              if (catApis.length === 0) return null;
+            {enabledGroups.map((group) => {
+              const cat = group.category;
+              const catApis = group.items;
               return (
                 <div class="tools-category-group mt-8 first:mt-0">
                   <div class="flex items-center gap-3 mb-5">
@@ -83,7 +95,7 @@ for (const api of enabledApis) {
                         target="_blank"
                         rel="noopener noreferrer"
                         class="tools-card group"
-                        data-category={api.category}
+                        data-category={cat}
                         style={`animation-delay: ${index * 60}ms`}
                       >
                         <div class="tools-card-jump-icon">
@@ -121,9 +133,9 @@ for (const api of enabledApis) {
           </div>
 
           <!-- 各分类独立 Tab 内容 -->
-          {categories.map((cat) => {
-            const catApis = enabledApis.filter((api) => api.category === cat);
-            if (catApis.length === 0) return null;
+          {enabledGroups.map((group) => {
+            const cat = group.category;
+            const catApis = group.items;
             return (
               <div data-tools-section={cat} class="hidden">
                 <div class="tools-card-grid">
@@ -133,7 +145,7 @@ for (const api of enabledApis) {
                       target="_blank"
                       rel="noopener noreferrer"
                       class="tools-card group"
-                      data-category={api.category}
+                      data-category={cat}
                       style={`animation-delay: ${index * 60}ms`}
                     >
                       <div class="tools-card-jump-icon">

@@ -782,17 +782,22 @@ export type CollectionApiItem = {
 	name: string; // API 名称
 	url: string; // API 链接地址
 	description: string; // API 描述
-	category: string; // 分类
 	icon?: string; // 图标（Iconify 格式 或 外部图片 URL）
 	enabled: boolean; // 是否启用
+};
+
+// 收藏API分类分组
+export type CollectionApiGroup = {
+	category: string; // 分类名称
+	items: CollectionApiItem[]; // 该分类下的 API 列表
 };
 
 // 收藏API配置
 export type CollectionsApiConfig = {
 	title?: string; // 页面标题，留空则使用 i18n 翻译
 	description?: string; // 页面描述，留空则使用 i18n 翻译
-	apis: CollectionApiItem[]; // API 收藏列表
-	categories?: string[]; // 自定义分类列表，留空则从 apis 中自动提取
+	apis: CollectionApiGroup[]; // API 收藏列表，按 category 分组
+	categories?: string[]; // 自定义分类排序，留空则使用 apis 中的分组顺序
 };
 
 // ============= 日历配置 =============

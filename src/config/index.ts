@@ -7,6 +7,7 @@ export type {
 	AnnouncementItem,
 	BirthdayItem,
 	CalendarConfig,
+	CollectionApiGroup,
 	CollectionApiItem,
 	CollectionsApiConfig,
 	CommentConfig,
