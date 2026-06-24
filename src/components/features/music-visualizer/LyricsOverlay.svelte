@@ -6,12 +6,28 @@ interface LyricLine {
 	text: string;
 }
 
+type LyricStatus = "loading" | "loaded" | "none" | "failed";
+
 let containerEl: HTMLDivElement;
 let trackEl: HTMLDivElement;
 let lyrics: LyricLine[] = $state([]);
 let currentIndex = $state(-1);
-let hasLyrics = $state(false);
+let lyricsStatus = $state<LyricStatus>("loading");
 let offsetY = $state(0);
+let statusLabels = $state({
+	loading: "正在加载歌词",
+	none: "暂无歌词",
+	failed: "歌词加载失败",
+});
+
+const statusText = $derived(
+	lyricsStatus === "failed"
+		? statusLabels.failed
+		: lyricsStatus === "none"
+			? statusLabels.none
+			: statusLabels.loading,
+);
+const hasLyrics = $derived(lyrics.length > 0);
 
 function syncLyricOffset() {
 	if (!containerEl || !trackEl || lyrics.length === 0) {
@@ -38,8 +54,8 @@ async function queueLyricOffset() {
 
 function onLyrics(e: CustomEvent) {
 	lyrics = e.detail.lyrics || [];
+	lyricsStatus = e.detail.status || (lyrics.length > 0 ? "loaded" : "none");
 	currentIndex = -1;
-	hasLyrics = lyrics.length > 0;
 	void queueLyricOffset();
 }
 
@@ -49,12 +65,18 @@ function onLrcIndex(e: CustomEvent) {
 }
 
 onMount(() => {
-	const mgr = (window as any).__fireflyMusic;
+	const mgr = window.__fireflyMusic;
 	if (mgr) {
 		const state = mgr.getState();
 		lyrics = state.lyrics || [];
 		currentIndex = state.currentLrcIndex;
-		hasLyrics = lyrics.length > 0;
+		statusLabels = {
+			loading: state.config?.i18n?.loadingLyrics || statusLabels.loading,
+			none: state.config?.i18n?.noLyrics || statusLabels.none,
+			failed: state.config?.i18n?.failedLyrics || statusLabels.failed,
+		};
+		lyricsStatus =
+			state.lyricsStatus || (lyrics.length > 0 ? "loaded" : "loading");
 	}
 	void queueLyricOffset();
 
@@ -68,10 +90,10 @@ onDestroy(() => {
 });
 </script>
 
-{#if hasLyrics}
-	<div bind:this={containerEl} class="music-visualizer__lyrics">
-		<div class="music-visualizer__lyrics-stage">
-			<div class="music-visualizer__lyrics-timeline"></div>
+<div bind:this={containerEl} class="music-visualizer__lyrics">
+	<div class="music-visualizer__lyrics-stage">
+		<div class="music-visualizer__lyrics-timeline"></div>
+		{#if hasLyrics}
 		<div
 			bind:this={trackEl}
 			class="music-visualizer__lyrics-inner"
@@ -89,6 +111,11 @@ onDestroy(() => {
 				</div>
 			{/each}
 		</div>
-		</div>
+		{:else}
+			<div class="music-visualizer__lyrics-empty" aria-live="polite">
+				<span class="music-visualizer__lyric-marker music-visualizer__lyric-marker--empty"></span>
+				<span>{statusText}</span>
+			</div>
+		{/if}
 	</div>
-{/if}
+</div>

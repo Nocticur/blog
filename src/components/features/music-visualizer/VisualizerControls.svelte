@@ -52,6 +52,19 @@ let currentTimeStr = $state("0:00");
 let durationStr = $state("0:00");
 let progress = $state(0);
 let isPlaylistOpen = $state(true);
+let playlistListEl: HTMLDivElement;
+
+function syncPlaylistScroll() {
+	if (!playlistListEl) return;
+
+	const activeItem = playlistListEl.querySelector<HTMLElement>(
+		".music-visualizer__playlist-item--active",
+	);
+	activeItem?.scrollIntoView({
+		block: "center",
+		behavior: "smooth",
+	});
+}
 
 function togglePlay() {
 	const mgr = window.__fireflyMusic;
@@ -119,6 +132,7 @@ function syncState() {
 	currentTimeStr = state.currentTimeStr;
 	durationStr = state.durationStr;
 	progress = state.progress;
+	setTimeout(syncPlaylistScroll, 0);
 }
 
 function onInit() {
@@ -131,6 +145,7 @@ function onTrack(e: CustomEvent) {
 	progress = 0;
 	currentTimeStr = "0:00";
 	durationStr = "0:00";
+	setTimeout(syncPlaylistScroll, 0);
 }
 
 function onPlayState(e: CustomEvent) {
@@ -300,48 +315,56 @@ onDestroy(() => {
 	aria-label="歌单切换"
 	aria-hidden={!isPlaylistOpen}
 >
-	<div class="music-visualizer__playlist-header">
-		<div>
-			<div class="music-visualizer__playlist-kicker">PLAYLIST</div>
-			<div class="music-visualizer__playlist-title">歌单切换</div>
+	<div class="music-visualizer__playlist-stage">
+		<div class="music-visualizer__playlist-timeline"></div>
+		<div class="music-visualizer__playlist-header">
+			<div>
+				<div class="music-visualizer__playlist-kicker">PLAYLIST</div>
+				<div class="music-visualizer__playlist-title">歌单切换</div>
+			</div>
+			<div class="music-visualizer__playlist-count">{playlist.length}</div>
 		</div>
-		<div class="music-visualizer__playlist-count">{playlist.length}</div>
-	</div>
 
-	<div class="music-visualizer__playlist-list" role="listbox" aria-label="当前歌单">
-		{#if playlist.length === 0}
-			<div class="music-visualizer__playlist-empty">歌单加载中</div>
-		{:else}
-			{#each playlist as track, i}
-				<button
-					type="button"
-					class="music-visualizer__playlist-item"
-					class:music-visualizer__playlist-item--active={i === currentIndex}
-					onclick={() => playTrack(i)}
-					role="option"
-					aria-selected={i === currentIndex}
-					title={`${track.name} - ${track.artist}`}
-				>
-					<div class="music-visualizer__playlist-cover">
-						{#if track.pic}
-							<img src={track.pic} alt="" loading="lazy" />
-						{:else}
-							<Icon icon="material-symbols:music-note-rounded" size="sm" />
-						{/if}
-					</div>
-					<div class="music-visualizer__playlist-meta">
-						<div class="music-visualizer__playlist-name">{track.name}</div>
-						<div class="music-visualizer__playlist-artist">{track.artist}</div>
-					</div>
-					{#if i === currentIndex}
-						<div class="music-visualizer__playlist-eq" aria-hidden="true">
-							<span></span>
-							<span></span>
-							<span></span>
+		<div
+			bind:this={playlistListEl}
+			class="music-visualizer__playlist-list"
+			role="listbox"
+			aria-label="当前歌单"
+		>
+			{#if playlist.length === 0}
+				<div class="music-visualizer__playlist-empty">歌单加载中</div>
+			{:else}
+				{#each playlist as track, i}
+					<button
+						type="button"
+						class="music-visualizer__playlist-item"
+						class:music-visualizer__playlist-item--active={i === currentIndex}
+						onclick={() => playTrack(i)}
+						role="option"
+						aria-selected={i === currentIndex}
+						title={`${track.name} - ${track.artist}`}
+					>
+						<div class="music-visualizer__playlist-cover">
+							{#if track.pic}
+								<img src={track.pic} alt="" loading="lazy" />
+							{:else}
+								<Icon icon="material-symbols:music-note-rounded" size="sm" />
+							{/if}
 						</div>
-					{/if}
-				</button>
-			{/each}
-		{/if}
+						<div class="music-visualizer__playlist-meta">
+							<div class="music-visualizer__playlist-name">{track.name}</div>
+							<div class="music-visualizer__playlist-artist">{track.artist}</div>
+						</div>
+						{#if i === currentIndex}
+							<div class="music-visualizer__playlist-eq" aria-hidden="true">
+								<span></span>
+								<span></span>
+								<span></span>
+							</div>
+						{/if}
+					</button>
+				{/each}
+			{/if}
+		</div>
 	</div>
 </aside>

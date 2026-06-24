@@ -7,12 +7,14 @@ import { AudioAnalyzer, type AudioData } from "./AudioAnalyzer";
 interface Props {
 	audioAnalyzer: AudioAnalyzer;
 	isDark?: boolean;
+	useLightBackground?: boolean;
 	onSceneReady?: (() => void) | undefined;
 }
 
 let {
 	audioAnalyzer,
 	isDark = true,
+	useLightBackground = false,
 	onSceneReady = undefined,
 }: Props = $props();
 
@@ -27,6 +29,7 @@ let particleMesh: THREE.InstancedMesh;
 let terrainMaterial: THREE.ShaderMaterial;
 let animationId: number;
 let clock: THREE.Clock;
+const lightBackgroundColor = new THREE.Color(0xffffff);
 
 const GRID_SIZE = 128;
 const SPACING = 1.05;
@@ -486,8 +489,11 @@ function init() {
 
 	scene = new THREE.Scene();
 	const theme = getThemeColors(isDark);
-	scene.background = theme.fogColor;
-	scene.fog = new THREE.Fog(theme.fogColor, 25, 80);
+	const backgroundColor = useLightBackground
+		? lightBackgroundColor
+		: theme.fogColor;
+	scene.background = backgroundColor;
+	scene.fog = new THREE.Fog(backgroundColor, 25, 80);
 
 	camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 200);
 	camera.position.set(0, 25, 35);
@@ -649,7 +655,10 @@ function animate() {
 	);
 
 	if (scene.fog instanceof THREE.Fog) {
-		scene.fog.color.lerp(theme.fogColor, 3 * delta);
+		scene.fog.color.lerp(
+			useLightBackground ? lightBackgroundColor : theme.fogColor,
+			3 * delta,
+		);
 		scene.background = scene.fog.color;
 	}
 

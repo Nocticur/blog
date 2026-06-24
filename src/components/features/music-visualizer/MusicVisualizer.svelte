@@ -8,6 +8,11 @@ import VisualizerControls from "./VisualizerControls.svelte";
 const audioAnalyzer = new AudioAnalyzer();
 const isDark = true; // 固定使用深色主题
 let sceneReady = $state(false);
+let useLightBackground = $state(false);
+
+function syncPageTheme() {
+	useLightBackground = !document.documentElement.classList.contains("dark");
+}
 
 function connectAudio() {
 	const audio = document.getElementById(
@@ -26,14 +31,22 @@ function connectAudio() {
 }
 
 function audioCtxState() {
-	return (audioAnalyzer as any).audioCtx?.state || "running";
+	return audioAnalyzer.audioCtx?.state || "running";
 }
 
 onMount(() => {
-	const mgr = (window as any).__fireflyMusic;
+	syncPageTheme();
+
+	const themeObserver = new MutationObserver(syncPageTheme);
+	themeObserver.observe(document.documentElement, {
+		attributes: true,
+		attributeFilter: ["class"],
+	});
+
+	const mgr = window.__fireflyMusic;
 	if (!mgr) {
 		const waitForMgr = () => {
-			if ((window as any).__fireflyMusic) {
+			if (window.__fireflyMusic) {
 				connectAudio();
 			} else {
 				setTimeout(waitForMgr, 100);
@@ -54,6 +67,7 @@ onMount(() => {
 	document.addEventListener("click", handleFirstClick);
 
 	return () => {
+		themeObserver.disconnect();
 		document.removeEventListener("click", handleFirstClick);
 	};
 });
@@ -71,6 +85,7 @@ onDestroy(() => {
 	<ThreeScene
 		{audioAnalyzer}
 		{isDark}
+		{useLightBackground}
 		onSceneReady={() => (sceneReady = true)}
 	/>
 </div>

@@ -66,10 +66,17 @@ declare global {
 				currentTimeStr: string;
 				durationStr: string;
 				lyrics: Array<{ time: number; text: string }>;
+				lyricsStatus?: "loading" | "loaded" | "none" | "failed";
 				currentLrcIndex: number;
 				initialized: boolean;
 				error: string | null;
-				config: Record<string, unknown>;
+				config: {
+					i18n?: {
+						loadingLyrics?: string;
+						noLyrics?: string;
+						failedLyrics?: string;
+					};
+				} & Record<string, unknown>;
 			};
 			togglePlay: () => void;
 			playNext: () => void;
