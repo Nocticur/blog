@@ -27,6 +27,9 @@ interface ActiveFilter {
 	labelKey: I18nKey;
 	values: string[];
 }
+interface PostMetaTag {
+	name: string;
+}
 
 // ===== Props =====
 export let tags: string[] = [];
@@ -59,24 +62,24 @@ let postRowRefs: Map<string, HTMLElement> = new Map();
 
 // ===== 分类颜色调色板 =====
 const categoryColorPalette = [
-	"text-amber-400",
-	"text-rose-400",
-	"text-emerald-400",
-	"text-blue-400",
-	"text-purple-400",
-	"text-pink-400",
-	"text-teal-400",
-	"text-orange-400",
-	"text-cyan-400",
-	"text-indigo-400",
-	"text-fuchsia-400",
-	"text-lime-400",
-	"text-red-400",
-	"text-violet-400",
-	"text-cyan-500",
-	"text-amber-500",
-	"text-rose-500",
-	"text-emerald-500",
+	"#fbbf24",
+	"#fb7185",
+	"#34d399",
+	"#60a5fa",
+	"#a78bfa",
+	"#f472b6",
+	"#2dd4bf",
+	"#fb923c",
+	"#22d3ee",
+	"#818cf8",
+	"#e879f9",
+	"#a3e635",
+	"#f87171",
+	"#a78bfa",
+	"#06b6d4",
+	"#f59e0b",
+	"#f43f5e",
+	"#10b981",
 ];
 
 // ===== 工具函数 =====
@@ -89,18 +92,26 @@ function formatMonth(month: number): string {
 	return `${month}${i18n(I18nKey.month)}`;
 }
 function getCategoryColor(name: string): string {
-	return categoryColors.get(name) || "text-[var(--meta-divider)]";
+	const color = categoryColors.get(name);
+	return color ? `color: ${color}` : "";
 }
 function normalizeCategoryName(name: string | null | undefined): string {
 	return (name || "").trim();
 }
-
+function normalizeTags(tags: string[] | undefined | null): string[] {
+	return Array.from(
+		new Set(
+			(tags || []).map((tag) => tag.trim()).filter((tag) => tag.length > 0),
+		),
+	);
+}
 function initializeCategoryColors(posts: Post[]): void {
+	categoryColors = new Map();
 	const set = new Set<string>();
-	for (const p of posts)
-		set.add(
-			normalizeCategoryName(p.data.category) || i18n(I18nKey.uncategorized),
-		);
+	for (const p of posts) {
+		const cat = normalizeCategoryName(p.data.category);
+		if (cat) set.add(cat);
+	}
 	const sorted = Array.from(set).sort((a, b) => a.localeCompare(b, "zh-CN"));
 	for (let i = 0; i < sorted.length; i++) {
 		categoryColors.set(
@@ -144,6 +155,19 @@ function groupByYearMonth(posts: Post[]): YearGroup[] {
 function formatFilterValues(f: ActiveFilter): string {
 	const prefix = f.labelKey === I18nKey.tags ? "#" : "";
 	return f.values.map((v) => `${prefix}${v}`).join(" / ");
+}
+function getPostCategoryName(post: Post): string {
+	return (
+		normalizeCategoryName(post.data.category) || i18n(I18nKey.uncategorized)
+	);
+}
+function getPostMetaTags(post: Post): PostMetaTag[] {
+	return normalizeTags(post.data.tags)
+		.slice(0, 3)
+		.map((tag) => ({ name: tag }));
+}
+function getPostMetaMoreCount(post: Post): number {
+	return Math.max(0, normalizeTags(post.data.tags).length - 3);
 }
 function resolvePrimaryFilter(filters: ActiveFilter[]): ActiveFilter | null {
 	return filters.find((f) => f.labelKey === I18nKey.tags) ?? filters[0] ?? null;
@@ -398,6 +422,9 @@ onMount(() => {
 						<div class="ap-posts-area">
 							<ul class="ap-post-list">
 								{#each monthGroup.posts as post, postIdx (post.id)}
+									{@const postTags = getPostMetaTags(post)}
+									{@const postMoreCount = getPostMetaMoreCount(post)}
+									{@const catColor = getCategoryColor(getPostCategoryName(post))}
 									<li
 										class="ap-post-row"
 										class:last={postIdx === monthGroup.posts.length - 1}
@@ -418,11 +445,31 @@ onMount(() => {
 											on:mouseleave={onPostLeave}
 										>
 											<span class="ap-date">{formatDate(post.data.published)}</span>
-											<span class="ap-category {getCategoryColor(normalizeCategoryName(post.data.category) || i18n(I18nKey.uncategorized))}">
-												{normalizeCategoryName(post.data.category) || i18n(I18nKey.uncategorized)}
-											</span>
-											<span class="ap-title group-hover:text-(--primary)">
-												{post.data.title}
+											<span class="ap-post-content">
+												<span class="ap-title group-hover:text-(--primary)">
+													{post.data.title}
+												</span>
+												<span class="ap-meta">
+													<span class="ap-category" style={catColor}>
+														#{getPostCategoryName(post)}
+													</span>
+													{#if postTags.length > 0}
+														<span class="ap-meta-gap" aria-hidden="true"></span>
+														{#each postTags as tag, i (tag.name)}
+															<span class="ap-tag">
+																{tag.name}
+															</span>
+															{#if i < postTags.length - 1}
+																<span class="ap-meta-divider" aria-hidden="true">/</span>
+															{/if}
+														{/each}
+													{/if}
+													{#if postMoreCount > 0}
+														<span class="ap-tag-more">
+															+{postMoreCount}
+														</span>
+													{/if}
+												</span>
 											</span>
 										</a>
 									</li>
@@ -617,8 +664,8 @@ onMount(() => {
 
 /* ── 文章链接 ── */
 .ap-post-link {
-	display: flex; align-items: center; gap: 0.6rem;
-	flex: 1; min-height: 2.25rem; padding: 0.2rem 0.5rem;
+	display: flex; align-items: center; gap: 0.85rem;
+	flex: 1; min-height: 2.5rem; padding: 0.25rem 0.5rem;
 	margin-left: 0;
 	border-radius: 0.5rem; text-decoration: none; overflow: hidden;
 }
@@ -627,14 +674,55 @@ onMount(() => {
 	font-variant-numeric: tabular-nums; white-space: nowrap;
 	flex-shrink: 0; width: 2.8rem; text-align: right;
 }
+.ap-post-content {
+	display: flex;
+	align-items: center;
+	gap: 0.85rem;
+	flex: 1;
+	min-width: 0;
+}
 .ap-category {
 	font-size: 0.8rem; font-weight: 700;
-	white-space: nowrap; flex-shrink: 0; min-width: 3rem;
+	white-space: nowrap; flex-shrink: 0;
+	color: var(--content-meta);
+}
+.ap-meta {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	flex-shrink: 0;
+	min-width: 0;
+	white-space: nowrap;
+}
+.ap-meta-gap {
+	display: inline-block;
+	width: 0.5rem;
+	flex-shrink: 0;
+}
+.ap-meta-divider {
+	color: var(--meta-divider);
+	font-size: 0.8rem;
+	font-weight: 700;
+	flex-shrink: 0;
+	margin: 0 0.05rem;
+}
+.ap-tag {
+	font-size: 0.8rem;
+	font-weight: 700;
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+.ap-tag-more {
+	color: var(--content-meta);
+	font-size: 0.8rem;
+	font-weight: 700;
+	white-space: nowrap;
+	flex-shrink: 0;
 }
 .ap-title {
 	font-size: 0.9rem; font-weight: 500; color: var(--deep-text);
 	overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-	flex: 1; transition: color 0.15s ease; display: inline-block;
+	flex: 1; min-width: 0; transition: color 0.15s ease; display: block;
 }
 
 :global(.dark) .archive-panel {
@@ -644,9 +732,49 @@ onMount(() => {
 
 @media (max-width: 768px) {
 	.archive-panel { --tw: 1.5rem; }
-	.ap-date     { width: 2.4rem; font-size: 0.8rem; }
-	.ap-category { min-width: 2.5rem; font-size: 0.75rem; }
-	.ap-title    { font-size: 0.82rem; }
+	.ap-post-link {
+		align-items: flex-start;
+		gap: 0.5rem;
+		min-height: auto;
+		padding: 0.45rem 0.5rem 0.5rem;
+	}
+	.ap-date {
+		width: 2.6rem;
+		font-size: 0.78rem;
+		margin-top: 0.1rem;
+	}
+	.ap-post-content {
+		flex: 1;
+		min-width: 0;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.2rem;
+	}
+	.ap-title {
+		width: 100%;
+		font-size: 0.92rem;
+		white-space: normal;
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		overflow-wrap: anywhere;
+	}
+	.ap-meta {
+		width: 100%;
+		flex-wrap: wrap;
+		gap: 0.2rem;
+		white-space: normal;
+	}
+	.ap-meta-gap {
+		display: none;
+	}
+	.ap-category { font-size: 0.75rem; }
+	.ap-tag,
+	.ap-tag-more,
+	.ap-meta-divider { font-size: 0.72rem; }
 
 	/* 移动端隐藏时间线虚线、节点与高亮层，保留标题与文章列表 */
 	.ap-year-block::before,
