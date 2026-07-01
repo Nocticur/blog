@@ -62,36 +62,42 @@ ZSK-Cloud 当前采用单 Access Token 方案：
 
 [配图：ZSK-Cloud Token 分层存储架构图]
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│  服务端 (zsk-auth)                                               │
-│  登录成功 → 生成 Access Token (30 min)                          │
-│          → 生成 Refresh Token (7 d)                             │
-│          → Set-Cookie: access_token (HttpOnly, Secure, Lax)    │
-│          → Set-Cookie: refresh_token (HttpOnly, Secure, Lax)   │
-│          → Response Body: { userId, username, nickname, ... }  │
-└─────────────────────────────────────────────────────────────────┘
-          │                              │
-          ▼                              ▼
-┌──────────────────┐        ┌──────────────────┐
-│  浏览器 Cookie    │        │  前端 Pinia Store │
-│  access_token     │        │  userId          │
-│  (HttpOnly)       │        │  username        │
-│  refresh_token    │        │  nickname        │
-│  (HttpOnly)       │        │  avatar          │
-│                   │        │  roles[]         │
-│  自动携带 / 防 XSS │        │  permissions[]   │
-│  自动过期         │        │  isLoggedIn      │
-└──────────────────┘        └──────────────────┘
-          │
-          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Redis                                                          │
-│  zsk:login:token:{userId}     → Set<accessToken>     TTL 30 min │
-│  zsk:login:refresh:{userId}   → Set<refreshToken>    TTL 7 d   │
-│  zsk:login:roles:{userId}     → Set<role>            TTL 7 d   │
-│  zsk:login:permissions:{userId} → Set<permission>    TTL 7 d   │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Server ["服务端 zsk-auth"]
+        S1["登录成功"]
+        S2["生成 Access Token (30 min)"]
+        S3["生成 Refresh Token (7 d)"]
+    end
+
+    S1 --> S2 --> S3
+
+    S3 --> S4["Set-Cookie: access_token (HttpOnly, Secure, Lax)"]
+    S3 --> S5["Set-Cookie: refresh_token (HttpOnly, Secure, Lax)"]
+    S3 --> S6["Response Body: { userId, username, nickname, ... }"]
+
+    subgraph Cookie ["浏览器 Cookie"]
+        C1["access_token (HttpOnly)"]
+        C2["refresh_token (HttpOnly)"]
+        C3["自动携带 / 防 XSS / 自动过期"]
+    end
+
+    subgraph Store ["前端 Pinia Store"]
+        ST1["userId / username / nickname / avatar"]
+        ST2["roles[] / permissions[] / isLoggedIn"]
+    end
+
+    subgraph Redis ["Redis"]
+        R1["zsk:login:token:{userId} → Set<accessToken> TTL 30 min"]
+        R2["zsk:login:refresh:{userId} → Set<refreshToken> TTL 7 d"]
+        R3["zsk:login:roles:{userId} → Set<role> TTL 7 d"]
+        R4["zsk:login:permissions:{userId} → Set<permission> TTL 7 d"]
+    end
+
+    S4 --> Cookie
+    S5 --> Cookie
+    S6 --> Store
+    S3 --> Redis
 ```
 
 双 Token 解决了单 Token 的核心矛盾：
@@ -104,14 +110,11 @@ ZSK-Cloud 当前采用单 Access Token 方案：
 
 [配图：RS256 私钥签名、公钥验证流程]
 
-```text
-┌─────────────┐         ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│  zsk-auth   │         │  zsk-gateway │    │ zsk-system   │    │ zsk-document │
-│  (私钥)     │         │  (公钥)      │    │  (公钥)      │    │  (公钥)      │
-│             │         │              │    │              │    │              │
-│  签发 Token  │────────>│  验证 Token  │──> │  验证 Token  │──> │  验证 Token  │
-│  RS256 签名  │         │  RS256 验证  │    │  RS256 验证  │    │  RS256 验证  │
-└─────────────┘         └──────────────┘    └──────────────┘    └──────────────┘
+```mermaid
+flowchart LR
+    A["zsk-auth<br/>私钥"] -->|"签发 Token<br/>RS256 签名"| B["zsk-gateway<br/>公钥"]
+    B -->|"验证 Token<br/>RS256 验证"| C["zsk-system<br/>公钥"]
+    C -->|"验证 Token<br/>RS256 验证"| D["zsk-document<br/>公钥"]
 ```
 
 - 仅 `zsk-auth` 持有私钥，负责签发 Token。
@@ -843,10 +846,3 @@ Pinia 状态仅存于内存，各标签页独立。推荐方案：
 - [OWASP: Cross-Site Scripting (XSS)](https://owasp.org/www-community/attacks/xss/)
 - [OWASP: Cross-Site Request Forgery (CSRF)](https://owasp.org/www-community/attacks/csrf)
 - [MDN: Set-Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie)
-- 项目源码：
-  - [JwtUtils.java](file:///e:/code/zsk/zsk-cloud/zsk-common/zsk-common-core/src/main/java/com/zsk/common/core/utils/JwtUtils.java)
-  - [AuthServiceImpl.java](file:///e:/code/zsk/zsk-cloud/zsk-auth/src/main/java/com/zsk/auth/service/impl/AuthServiceImpl.java)
-  - [AuthFilter.java](file:///e:/code/zsk/zsk-cloud/zsk-gateway/src/main/java/com/zsk/gateway/filter/AuthFilter.java)
-  - [HeaderContextFilter.java](file:///e:/code/zsk/zsk-cloud/zsk-common/zsk-common-security/src/main/java/com/zsk/common/security/filter/HeaderContextFilter.java)
-  - [CacheConstants.java](file:///e:/code/zsk/zsk-cloud/zsk-common/zsk-common-core/src/main/java/com/zsk/common/core/constant/CacheConstants.java)
-  - [LoginResponse.java](file:///e:/code/zsk/zsk-cloud/zsk-auth/src/main/java/com/zsk/auth/domain/LoginResponse.java)

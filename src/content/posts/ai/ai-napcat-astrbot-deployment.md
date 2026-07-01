@@ -345,9 +345,10 @@ npx skills add alchaincyf/nuwa-skill
 
 蒸馏完成后，将生成的 Skill 内容提取为系统 Prompt，粘贴到 AstrBot WebUI 的 **系统 Prompt** 中即可。相比手搓人格，蒸馏出来的 Prompt 更结构化、更稳定，且保留了目标人物的核心思维模式。
 
-### 喵墩备份（天阶功法，某天炸了别把为师名字暴露出来）
+### 喵墩备份
 
-![](./image/ai-napcat-astrbot-deployment.assets/ai-napcat-astrbot-deployment-20260529001009.png)
+> [!CAUTION] 注意
+> 天阶功法，实属过于逆天，某天被人投诉别把为师名字暴露出来
 
 以下是我家猫娘「喵墩」的完整人格设定，可以直接复制使用：
 
