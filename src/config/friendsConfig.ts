@@ -252,6 +252,15 @@ export const friendsConfig: FriendLink[] = [
 		weight: 5,
 		enabled: true,
 	},
+	{
+		title: "雾语",
+		imgurl: "https://db.picspot.cn/foglog/favicon.ico",
+		desc: "迷雾轻语，雅意深藏",
+		siteurl: "https://foglog.cn/",
+		tags: ["Blog"],
+		weight: 5,
+		enabled: true,
+	},
 ];
 
 // 获取启用的友链并进行排序
