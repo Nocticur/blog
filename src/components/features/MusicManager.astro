@@ -457,23 +457,16 @@ const managerConfigStr = JSON.stringify({
     };
 
     // ── Swup page transition hook: re-sync widgets after navigation ──
+    // Per CLAUDE.md 4.4, only listen to `astro:page-load` (bridged by
+    // @swup/astro). It fires once per navigation incl. first load — do NOT
+    // also subscribe to `swup:contentReplaced` / `page:view` /
+    // `content:replace`, which would trigger this 4× per navigation.
     function scheduleResync() {
         setTimeout(function () {
             if (window.__fireflyMusic) window.__fireflyMusic.resync();
         }, 100);
     }
 
-    function onSwupReady() {
-        if (window.swup && window.swup.hooks) {
-            window.swup.hooks.on('page:view', scheduleResync);
-            window.swup.hooks.on('content:replace', scheduleResync);
-        }
-    }
-
-    if (window.swup && window.swup.hooks) onSwupReady();
-    else document.addEventListener('swup:enable', onSwupReady);
-
     document.addEventListener('astro:page-load', scheduleResync);
-    document.addEventListener('swup:contentReplaced', scheduleResync);
 })();
 </script>

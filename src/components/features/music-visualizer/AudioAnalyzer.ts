@@ -33,11 +33,66 @@ export interface AudioAnalyzerEvents {
 	onBeat?: (strength: number) => void;
 }
 
+// ── Shared singleton audio graph ─────────────────────────────────────────
+// `createMediaElementSource()` can only be called ONCE per HTMLMediaElement
+// (the browser throws InvalidStateError on subsequent calls, and the binding
+// is irreversible). The audio element's output is permanently rerouted
+// through this AudioContext, so closing the context would silence it forever.
+//
+// Therefore the AudioContext + MediaElementSourceNode + GainNode MUST be a
+// singleton that lives as long as the shared `#firefly-music-audio` element
+// (i.e. for the lifetime of the page, since MusicManager is in the Swup
+// outside-container and is never torn down).
+//
+// Each AudioAnalyzer instance only creates its own AnalyserNode tapped off
+// the shared gainNode — that per-instance analyser is safe to disconnect.
+interface SharedAudioGraph {
+	audioCtx: AudioContext;
+	source: MediaElementAudioSourceNode;
+	gainNode: GainNode;
+}
+
+const SHARED_GRAPH_KEY = "__fireflyAudioGraph";
+
+function getSharedAudioGraph(
+	audioEl: HTMLAudioElement,
+): SharedAudioGraph | null {
+	const w = window as unknown as Record<string, unknown>;
+	const existing = w[SHARED_GRAPH_KEY] as SharedAudioGraph | undefined;
+	if (existing) {
+		if (existing.audioCtx.state === "suspended") {
+			existing.audioCtx.resume();
+		}
+		return existing;
+	}
+
+	const AC: typeof AudioContext =
+		window.AudioContext ||
+		(window as unknown as { webkitAudioContext: typeof AudioContext })
+			.webkitAudioContext;
+
+	try {
+		const audioCtx = new AC();
+		const source = audioCtx.createMediaElementSource(audioEl);
+		const gainNode = audioCtx.createGain();
+		gainNode.gain.value = 1;
+		source.connect(gainNode);
+		gainNode.connect(audioCtx.destination);
+		const graph: SharedAudioGraph = { audioCtx, source, gainNode };
+		w[SHARED_GRAPH_KEY] = graph;
+		return graph;
+	} catch (e) {
+		console.warn(
+			"AudioAnalyzer: Failed to create shared audio graph for audio element",
+			e,
+		);
+		return null;
+	}
+}
+
 export class AudioAnalyzer {
 	public audioCtx: AudioContext | null = null;
 	private analyser: AnalyserNode | null = null;
-	private source: MediaElementAudioSourceNode | null = null;
-	private gainNode: GainNode | null = null;
 	private audioElement: HTMLAudioElement | null = null;
 	private dataArray = new Uint8Array(512);
 	private prevData: number[] = new Array(512).fill(0);
@@ -77,55 +132,52 @@ export class AudioAnalyzer {
 		if (this.connected && this.audioElement === audioEl) return;
 		this.audioElement = audioEl;
 
-		if (this.audioCtx) {
-			if (this.audioCtx.state === "suspended") {
-				this.audioCtx.resume();
-			}
-			return;
+		// Reuse the shared singleton audio graph. This is MANDATORY because:
+		//  1. `createMediaElementSource()` is one-shot per audio element —
+		//     calling it again on a second visit throws InvalidStateError.
+		//  2. Closing the AudioContext would permanently silence the shared
+		//     audio element (the element's output is rerouted through the AC
+		//     and cannot be un-rerouted).
+		const graph = getSharedAudioGraph(audioEl);
+		if (!graph) return;
+
+		this.audioCtx = graph.audioCtx;
+
+		if (this.audioCtx.state === "suspended") {
+			this.audioCtx.resume();
 		}
 
-		const AC: typeof AudioContext =
-			window.AudioContext ||
-			(window as unknown as { webkitAudioContext: typeof AudioContext })
-				.webkitAudioContext;
-		this.audioCtx = new AC();
+		// Per-instance analyser tapped off the shared gainNode. Multiple
+		// analysers can tap the same gainNode without interfering with each
+		// other or with the audio output path.
 		this.analyser = this.audioCtx.createAnalyser();
 		this.analyser.fftSize = 1024;
 		this.analyser.smoothingTimeConstant = 0.8;
-
-		this.gainNode = this.audioCtx.createGain();
-		this.gainNode.gain.value = 1;
-
-		try {
-			this.source = this.audioCtx.createMediaElementSource(audioEl);
-			this.source.connect(this.gainNode);
-			this.gainNode.connect(this.audioCtx.destination);
-			this.gainNode.connect(this.analyser);
-			this.connected = true;
-		} catch (e) {
-			console.warn("AudioAnalyzer: Failed to connect to audio element", e);
-		}
+		graph.gainNode.connect(this.analyser);
 
 		this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+		this.connected = true;
 	}
 
 	disconnect() {
-		if (this.source) {
-			this.source.disconnect();
-			this.source = null;
-		}
-		if (this.gainNode) {
-			this.gainNode.disconnect();
-			this.gainNode = null;
-		}
+		// IMPORTANT: only tear down the per-instance analyser.
+		// The shared audioCtx / source / gainNode are owned by the singleton
+		// graph (window.__fireflyAudioGraph) and MUST stay alive — otherwise
+		// the shared `#firefly-music-audio` element would be silenced forever
+		// and the sidebar MusicPlayer would stop producing sound after the
+		// user navigates away from /music/.
 		if (this.analyser) {
-			this.analyser.disconnect();
+			try {
+				this.analyser.disconnect();
+			} catch {
+				/* already disconnected */
+			}
 			this.analyser = null;
 		}
-		if (this.audioCtx) {
-			this.audioCtx.close();
-			this.audioCtx = null;
-		}
+		// Null out local references but do NOT close audioCtx and do NOT
+		// disconnect source / gainNode.
+		this.audioCtx = null;
+		this.audioElement = null;
 		this.connected = false;
 	}
 
