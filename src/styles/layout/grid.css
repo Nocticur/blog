@@ -38,12 +38,20 @@
 	display: flex;
 	flex-direction: column;
 	border-radius: 1rem;
+	border: 1px solid var(--line-divider);
+	background: var(--card-bg);
 	overflow: hidden;
-	transition: transform 0.25s ease;
+	transition: transform 0.25s ease, border-color 0.25s ease;
 }
 
 .article-toc-container:hover {
 	transform: translateX(-6px);
+	border-color: var(--deep-text);
+}
+
+/* 暗色模式下 hover 使用纯白边框，与左侧目录 hover 风格一致 */
+:root.dark .article-toc-container:hover {
+	border-color: #fff;
 }
 
 .article-toc-header {

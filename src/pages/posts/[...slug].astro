@@ -9,7 +9,7 @@ import KatexManager from "@components/features/KatexManager.astro";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
-import { getRelatedPosts, getSortedPosts } from "@utils/content-utils";
+import { getCatalogGroups, getSortedPosts } from "@utils/content-utils";
 import {
 	getFileDirFromPath,
 	getPostUrlBySlug,
@@ -20,7 +20,6 @@ import utc from "dayjs/plugin/utc";
 import CoverImage from "@/components/common/CoverImage.astro";
 import PostMetadata from "@/components/layout/PostMeta.astro";
 import PostFooterActions from "@/components/misc/PostFooterActions.astro";
-import RecommendedPost from "@/components/misc/RecommendedPost.astro";
 import { coverImageConfig } from "@/config/coverImageConfig";
 import { homeConfig } from "@/config/homeConfig";
 import { siteConfig } from "@/config/siteConfig";
@@ -138,7 +137,7 @@ const jsonLd = {
 		: siteConfig.lang.replace("_", "-"),
 };
 
-const relatedPosts = await getRelatedPosts(entry, 5);
+const catalogGroups = await getCatalogGroups(entry.id);
 ---
 
 <MainGridLayout
@@ -149,6 +148,7 @@ const relatedPosts = await getRelatedPosts(entry, 5);
   setOGTypeArticle={true}
   postSlug={entry.id}
   postCategory={entry.data.category || undefined}
+  catalogGroups={catalogGroups}
   bannerPostMeta={bannerPostMeta}
 >
   <!-- KaTeX 按需加载 - 仅在文章页面 -->
@@ -409,8 +409,6 @@ const relatedPosts = await getRelatedPosts(entry, 5);
       </div>
     </a>
   </div>
-
-  <RecommendedPost relatedPosts={relatedPosts} currentPostId={entry.id} />
 
   <!-- 评论 -->
   {entry.data.comment && !entry.data.password && <Comment post={entry} />}

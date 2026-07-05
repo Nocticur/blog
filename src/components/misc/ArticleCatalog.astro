@@ -1,0 +1,146 @@
+---
+import I18nKey from "@/i18n/i18nKey";
+import { i18n } from "@/i18n/translation";
+import type { CatalogGroup } from "@/utils/content-utils";
+import { getPostUrlBySlug } from "@/utils/url-utils";
+
+interface Props {
+	groups: CatalogGroup[];
+	currentPostId: string;
+	class?: string;
+}
+
+const { groups, currentPostId, class: className } = Astro.props;
+---
+
+<div
+	id="article-catalog-wrapper"
+	class:list={["article-catalog-wrapper catalog-fade-in hidden xl:block", className]}
+>
+	<div class="article-catalog-container">
+		<div class="article-catalog-header">
+			<span class="article-toc-title">{i18n(I18nKey.allPosts)}</span>
+		</div>
+		<div class="catalog-scroll-container custom-scrollbar article-catalog-body">
+			<nav class="catalog-content" id="article-catalog-content">
+				{groups.map((group) => (
+					<div
+						class:list={["catalog-group", { "is-expanded": group.isCurrent }]}
+						data-current={group.isCurrent ? "true" : "false"}
+					>
+						<button
+							class="catalog-group__header"
+							type="button"
+							aria-expanded={group.isCurrent ? "true" : "false"}
+						>
+							<svg
+								class="catalog-group__icon"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+							</svg>
+							<span class="catalog-group__name" title={group.name}>{group.name}</span>
+							<span class="catalog-group__count">{group.count}</span>
+							<svg
+								class="catalog-group__chevron"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<polyline points="9 18 15 12 9 6" />
+							</svg>
+						</button>
+						<div class="catalog-group__list">
+							<ul>
+								{group.posts.map((post) => (
+									<li>
+										<a
+											class:list={[
+												"catalog-item",
+												{
+													"is-active": post.id === currentPostId,
+													"is-pinned": post.data.pinned,
+												},
+											]}
+											href={getPostUrlBySlug(post.id)}
+											aria-current={post.id === currentPostId ? "page" : undefined}
+										>
+											<svg
+												class="catalog-item__icon"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="2"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												aria-hidden="true"
+											>
+												<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+												<polyline points="14 2 14 8 20 8" />
+												<line x1="9" y1="13" x2="15" y2="13" />
+												<line x1="9" y1="17" x2="13" y2="17" />
+											</svg>
+											<span class="catalog-item__label" title={post.data.title}>
+												{post.data.title}
+											</span>
+											{post.data.pinned && (
+												<span class="catalog-item__pin">{i18n(I18nKey.pinned)}</span>
+											)}
+										</a>
+									</li>
+								))}
+							</ul>
+						</div>
+					</div>
+				))}
+			</nav>
+		</div>
+	</div>
+</div>
+
+<script>
+	// 手风琴交互 + 当前文章滚动入视
+	// 仅监听 astro:page-load 单一事件（符合 CLAUDE.md 4.4 规范）
+	function initArticleCatalog() {
+		const content = document.getElementById("article-catalog-content");
+		if (!content) return;
+		// 用 dataset 标记避免重复绑定（首次立即调用 + astro:page-load 可能触发两次）
+		if (content.dataset.catalogBound === "true") return;
+		content.dataset.catalogBound = "true";
+
+		// 手风琴 toggle（事件委托）
+		content.addEventListener("click", (e) => {
+			const header = (e.target as HTMLElement).closest<HTMLElement>(
+				".catalog-group__header",
+			);
+			if (!header) return;
+			const group = header.parentElement;
+			if (!group || !group.classList.contains("catalog-group")) return;
+			const expanded = group.classList.toggle("is-expanded");
+			header.setAttribute("aria-expanded", expanded ? "true" : "false");
+		});
+
+		// 当前文章滚动入视（不强制滚动整个页面）
+		const activeItem = content.querySelector<HTMLElement>(
+			".catalog-item.is-active",
+		);
+		if (activeItem) {
+			activeItem.scrollIntoView({ block: "nearest", behavior: "auto" });
+		}
+	}
+
+	// 兼容首次加载：astro <script> 作为 module 异步执行，可能错过首次 astro:page-load
+	// 因此注册监听后立即调用一次兜底
+	initArticleCatalog();
+	document.addEventListener("astro:page-load", initArticleCatalog);
+</script>
