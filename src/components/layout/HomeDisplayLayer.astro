@@ -43,12 +43,32 @@ const transparentPixel =
 		</div>
 
 		{/* ===== 百叶窗动画元素 ===== */}
+		{/* 最终图三层组合（从后到前）：后景视频 / 中景图 / 前景人物图 */}
+		<video
+			class="home-portfolio-shutter__final-video"
+			data-shutter-final-video
+			data-src={shutterConfig.finalImage.backgroundVideo}
+			muted
+			loop
+			playsinline
+			preload="none"
+			aria-hidden="true"
+		></video>
 		<img
-			class="home-portfolio-shutter__final-image"
-			data-shutter-final-image
-			data-src={shutterConfig.finalImage.src}
+			class="home-portfolio-shutter__final-image home-portfolio-shutter__final-image--midground"
+			data-shutter-final-midground
+			data-src={shutterConfig.finalImage.midgroundImage}
 			src={transparentPixel}
 			alt={shutterConfig.finalImage.alt}
+			loading="eager"
+			decoding="async"
+		/>
+		<img
+			class="home-portfolio-shutter__final-image home-portfolio-shutter__final-image--foreground"
+			data-shutter-final-foreground
+			data-src={shutterConfig.finalImage.foregroundImage}
+			src={transparentPixel}
+			alt=""
 			loading="eager"
 			decoding="async"
 		/>
@@ -186,10 +206,18 @@ const transparentPixel =
 
 	const MERGE_FINAL_IMAGE_OFFSET = 0.02;
 	const MERGE_FINAL_IMAGE_DURATION = 1.2;
+	// 后景视频在中景图渐入开始 0.5s 后开始渐入
+	const MERGE_VIDEO_START = MERGE_FINAL_IMAGE_OFFSET + 0.5;
+	const MERGE_VIDEO_DURATION = 0.8;
+	// 前景人物图在中景图完全显现后开始渐入，持续 1s
+	const MERGE_MIDGROUND_REVEAL_END =
+		MERGE_FINAL_IMAGE_OFFSET + MERGE_FINAL_IMAGE_DURATION;
+	const MERGE_FOREGROUND_DURATION = 1.0;
 	const MERGE_FINAL_COPY_GAP = 0.12;
+	// 文字在中景、视频、前景均完全显现后再渐入
 	const MERGE_FINAL_COPY_AT = `merge+=${(
-		MERGE_FINAL_IMAGE_OFFSET +
-		MERGE_FINAL_IMAGE_DURATION +
+		MERGE_MIDGROUND_REVEAL_END +
+		MERGE_FOREGROUND_DURATION +
 		MERGE_FINAL_COPY_GAP
 	).toFixed(2)}`;
 
@@ -214,15 +242,21 @@ const transparentPixel =
 
 	function getLazyImages(root: HTMLElement) {
 		return Array.from(
-			root.querySelectorAll<HTMLImageElement>(
-				"img[data-shutter-image], img[data-shutter-final-image], img[data-shutter-interlude-fg], img[data-shutter-interlude-strip-left], img[data-shutter-interlude-strip-right]",
+			root.querySelectorAll<HTMLElement>(
+				"img[data-shutter-image], img[data-shutter-final-midground], img[data-shutter-final-foreground], img[data-shutter-interlude-fg], img[data-shutter-interlude-strip-left], img[data-shutter-interlude-strip-right], video[data-shutter-final-video]",
 			),
 		);
 	}
 
 	function resetLazyImages(root: HTMLElement) {
-		getLazyImages(root).forEach((image) => {
-			image.setAttribute("src", TRANSPARENT_PIXEL);
+		getLazyImages(root).forEach((element) => {
+			if (element instanceof HTMLVideoElement) {
+				element.pause?.();
+				element.removeAttribute("src");
+				element.load?.();
+				return;
+			}
+			element.setAttribute("src", TRANSPARENT_PIXEL);
 		});
 	}
 
@@ -236,12 +270,16 @@ const transparentPixel =
 	}
 
 	async function hydrateLazyImages(root: HTMLElement) {
-		const images = getLazyImages(root);
-		const decodeQueue = images.map(async (image) => {
-			const src = image.dataset.src;
-			if (src && image.getAttribute("src") !== src) {
-				image.setAttribute("src", src);
+		const elements = getLazyImages(root);
+		const decodeQueue = elements.map(async (element) => {
+			const src = element.dataset.src;
+			if (!src) return;
+			if (element instanceof HTMLVideoElement) {
+				if (element.src !== src) element.src = src;
+				return; // 视频无需 decode()
 			}
+			const image = element as HTMLImageElement;
+			if (image.getAttribute("src") !== src) image.setAttribute("src", src);
 			await image.decode?.().catch(() => undefined);
 		});
 
@@ -351,7 +389,15 @@ const transparentPixel =
 		const title = root.querySelector<HTMLElement>("[data-display-title]");
 		const desc = root.querySelector<HTMLElement>("[data-display-desc]");
 		// 百叶窗元素
-		const finalImage = root.querySelector<HTMLElement>("[data-shutter-final-image]");
+		const finalVideo = root.querySelector<HTMLVideoElement>(
+			"[data-shutter-final-video]",
+		);
+		const finalMidground = root.querySelector<HTMLElement>(
+			"[data-shutter-final-midground]",
+		);
+		const finalForeground = root.querySelector<HTMLElement>(
+			"[data-shutter-final-foreground]",
+		);
 		const finalCopy = root.querySelector<HTMLElement>("[data-shutter-final-copy]");
 		const rail = root.querySelector<HTMLElement>(".home-portfolio-shutter__rail");
 		const mask = root.querySelector<HTMLElement>("[data-shutter-mask]");
@@ -381,7 +427,9 @@ const transparentPixel =
 			!kicker ||
 			!title ||
 			!desc ||
-			!finalImage ||
+			!finalVideo ||
+			!finalMidground ||
+			!finalForeground ||
 			!finalCopy ||
 			!rail ||
 			!mask ||
@@ -423,7 +471,10 @@ const transparentPixel =
 		// 百叶窗
 		gsap.set(rail, { autoAlpha: 1 });
 		gsap.set(mask, { scaleY: 0, transformOrigin: "50% 100%" });
-		gsap.set(finalImage, { autoAlpha: 0, yPercent: -35, scale: 1.06 });
+		// 最终图三层：中景图（首层渐入）、后景视频（最底）、前景人物图（最前，xPercent:-50 保持居中）
+		gsap.set(finalMidground, { autoAlpha: 0, yPercent: -35, scale: 1.06 });
+		gsap.set(finalVideo, { autoAlpha: 0 });
+		gsap.set(finalForeground, { autoAlpha: 0, xPercent: -50, scale: 1.02 });
 		gsap.set(finalCopy, { autoAlpha: 0, y: 80 });
 		gsap.set(panelCopies, { autoAlpha: 0, y: 48 });
 
@@ -549,7 +600,6 @@ const transparentPixel =
 		panels.forEach((panel, index) => {
 			const image = panel.querySelector<HTMLElement>("[data-shutter-image]");
 			const copy = panel.querySelector<HTMLElement>("[data-shutter-panel-copy]");
-			const at = SHUTTER_START_OFFSET + index * SHUTTER_PANEL_STEP;
 
 			timeline.to(
 				panel,
@@ -629,7 +679,8 @@ const transparentPixel =
 			`shutter-interlude+=${INTERLUDE_COPY_START}`,
 		);
 
-		// Phase C: Merge — 遮罩 + 最终大图
+		// Phase C: Merge — 遮罩 + 最终图三层组合
+		// 时序：中景图渐入 →（完全显现后）后景视频 + 前景图同时渐入 →（完全显现后）文字渐入
 		timeline.addLabel("merge", `shutter-interlude+=${INTERLUDE_TOTAL}`);
 
 		// 黑色遮罩从底部向上展开
@@ -639,9 +690,9 @@ const transparentPixel =
 			"merge",
 		);
 
-		// 最终大图从上方渐入
+		// 1. 中景图渐入（代替原 finalImage）
 		timeline.to(
-			finalImage,
+			finalMidground,
 			{
 				autoAlpha: 1,
 				yPercent: 0,
@@ -652,7 +703,33 @@ const transparentPixel =
 			`merge+=${MERGE_FINAL_IMAGE_OFFSET}`,
 		);
 
-		// 最终文字渐入
+		// 2. 后景视频在中景渐入 0.5s 后开始渐入（静音循环）
+		timeline.to(
+			finalVideo,
+			{
+				autoAlpha: 1,
+				duration: MERGE_VIDEO_DURATION,
+				ease: "power2.inOut",
+				onStart: () => {
+					finalVideo.play().catch(() => undefined);
+				},
+			},
+			`merge+=${MERGE_VIDEO_START}`,
+		);
+
+		// 3. 前景人物图在中景完全显现后渐入（xPercent:-50 保持水平居中）
+		timeline.to(
+			finalForeground,
+			{
+				autoAlpha: 1,
+				scale: 1,
+				duration: MERGE_FOREGROUND_DURATION,
+				ease: "power2.inOut",
+			},
+			`merge+=${MERGE_MIDGROUND_REVEAL_END}`,
+		);
+
+		// 4. 三层完全显现后，最终文字渐入
 		timeline.to(
 			finalCopy,
 			{ autoAlpha: 1, y: 0, duration: 0.46, ease: "power3.inOut" },
@@ -668,6 +745,7 @@ const transparentPixel =
 		activeCleanup = () => {
 			timeline.scrollTrigger?.kill();
 			timeline.kill();
+			finalVideo.pause?.();
 			gsap.set(
 				[
 					root,
@@ -679,7 +757,9 @@ const transparentPixel =
 					desc,
 					rail,
 					mask,
-					finalImage,
+					finalVideo,
+					finalMidground,
+					finalForeground,
 					finalCopy,
 					interlude,
 					interludeBg,

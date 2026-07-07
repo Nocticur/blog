@@ -428,7 +428,7 @@ const heroRightPanel = homeConfig.hero.rightPanel ?? {
 			const title = section.querySelector(".home-section-title, [data-motion-title]");
 			const cards = section.querySelectorAll(".card-base, .post-card-wrapper, .home-pending, .stats-container, [data-motion-card]");
 			const images = section.querySelectorAll(
-			"img[data-home-motion-image]:not([data-shutter-image]):not([data-shutter-final-image]), [data-home-motion-image]:not([data-shutter-image]):not([data-shutter-final-image])",
+			"img[data-home-motion-image]:not([data-shutter-image]):not([data-shutter-final-midground]):not([data-shutter-final-foreground]), [data-home-motion-image]:not([data-shutter-image]):not([data-shutter-final-midground]):not([data-shutter-final-foreground])",
 		);
 			if (!title && cards.length === 0 && images.length === 0) return;
 

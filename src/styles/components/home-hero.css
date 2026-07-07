@@ -473,8 +473,8 @@
 	filter: blur(12px);
 }
 
-.home-page--motion-pending > :not(#home-hero) img[data-home-motion-image]:not([data-shutter-image]):not([data-shutter-final-image]),
-.home-page--motion-pending > :not(#home-hero) [data-home-motion-image]:not([data-shutter-image]):not([data-shutter-final-image]) {
+.home-page--motion-pending > :not(#home-hero) img[data-home-motion-image]:not([data-shutter-image]):not([data-shutter-final-midground]):not([data-shutter-final-foreground]),
+.home-page--motion-pending > :not(#home-hero) [data-home-motion-image]:not([data-shutter-image]):not([data-shutter-final-midground]):not([data-shutter-final-foreground]) {
 	clip-path: inset(0 0 100% 0);
 	transform: scale(1.1);
 }

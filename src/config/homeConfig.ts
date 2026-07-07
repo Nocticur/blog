@@ -72,7 +72,9 @@ export const homeConfig: HomeConfig = {
 		description: "岁岁常欢愉，万事皆胜意",
 		scrollDistance: 6000,
 		finalImage: {
-			src: "/assets/images/home-truncated/utl.webp",
+			midgroundImage: "/assets/images/home-truncated/utl-back1.webp",
+			backgroundVideo: "/assets/images/home-truncated/utl-back2.webm",
+			foregroundImage: "/assets/images/home-truncated/utl-1.webp",
 			alt: "2026年 加油！",
 		},
 		interlude: {

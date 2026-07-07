@@ -8,7 +8,7 @@
 }
 
 .home-portfolio-shutter__rail,
-.home-portfolio-shutter__final-image,
+.home-portfolio-shutter__final-video,
 .home-portfolio-shutter__final-copy,
 .home-portfolio-shutter__mask,
 .home-portfolio-shutter__interlude {
@@ -138,25 +138,64 @@
 }
 
 .home-portfolio-shutter__panel-image,
+.home-portfolio-shutter__final-video,
 .home-portfolio-shutter__final-image {
 	display: block;
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-	object-position: center;
 	user-select: none;
 	-webkit-user-drag: none;
 	will-change: transform, opacity;
 }
 
-.home-portfolio-shutter__final-image {
-	z-index: 5;
-	min-height: 100%;
+/* ===== 最终图三层组合（从后到前：视频 / 中景 / 前景） ===== */
+/* 共用基础：opacity/visibility 由 GSAP autoAlpha 接管 */
+.home-portfolio-shutter__final-video,
+.home-portfolio-shutter__final-image--midground,
+.home-portfolio-shutter__final-image--foreground {
 	opacity: 0;
 	visibility: hidden;
 }
 
+/* 后景视频：最底（z=5），cover 填满 */
+.home-portfolio-shutter__final-video {
+	z-index: 5;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: center;
+}
+
+/* 中景图：中间层（z=6），cover 填满，底部固定顶部可裁剪 */
+.home-portfolio-shutter__final-image--midground {
+	position: absolute;
+	z-index: 6;
+	top: auto;
+	right: auto;
+	bottom: 0;
+	left: 0;
+	width: 100%;
+	height: 120%;
+	object-fit: cover;
+	object-position: center bottom;
+}
+
+/* 前景人物图：最前层（z=7），不裁剪，垂直底部水平居中，尺寸收小 */
+.home-portfolio-shutter__final-image--foreground {
+	position: absolute;
+	z-index: 7;
+	bottom: 0;
+	left: 50%;
+	width: auto;
+	max-width: 100%;
+	height: clamp(40vh, 55vh, 70vh);
+	object-fit: contain;
+	object-position: center bottom;
+	transform: translateX(-50%);
+}
+
 .home-portfolio-shutter__panel-image {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
 	object-position: center bottom;
 }
 
@@ -240,7 +279,7 @@
 }
 
 .home-portfolio-shutter__final-copy {
-	z-index: 6;
+	z-index: 8;
 	display: flex;
 	flex-direction: column;
 	align-items: center;

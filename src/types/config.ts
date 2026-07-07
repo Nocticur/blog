@@ -230,16 +230,23 @@ export type HomePortfolioShutterInterlude = {
 	copyRight: string;
 };
 
+export type HomePortfolioShutterFinalImage = {
+	/** 中景图（首层渐入，代替原 utl.webp） */
+	midgroundImage: string;
+	/** 后景视频（中景完全显现后渐入，最底层，静音循环） */
+	backgroundVideo: string;
+	/** 前景人物图（与后景同时渐入，最前层，不裁剪） */
+	foregroundImage: string;
+	alt: string;
+};
+
 export type HomePortfolioShutterConfig = {
 	enabled: boolean;
 	kicker: string;
 	title: string;
 	description: string;
 	scrollDistance: number;
-	finalImage: {
-		src: string;
-		alt: string;
-	};
+	finalImage: HomePortfolioShutterFinalImage;
 	panels: HomePortfolioShutterPanel[];
 	/** 5 张长条图之后的插入动画段：三层布局（背景长条 / 中景文字 / 前景大图） */
 	interlude: HomePortfolioShutterInterlude;
