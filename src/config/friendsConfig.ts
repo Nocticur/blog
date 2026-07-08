@@ -261,6 +261,15 @@ export const friendsConfig: FriendLink[] = [
 		weight: 5,
 		enabled: true,
 	},
+	{
+		title: "Kanako的小窝",
+		imgurl: "https://blog.kanako.top/icon.png",
+		desc: "宁静致远，厚积薄发",
+		siteurl: "https://blog.kanako.top/",
+		tags: ["Blog"],
+		weight: 5,
+		enabled: true,
+	},
 ];
 
 // 获取启用的友链并进行排序
