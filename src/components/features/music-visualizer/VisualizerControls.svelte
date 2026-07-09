@@ -51,8 +51,83 @@ let playMode = $state(0);
 let currentTimeStr = $state("0:00");
 let durationStr = $state("0:00");
 let progress = $state(0);
+let initialized = $state(false);
 let rightPanelMode = $state<"tools" | "playlist">("tools");
 let playlistListEl: HTMLDivElement;
+let progressTrackEl = $state<HTMLDivElement | null>(null);
+let volumeTrackEl = $state<HTMLDivElement | null>(null);
+let isDraggingProgress = $state(false);
+let isDraggingVolume = $state(false);
+let progressTrackHover = $state(false);
+let volumeTrackHover = $state(false);
+
+function getPercentFromPointer(track: HTMLElement, clientX: number) {
+	const rect = track.getBoundingClientRect();
+	return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+}
+
+function seekFromClientX(clientX: number) {
+	if (!progressTrackEl) return;
+	const percent = getPercentFromPointer(progressTrackEl, clientX);
+	progress = percent * 100;
+	window.__fireflyMusic?.seek(percent);
+}
+
+function setVolumeFromClientX(clientX: number) {
+	if (!volumeTrackEl) return;
+	const val = getPercentFromPointer(volumeTrackEl, clientX);
+	volume = val;
+	isMuted = false;
+	window.__fireflyMusic?.setVolume(val);
+}
+
+function onProgressPointerDown(e: PointerEvent) {
+	const track = e.currentTarget as HTMLDivElement;
+	track.setPointerCapture(e.pointerId);
+	isDraggingProgress = true;
+	seekFromClientX(e.clientX);
+}
+
+function onProgressPointerMove(e: PointerEvent) {
+	if (!isDraggingProgress) return;
+	seekFromClientX(e.clientX);
+}
+
+function onProgressPointerUp(e: PointerEvent) {
+	if (!isDraggingProgress) return;
+	isDraggingProgress = false;
+	if (e.currentTarget instanceof HTMLElement) {
+		try {
+			e.currentTarget.releasePointerCapture(e.pointerId);
+		} catch {
+			/* already released */
+		}
+	}
+}
+
+function onVolumePointerDown(e: PointerEvent) {
+	const track = e.currentTarget as HTMLDivElement;
+	track.setPointerCapture(e.pointerId);
+	isDraggingVolume = true;
+	setVolumeFromClientX(e.clientX);
+}
+
+function onVolumePointerMove(e: PointerEvent) {
+	if (!isDraggingVolume) return;
+	setVolumeFromClientX(e.clientX);
+}
+
+function onVolumePointerUp(e: PointerEvent) {
+	if (!isDraggingVolume) return;
+	isDraggingVolume = false;
+	if (e.currentTarget instanceof HTMLElement) {
+		try {
+			e.currentTarget.releasePointerCapture(e.pointerId);
+		} catch {
+			/* already released */
+		}
+	}
+}
 
 function syncPlaylistScroll() {
 	if (!playlistListEl || rightPanelMode !== "playlist") return;
@@ -91,24 +166,6 @@ function toggleMute() {
 	if (mgr) mgr.toggleMute();
 }
 
-function onVolumeClick(e: MouseEvent) {
-	const target = e.currentTarget as HTMLElement;
-	const rect = target.getBoundingClientRect();
-	const x = e.clientX - rect.left;
-	const val = Math.max(0, Math.min(1, x / rect.width));
-	const mgr = window.__fireflyMusic;
-	if (mgr) mgr.setVolume(val);
-}
-
-function onProgressClick(e: MouseEvent) {
-	const target = e.currentTarget as HTMLElement;
-	const rect = target.getBoundingClientRect();
-	const x = e.clientX - rect.left;
-	const percent = Math.max(0, Math.min(1, x / rect.width));
-	const mgr = window.__fireflyMusic;
-	if (mgr) mgr.seek(percent);
-}
-
 function playTrack(index: number) {
 	const mgr = window.__fireflyMusic;
 	if (mgr) mgr.playTrackByIndex(index);
@@ -135,6 +192,7 @@ function syncState() {
 	currentTimeStr = state.currentTimeStr;
 	durationStr = state.durationStr;
 	progress = state.progress;
+	initialized = state.initialized;
 	setTimeout(syncPlaylistScroll, 0);
 }
 
@@ -156,12 +214,14 @@ function onPlayState(e: CustomEvent) {
 }
 
 function onTime(e: CustomEvent) {
+	if (isDraggingProgress) return;
 	currentTimeStr = e.detail.currentTimeStr;
 	durationStr = e.detail.durationStr;
 	progress = e.detail.progress;
 }
 
 function onVolume(e: CustomEvent) {
+	if (isDraggingVolume) return;
 	volume = e.detail.volume;
 	isMuted = e.detail.isMuted;
 }
@@ -203,22 +263,28 @@ onDestroy(() => {
 				type="button"
 				class="music-visualizer__record"
 				class:music-visualizer__record--playing={isPlaying}
+				class:music-visualizer__record--loading={!initialized}
 				onclick={togglePlay}
 				title={isPlaying ? "暂停" : "播放"}
 				aria-label={isPlaying ? "暂停" : "播放"}
 			>
 				<span class="music-visualizer__record-disc" aria-hidden="true">
-					{#if currentTrack?.pic}
-						<img
-							class="music-visualizer__record-image"
-							src={currentTrack.pic}
-							alt=""
-						/>
-					{:else}
-						<span class="music-visualizer__record-placeholder">
-							<Icon icon="material-symbols:music-note-rounded" size="2xl" />
-						</span>
-					{/if}
+					<span class="music-visualizer__record-grooves"></span>
+					<span class="music-visualizer__record-label">
+						{#if currentTrack?.pic}
+							<img
+								class="music-visualizer__record-image"
+								src={currentTrack.pic}
+								alt=""
+							/>
+						{:else}
+							<span class="music-visualizer__record-placeholder">
+								<Icon icon="material-symbols:music-note-rounded" size="2xl" />
+							</span>
+						{/if}
+					</span>
+					<span class="music-visualizer__record-hole"></span>
+					<span class="music-visualizer__record-shine"></span>
 				</span>
 				<span class="music-visualizer__record-overlay" aria-hidden="true">
 					{#if isPlaying}
@@ -235,7 +301,7 @@ onDestroy(() => {
 				</span>
 			</div>
 
-			<div class="music-visualizer__tool-row" aria-label="音乐控制">
+			<div class="music-visualizer__tool-row">
 				<button
 					type="button"
 					class="music-visualizer__btn music-visualizer__btn--mobile-play"
@@ -252,61 +318,45 @@ onDestroy(() => {
 
 				<button
 					type="button"
-					class="music-visualizer__btn music-visualizer__btn--playlist"
-					onclick={togglePlaylist}
-					title="打开歌单"
-					aria-label="打开歌单"
-					aria-controls="music-visualizer-playlist-panel"
-					aria-expanded={rightPanelMode === "playlist"}
-				>
-					<Icon icon="material-symbols:queue-music-rounded" size="lg" />
-				</button>
-
-				<button
-					type="button"
-					class="music-visualizer__btn music-visualizer__btn--mode"
+					class="music-visualizer__btn"
 					onclick={cycleMode}
 					title="播放模式"
 					aria-label="播放模式"
 				>
 					{#if playMode === 0}
-						<Icon icon="material-symbols:repeat-rounded" size="lg" />
+						<Icon icon="material-symbols:repeat-rounded" size="md" />
 					{:else if playMode === 1}
-						<Icon icon="material-symbols:repeat-one-rounded" size="lg" />
+						<Icon icon="material-symbols:repeat-one-rounded" size="md" />
 					{:else}
-						<Icon icon="material-symbols:shuffle-rounded" size="lg" />
+						<Icon icon="material-symbols:shuffle-rounded" size="md" />
 					{/if}
 				</button>
 
-				<div class="music-visualizer__volume-group">
-					<button
-						type="button"
-						class="music-visualizer__btn music-visualizer__btn--mute"
-						onclick={toggleMute}
-						title="音量"
-						aria-label="音量"
-					>
-						{#if isMuted || volume === 0}
-							<Icon icon="material-symbols:volume-off-rounded" size="lg" />
-						{:else}
-							<Icon icon="material-symbols:volume-up-rounded" size="lg" />
-						{/if}
-					</button>
-					<div
-						class="music-visualizer__volume-bar"
-						onclick={onVolumeClick}
-						role="slider"
-						aria-label="音量"
-						aria-valuemin="0"
-						aria-valuemax="100"
-						aria-valuenow={Math.round((isMuted ? 0 : volume) * 100)}
-					>
-						<div
-							class="music-visualizer__volume-fill"
-							style={`width: ${isMuted ? 0 : volume * 100}%`}
-						/>
-					</div>
-				</div>
+				<button
+					type="button"
+					class="music-visualizer__btn"
+					onclick={togglePlaylist}
+					title="歌单"
+					aria-label="歌单"
+					aria-controls="music-visualizer-playlist-panel"
+					aria-expanded={rightPanelMode === "playlist"}
+				>
+					<Icon icon="material-symbols:queue-music-rounded" size="md" />
+				</button>
+
+				<button
+					type="button"
+					class="music-visualizer__btn"
+					onclick={toggleMute}
+					title="音量"
+					aria-label="音量"
+				>
+					{#if isMuted || volume === 0}
+						<Icon icon="material-symbols:volume-off-rounded" size="md" />
+					{:else}
+						<Icon icon="material-symbols:volume-up-rounded" size="md" />
+					{/if}
+				</button>
 			</div>
 		</section>
 	{:else}
@@ -394,43 +444,137 @@ onDestroy(() => {
 	{/if}
 </div>
 
-<div class="music-visualizer__bottom-progress" aria-label="播放进度">
-	<button
-		type="button"
-		class="music-visualizer__btn music-visualizer__btn--prev"
-		onclick={playPrev}
-		title="上一首"
-		aria-label="上一首"
-	>
-		<Icon icon="material-symbols:skip-previous-rounded" size="2xl" />
-	</button>
-
-	<div class="music-visualizer__progress-wrapper">
-		<span class="music-visualizer__time">{currentTimeStr}</span>
-		<div
-			class="music-visualizer__progress-bar"
-			onclick={onProgressClick}
-			role="slider"
-			aria-label="进度"
-			aria-valuemin="0"
-			aria-valuemax="100"
-			aria-valuenow={Math.round(progress)}
-		>
+<div class="music-visualizer__bottom-dock" aria-label="播放控制">
+	<div class="music-visualizer__bottom-dock-inner">
+		<div class="music-visualizer__volume-block">
+			<button
+				type="button"
+				class="music-visualizer__dock-btn music-visualizer__dock-btn--mute"
+				onclick={toggleMute}
+				title="音量"
+				aria-label="音量"
+			>
+				{#if isMuted || volume === 0}
+					<Icon icon="material-symbols:volume-off-rounded" size="md" />
+				{:else}
+					<Icon icon="material-symbols:volume-up-rounded" size="md" />
+				{/if}
+			</button>
 			<div
-				class="music-visualizer__progress-fill"
-				style={`width: ${progress}%`}
-			/>
+				bind:this={volumeTrackEl}
+				class="music-visualizer__timeline-track music-visualizer__timeline-track--volume"
+				class:is-hover={volumeTrackHover}
+				class:is-dragging={isDraggingVolume}
+				onpointerdown={onVolumePointerDown}
+				onpointermove={onVolumePointerMove}
+				onpointerup={onVolumePointerUp}
+				onpointercancel={onVolumePointerUp}
+				onmouseenter={() => (volumeTrackHover = true)}
+				onmouseleave={() => (volumeTrackHover = false)}
+				role="slider"
+				aria-label="音量"
+				aria-valuemin="0"
+				aria-valuemax="100"
+				aria-valuenow={Math.round((isMuted ? 0 : volume) * 100)}
+			>
+				<div class="music-visualizer__timeline-rail"></div>
+				<div
+					class="music-visualizer__timeline-fill"
+					style={`width: ${isMuted ? 0 : volume * 100}%`}
+				></div>
+				<div
+					class="music-visualizer__timeline-thumb"
+					style={`left: ${isMuted ? 0 : volume * 100}%`}
+				></div>
+			</div>
 		</div>
-		<span class="music-visualizer__time">{durationStr}</span>
-	</div>
 
-	<button
-		type="button"
-		class="music-visualizer__btn music-visualizer__btn--next"
-		onclick={playNext}
-		title="下一首"
-		aria-label="下一首"
-	>
-		<Icon icon="material-symbols:skip-next-rounded" size="2xl" />
-	</button>
+		<div class="music-visualizer__dock-divider" aria-hidden="true"></div>
+
+		<button
+			type="button"
+			class="music-visualizer__transport-btn"
+			onclick={playPrev}
+			title="上一首"
+			aria-label="上一首"
+		>
+			<Icon icon="material-symbols:skip-previous-rounded" size="xl" />
+		</button>
+
+		<div class="music-visualizer__timeline-block">
+			<span class="music-visualizer__time">{currentTimeStr}</span>
+			<div
+				bind:this={progressTrackEl}
+				class="music-visualizer__timeline-track"
+				class:is-hover={progressTrackHover}
+				class:is-dragging={isDraggingProgress}
+				onpointerdown={onProgressPointerDown}
+				onpointermove={onProgressPointerMove}
+				onpointerup={onProgressPointerUp}
+				onpointercancel={onProgressPointerUp}
+				onmouseenter={() => (progressTrackHover = true)}
+				onmouseleave={() => (progressTrackHover = false)}
+				role="slider"
+				aria-label="进度"
+				aria-valuemin="0"
+				aria-valuemax="100"
+				aria-valuenow={Math.round(progress)}
+			>
+				<div class="music-visualizer__timeline-rail"></div>
+				<div
+					class="music-visualizer__timeline-fill"
+					style={`width: ${progress}%`}
+				></div>
+				<div
+					class="music-visualizer__timeline-thumb"
+					style={`left: ${progress}%`}
+				></div>
+			</div>
+			<span class="music-visualizer__time">{durationStr}</span>
+		</div>
+
+		<button
+			type="button"
+			class="music-visualizer__transport-btn"
+			onclick={playNext}
+			title="下一首"
+			aria-label="下一首"
+		>
+			<Icon icon="material-symbols:skip-next-rounded" size="xl" />
+		</button>
+
+		<div class="music-visualizer__dock-divider" aria-hidden="true"></div>
+
+		<div class="music-visualizer__dock-tools" aria-label="音乐工具">
+			<button
+				type="button"
+				class="music-visualizer__dock-btn"
+				class:is-active={rightPanelMode === "playlist"}
+				onclick={togglePlaylist}
+				title="歌单"
+				aria-label="歌单"
+				aria-controls="music-visualizer-playlist-panel"
+				aria-expanded={rightPanelMode === "playlist"}
+			>
+				<Icon icon="material-symbols:queue-music-rounded" size="md" />
+			</button>
+
+			<button
+				type="button"
+				class="music-visualizer__dock-btn"
+				class:is-active={playMode !== 0}
+				onclick={cycleMode}
+				title="播放模式"
+				aria-label="播放模式"
+			>
+				{#if playMode === 0}
+					<Icon icon="material-symbols:repeat-rounded" size="md" />
+				{:else if playMode === 1}
+					<Icon icon="material-symbols:repeat-one-rounded" size="md" />
+				{:else}
+					<Icon icon="material-symbols:shuffle-rounded" size="md" />
+				{/if}
+			</button>
+		</div>
+	</div>
 </div>
