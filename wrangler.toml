@@ -4,6 +4,11 @@ main = "src/worker.js"
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
+# 与 Astro trailingSlash: "always" 对齐
+html_handling = "force-trailing-slash"
+# 未匹配路由时返回 dist/404.html（status 404）
+not_found_handling = "404-page"
 
 [vars]
 NODE_VERSION = "22"
