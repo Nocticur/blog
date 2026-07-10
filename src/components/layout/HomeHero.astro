@@ -219,14 +219,6 @@ const rainConfig = {
 	let rainIntensity = 0.6;
 	let rainColorRgb: string | null = null;
 
-	// 指针景深视差
-	let parallaxMoveHandler: ((e: PointerEvent) => void) | null = null;
-	let parallaxLeaveHandler: (() => void) | null = null;
-	let parallaxBgX: ((v: number) => void) | null = null;
-	let parallaxBgY: ((v: number) => void) | null = null;
-	let parallaxFrameX: ((v: number) => void) | null = null;
-	let parallaxFrameY: ((v: number) => void) | null = null;
-
 	function prefersReducedMotion() {
 		return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 	}
@@ -563,73 +555,6 @@ const rainConfig = {
 		rainDrops = [];
 		rainSplashes = [];
 		rainEdges = [];
-	}
-
-	// ============================================
-	// 指针景深视差（GSAP quickTo）
-	// ============================================
-	function initHeroParallax() {
-		const hero = document.getElementById("home-hero");
-		if (!hero) return;
-		if (prefersReducedMotion() || isMobile()) return;
-
-		destroyHeroParallax();
-
-		const bg = hero.querySelector<HTMLElement>(".home-hero__video");
-		const frame = hero.querySelector<HTMLElement>(".home-hero__viewfinder");
-		if (!bg && !frame) return;
-
-		// 背景放大以留出平移余量，避免露边
-		if (bg) gsap.set(bg, { scale: 1.06, transformOrigin: "center center" });
-
-		const q = { duration: 0.6, ease: "power3.out" };
-		if (bg) {
-			parallaxBgX = gsap.quickTo(bg, "x", q);
-			parallaxBgY = gsap.quickTo(bg, "y", q);
-		}
-		if (frame) {
-			parallaxFrameX = gsap.quickTo(frame, "x", q);
-			parallaxFrameY = gsap.quickTo(frame, "y", q);
-		}
-
-		const BG_AMP = 18; // 背景同向、幅度大
-		const FRAME_AMP = 10; // 前景框反向、幅度小
-
-		parallaxMoveHandler = (e: PointerEvent) => {
-			const rect = hero.getBoundingClientRect();
-			const nx = (e.clientX - rect.left) / rect.width - 0.5; // -0.5 ~ 0.5
-			const ny = (e.clientY - rect.top) / rect.height - 0.5;
-			parallaxBgX?.(nx * BG_AMP);
-			parallaxBgY?.(ny * BG_AMP);
-			parallaxFrameX?.(-nx * FRAME_AMP);
-			parallaxFrameY?.(-ny * FRAME_AMP);
-		};
-		parallaxLeaveHandler = () => {
-			parallaxBgX?.(0);
-			parallaxBgY?.(0);
-			parallaxFrameX?.(0);
-			parallaxFrameY?.(0);
-		};
-		hero.addEventListener("pointermove", parallaxMoveHandler);
-		hero.addEventListener("pointerleave", parallaxLeaveHandler);
-	}
-
-	function destroyHeroParallax() {
-		const hero = document.getElementById("home-hero");
-		if (hero) {
-			if (parallaxMoveHandler) hero.removeEventListener("pointermove", parallaxMoveHandler);
-			if (parallaxLeaveHandler) hero.removeEventListener("pointerleave", parallaxLeaveHandler);
-			const bg = hero.querySelector<HTMLElement>(".home-hero__video");
-			const frame = hero.querySelector<HTMLElement>(".home-hero__viewfinder");
-			if (bg) gsap.set(bg, { clearProps: "transform" });
-			if (frame) gsap.set(frame, { clearProps: "transform" });
-		}
-		parallaxMoveHandler = null;
-		parallaxLeaveHandler = null;
-		parallaxBgX = null;
-		parallaxBgY = null;
-		parallaxFrameX = null;
-		parallaxFrameY = null;
 	}
 
 	// ============================================
@@ -976,7 +901,6 @@ const rainConfig = {
 		requestAnimationFrame(() => {
 			initHomeScrollMotion();
 			initHeroRain();
-			initHeroParallax();
 		});
 	}
 
@@ -985,7 +909,6 @@ const rainConfig = {
 		destroyWorkStatus();
 		destroyHeroHatch();
 		destroyHeroRain();
-		destroyHeroParallax();
 	}
 
 	async function scheduleHomeInit() {

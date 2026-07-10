@@ -63,8 +63,6 @@ html:has(.home-hero) #top-row {
 	height: 100%;
 	object-fit: cover;
 	z-index: 0;
-	/* 指针景深视差目标（transform 由脚本设置） */
-	will-change: transform;
 }
 
 /* ---------- 玻璃雨珠 + 撞击水花画布 ---------- */
@@ -96,8 +94,6 @@ html:has(.home-hero) #top-row {
 	inset: 0;
 	z-index: 8;
 	pointer-events: none;
-	/* 指针景深视差目标（反向微移，transform 由脚本设置） */
-	will-change: transform;
 }
 
 .home-hero__viewfinder-corner {
