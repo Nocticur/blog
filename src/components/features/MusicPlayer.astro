@@ -75,13 +75,17 @@ const widgetId =
                     <div class="vol-bar absolute left-0 top-0 h-full bg-(--primary) rounded-full w-[70%]"></div>
                 </div>
             </div>
-            <!-- Lyric Toggle + Floating Lyric Toggle -->
-            <button class={`btn-lrc-toggle hover:text-(--primary) transition-all duration-300 p-0.5 transform active:scale-95 text-neutral-400 shrink-0 ml-auto ${!config.showLyrics ? 'hidden' : ''}`} title={i18n(I18nKey.musicLyrics)} aria-label={i18n(I18nKey.musicLyrics)}>
+            <!-- Visualizer (3D page) + Lyric Toggle + Floating Lyric Toggle -->
+            <a href="/music/" class="btn-visualizer transition-all duration-300 p-0.5 transform active:scale-95 shrink-0 ml-auto inline-flex items-center justify-center" title="音乐可视化" aria-label="音乐可视化">
+                <Icon name="material-symbols:graphic-eq-rounded" class="text-xl" aria-hidden="true" />
+            </a>
+            <button class={`btn-lrc-toggle hover:text-(--primary) transition-all duration-300 p-0.5 transform active:scale-95 text-neutral-400 shrink-0 ${!config.showLyrics ? 'hidden' : ''}`} title={i18n(I18nKey.musicLyrics)} aria-label={i18n(I18nKey.musicLyrics)}>
                 <Icon name="material-symbols:subtitles-off-outline-rounded" class="icon-lrc-off text-xl" aria-hidden="true" />
                 <Icon name="material-symbols:subtitles-outline-rounded" class="icon-lrc-on text-xl hidden" aria-hidden="true" />
             </button>
             <button class={`btn-floating-lrc-toggle hover:text-(--primary) transition-all duration-300 p-0.5 pr-2 transform active:scale-95 text-neutral-400 shrink-0 ${!config.showLyrics ? 'hidden' : ''}`} title={i18n(I18nKey.musicFloatingLyrics)} aria-label={i18n(I18nKey.musicFloatingLyrics)}>
-                <Icon name="material-symbols:lyrics-outline-rounded" class="text-xl" aria-hidden="true" />
+                <Icon name="material-symbols:lyrics-outline-rounded" class="icon-floating-lrc-off text-xl" aria-hidden="true" />
+                <Icon name="material-symbols:lyrics-rounded" class="icon-floating-lrc-on text-xl hidden" aria-hidden="true" />
             </button>
         </div>
     </div>
@@ -127,11 +131,6 @@ const widgetId =
     <button class="btn-drawer-toggle text-neutral-400 hover:text-(--primary) transition-all duration-300 p-2 transform active:scale-95" title={i18n(I18nKey.musicPlaylist)} aria-label={i18n(I18nKey.musicPlaylist)}>
         <Icon name="mdi:playlist-music" class="text-xl" aria-hidden="true" />
     </button>
-
-    <!-- Visualizer Button -->
-    <a href="/music/" class="btn-visualizer text-neutral-400 hover:text-(--primary) transition-all duration-300 p-2 transform active:scale-95 inline-flex items-center justify-center" title="音乐可视化" aria-label="音乐可视化">
-        <Icon name="material-symbols:graphic-eq-rounded" class="text-xl" aria-hidden="true" />
-    </a>
 </div>
 
 <!-- Lyrics Drawer -->
@@ -225,6 +224,8 @@ const widgetId =
         volBar: widget.querySelector('.vol-bar'),
         btnLrc: widget.querySelector('.btn-lrc-toggle'),
         btnFloatingLrc: widget.querySelector('.btn-floating-lrc-toggle'),
+        iconFloatingLrcOn: widget.querySelector('.icon-floating-lrc-on'),
+        iconFloatingLrcOff: widget.querySelector('.icon-floating-lrc-off'),
         iconLrcOn: widget.querySelector('.icon-lrc-on'),
         iconLrcOff: widget.querySelector('.icon-lrc-off'),
         lrcDrawer: widget.querySelector('.lrc-drawer'),
@@ -649,6 +650,30 @@ const widgetId =
 
     // Floating lyrics toggle
     if (ui.btnFloatingLrc) {
+        var FLOATING_LRC_KEY = 'floating-lyrics-visible';
+
+        function updateFloatingLrcUI(visible) {
+            if (visible) {
+                ui.btnFloatingLrc.classList.add('text-(--primary)');
+                ui.btnFloatingLrc.classList.remove('text-neutral-400');
+                if (ui.iconFloatingLrcOn) ui.iconFloatingLrcOn.classList.remove('hidden');
+                if (ui.iconFloatingLrcOff) ui.iconFloatingLrcOff.classList.add('hidden');
+            } else {
+                ui.btnFloatingLrc.classList.remove('text-(--primary)');
+                ui.btnFloatingLrc.classList.add('text-neutral-400');
+                if (ui.iconFloatingLrcOn) ui.iconFloatingLrcOn.classList.add('hidden');
+                if (ui.iconFloatingLrcOff) ui.iconFloatingLrcOff.classList.remove('hidden');
+            }
+        }
+
+        // Sync initial icon state from persisted preference
+        updateFloatingLrcUI(localStorage.getItem(FLOATING_LRC_KEY) !== 'false');
+
+        // Keep icon in sync with FloatingLyrics (covers its own close button too)
+        on('fm:floating-lyrics-state', function (e) {
+            updateFloatingLrcUI(!!e.detail.visible);
+        });
+
         ui.btnFloatingLrc.addEventListener('click', function () {
             window.dispatchEvent(new CustomEvent('fm:toggle-floating-lyrics'));
         });

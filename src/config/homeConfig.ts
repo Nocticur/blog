@@ -59,7 +59,7 @@ export const homeConfig: HomeConfig = {
 	// 展示层：垂直线 → 长柱 → 字体显隐 → 柱子扩全屏 → 衔接百叶窗
 	displayLayer: {
 		enabled: true,
-		kicker: "展示",
+		kicker: "作品展示",
 		title: "CRYSTALLIZE GALLERY",
 		description:
 			"Where fleeting visions crystallize into permanence — each frame a frozen breath of time, each work a memory hardened into light.",
@@ -73,7 +73,7 @@ export const homeConfig: HomeConfig = {
 		kicker: "The End",
 		title: "愿你每一天 都闪闪发光",
 		description: "岁岁常欢愉，万事皆胜意",
-		scrollDistance: 6000,
+		scrollDistance: 3000,
 		finalImage: {
 			midgroundImage: "/assets/images/home-truncated/utl-back1.webp",
 			backgroundVideo: "/assets/images/home-truncated/utl-back2.webm",

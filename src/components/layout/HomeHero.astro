@@ -452,7 +452,7 @@ const rainConfig = {
 		rainDpr = Math.min(window.devicePixelRatio || 1, 1.5);
 
 		function resize() {
-			if (!rainCanvas || !rainCtx) return;
+			if (!rainCanvas || !rainCtx || !hero) return;
 			const rect = hero.getBoundingClientRect();
 			rainCanvas.width = Math.round(rect.width * rainDpr);
 			rainCanvas.height = Math.round(rect.height * rainDpr);

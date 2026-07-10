@@ -58,6 +58,13 @@ import { i18n } from "@/i18n/translation";
 			container.classList.add("translate-y-full");
 			container.classList.remove("translate-y-0", "pointer-events-auto");
 		}
+		// Broadcast current visibility so external toggles (e.g. the music
+		// widget button) can keep their on/off icon in sync.
+		window.dispatchEvent(
+			new CustomEvent("fm:floating-lyrics-state", {
+				detail: { visible: state.visible },
+			}),
+		);
 	}
 
 	function updateLyricsDisplay() {

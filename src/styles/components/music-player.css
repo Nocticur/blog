@@ -10,3 +10,45 @@
 .animate-spin-slow {
 	animation: spin-slow 10s linear infinite;
 }
+
+/* ============================================
+   图标按钮 hover 圆形背景
+   ============================================ */
+.music-player-widget .btn-mute,
+.music-player-widget .btn-lrc-toggle,
+.music-player-widget .btn-floating-lrc-toggle,
+.music-player-widget .btn-visualizer,
+.music-player-widget .btn-repeat,
+.music-player-widget .btn-prev,
+.music-player-widget .btn-play,
+.music-player-widget .btn-next,
+.music-player-widget .btn-drawer-toggle {
+	border-radius: var(--radius-full);
+	transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.music-player-widget .btn-mute:hover,
+.music-player-widget .btn-lrc-toggle:hover,
+.music-player-widget .btn-floating-lrc-toggle:hover,
+.music-player-widget .btn-visualizer:hover,
+.music-player-widget .btn-repeat:hover,
+.music-player-widget .btn-prev:hover,
+.music-player-widget .btn-play:hover,
+.music-player-widget .btn-next:hover,
+.music-player-widget .btn-drawer-toggle:hover {
+	background-color: var(--btn-plain-bg-hover);
+}
+
+/* ============================================
+   可视化按钮（跳转 3D 页面）— 红色强调
+   注：本项目主题为黑白灰阶，无全局红色变量，
+   此处以局部变量集中管理，避免散落硬编码色值。
+   ============================================ */
+.music-player-widget .btn-visualizer {
+	--visualizer-color: #ef4444;
+	--visualizer-color-hover: #dc2626;
+	color: var(--visualizer-color);
+}
+.music-player-widget .btn-visualizer:hover {
+	color: var(--visualizer-color-hover);
+}

@@ -107,17 +107,18 @@
 	pointer-events: none;
 }
 
-/* 左侧垂直大字「展示」 — 在 page-bg 上，色为 deep-text */
+/* 左侧大字「生图展示」 — 4 字组成 2×2 方块，在 page-bg 上，色为 deep-text */
 .home-display-layer__kicker {
 	grid-column: 1;
 	justify-self: end;
 	align-self: center;
 	margin-right: clamp(2.5rem, 7vw, 7rem);
-	writing-mode: vertical-rl;
-	text-orientation: upright;
+	width: 2.6em;
+	text-align: center;
+	word-break: break-all;
 	font-size: clamp(2rem, 4.5vw, 4.5rem);
 	font-weight: 500;
-	line-height: 1;
+	line-height: 1.2;
 	letter-spacing: 0.16em;
 	color: var(--deep-text);
 	will-change: transform, opacity;
