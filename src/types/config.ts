@@ -330,7 +330,6 @@ export type HomeConfig = {
 			pill: string;
 			title: string;
 			diamond: string;
-			subtitle: string;
 			microText: string;
 		};
 		/** 玻璃雨珠 + 撞击水花动效（仅桌面端、尊重 reduced-motion） */

@@ -95,7 +95,6 @@ export const homeConfig: HomeConfig = {
 			pill: "BLOG",
 			title: "博客",
 			diamond: "✦",
-			subtitle: "CREATIVE",
 			microText: "システム起動完了",
 		},
 		// 玻璃雨珠 + 撞击水花（仅桌面端生效，自动尊重 prefers-reduced-motion）

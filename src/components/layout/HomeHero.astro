@@ -76,7 +76,6 @@ const heroRightPanel = homeConfig.hero.rightPanel ?? {
 	pill: "BLOG",
 	title: "博客",
 	diamond: "✦",
-	subtitle: "CREATIVE",
 	microText: "システム起動完了",
 };
 
@@ -136,7 +135,7 @@ const rainConfig = {
 		<section class="home-hero__left-panel">
 			<div class="home-hero__profile">
 				<div class="home-hero__identity-row">
-					<!-- 头像（左侧，放大） + 状态 -->
+					<!-- 头像（仅移动端展示；桌面端已去除大头照） -->
 					<div class="home-hero__avatar-group">
 						<div class="home-hero__avatar-wrapper">
 							<img
@@ -226,7 +225,7 @@ const rainConfig = {
 				<span class="home-hero__v-title">{heroRightPanel.title}</span>
 				<span class="home-hero__v-sub">{homeConfig.name || ""}</span>
 				<span class="home-hero__diamond">{heroRightPanel.diamond}</span>
-				<span class="home-hero__v-sub">{heroRightPanel.subtitle}</span>
+				<span class="home-hero__v-sub home-hero__v-status is-working" id="hero-work-status-vertical">WORKING</span>
 			</div>
 			<div class="home-hero__panel-footer">
 				<div class="home-hero__footer-line"></div>
@@ -583,7 +582,8 @@ const rainConfig = {
 	async function initHeroHatch(heroTitleReady: Promise<void>, token: number) {
 		const nameEl = document.querySelector<HTMLElement>(".home-hero__name");
 		if (!nameEl) return;
-		if (prefersReducedMotion() || isMobile()) return;
+		// 移动端大标题同样呈现铅笔（Hatching）动效，仅在明确减弱动效时跳过
+		if (prefersReducedMotion()) return;
 
 		await heroTitleReady;
 
@@ -679,9 +679,7 @@ const rainConfig = {
 		const edges: HitEdge[] = [];
 		const selectors = [
 			".home-hero__viewfinder-corner",
-			".home-hero__avatar-wrapper",
 			".home-hero__dialogue-box",
-			".home-hero__focus-frame",
 		];
 		for (const selector of selectors) {
 			hero.querySelectorAll<HTMLElement>(selector).forEach((el) => {
@@ -886,9 +884,7 @@ const rainConfig = {
 		}
 
 		const occupation = hero.querySelector(".home-hero__occupation");
-		const nameLetters = hero.querySelectorAll(".home-hero__name-letter");
 		const badge = hero.querySelector(".home-hero__name-badge");
-		const avatar = hero.querySelector(".home-hero__avatar-group");
 		const speech = hero.querySelector(".home-hero__dialogue-box");
 		const rightPanel = hero.querySelector(".home-hero__right-panel");
 		const focusFrame = hero.querySelector(".home-hero__focus-frame");
@@ -898,14 +894,11 @@ const rainConfig = {
 
 		hero.classList.add("home-hero--motion-ready");
 
-		let resolveHeroTitleReady: () => void;
-		const heroTitleReady = new Promise<void>((resolve) => {
-			resolveHeroTitleReady = resolve;
-		});
+		// 大标题（名字）不参与进场动画，默认直接呈现铅笔（Hatching）动效 → 立即就绪
+		const heroTitleReady = Promise.resolve();
 
 		heroOpeningTimeline = gsap.timeline({
 			defaults: { ease: "power4.out" },
-			onInterrupt: () => resolveHeroTitleReady(),
 		});
 
 		heroOpeningTimeline
@@ -969,47 +962,17 @@ const rainConfig = {
 				duration: 0.92,
 				ease: "expo.out",
 			}, 0.82)
-			.fromTo(nameLetters, {
-				autoAlpha: 0,
-				y: 60,
-				scale: 0.82,
-			}, {
-				autoAlpha: 1,
-				y: 0,
-				scale: 1,
-				duration: 0.92,
-				stagger: 0.08,
-				ease: "expo.out",
-				onComplete: () => resolveHeroTitleReady(),
-			}, 0.98)
 			.fromTo(badge, {
 				autoAlpha: 0,
 				y: 18,
 				scale: 0.7,
-				transformOrigin: "0% 50%",
 			}, {
 				autoAlpha: 1,
 				y: 0,
 				scale: 1,
 				duration: 0.78,
 				ease: "expo.out",
-			}, 1.34 + nameLetters.length * 0.08)
-			.fromTo(avatar, {
-				autoAlpha: 0,
-				x: -54,
-				y: 12,
-				scale: 0.82,
-				clipPath: "circle(0% at 50% 50%)",
-			}, {
-				autoAlpha: 1,
-				x: 0,
-				y: 0,
-				scale: 1,
-				clipPath: "circle(76% at 50% 50%)",
-				duration: 1.05,
-				ease: "expo.out",
-				clearProps: "clipPath",
-			}, 1.45)
+			}, 1.34)
 			.fromTo(rightPanel, {
 				autoAlpha: 0,
 				x: 60,
@@ -1149,6 +1112,7 @@ const rainConfig = {
 		const avatar = document.getElementById("hero-avatar") as HTMLImageElement | null;
 		const badge = document.getElementById("work-status");
 		const statusText = badge?.querySelector(".home-hero__status-text");
+		const verticalStatus = document.getElementById("hero-work-status-vertical");
 		if (!hero || !avatar || !badge || !statusText) return;
 		const heroEl = hero;
 		const avatarEl = avatar;
@@ -1180,6 +1144,11 @@ const rainConfig = {
 			}
 			statusTextEl.textContent = isWorking ? "上班中" : "下班";
 			badgeEl.classList.toggle("is-off-work", !isWorking);
+
+			if (verticalStatus) {
+				verticalStatus.textContent = isWorking ? "WORKING" : "OFF WORK";
+				verticalStatus.classList.toggle("is-working", isWorking);
+			}
 		}
 
 		updateStatus();

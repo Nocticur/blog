@@ -472,11 +472,6 @@ html:has(.home-hero) #top-row {
 	transform: translateY(48px);
 }
 
-.home-hero--motion-pending .home-hero__name-letter {
-	opacity: 0;
-	transform: translateY(60px) scale(0.82);
-}
-
 .home-hero--motion-pending .home-hero__name-badge {
 	opacity: 0;
 	transform: translateY(12px) scale(0.7);
@@ -584,6 +579,25 @@ html:has(.home-hero) #top-row {
 	color: rgba(0, 0, 0, 0.4);
 }
 
+/* 上下班状态：上班绿色，下班正常白色 */
+.home-hero__v-status {
+	color: #ffffff;
+	font-weight: 700;
+	transition: color 0.3s ease;
+}
+
+.home-hero__v-status.is-working {
+	color: #3fb950;
+}
+
+[data-theme="light"] .home-hero__v-status {
+	color: #1a1a2e;
+}
+
+[data-theme="light"] .home-hero__v-status.is-working {
+	color: #2ea043;
+}
+
 .home-hero__diamond {
 	color: #b5893d;
 	font-size: 0.7rem;
@@ -621,6 +635,40 @@ html:has(.home-hero) #top-row {
 
 [data-theme="light"] .home-hero__micro-text {
 	color: rgba(0, 0, 0, 0.25);
+}
+
+/* ============================================
+   桌面端：去除大头照 + 标题/职业/徽章视窗居中
+   仅 >=769px 生效，移动端保持原样（含头像）
+   ============================================ */
+@media (min-width: 769px) {
+	/* 桌面端去除大头照 */
+	.home-hero__avatar-group {
+		display: none;
+	}
+
+	/* 视窗居中：左侧面板占栅格 87% 列，其中心在 43.5vw。
+	   将左内边距设为右栏宽度（13vw）即可把内容中心推回视口 50%，
+	   与底部对话框（left:50%）对齐 */
+	.home-hero__left-panel {
+		align-items: center;
+		padding-inline-start: 13vw;
+		padding-inline-end: 0;
+	}
+
+	.home-hero__profile {
+		align-items: center;
+	}
+
+	.home-hero__identity-row {
+		align-items: center;
+		justify-content: center;
+	}
+
+	.home-hero__name-group {
+		align-items: center;
+		text-align: center;
+	}
 }
 
 /* ============================================
@@ -730,5 +778,10 @@ html:has(.home-hero) #top-row {
 @media (min-width: 769px) and (max-width: 1024px) {
 	.home-hero__canvas-container {
 		grid-template-columns: 88% 12%;
+	}
+
+	/* 右栏 12%，视窗居中补偿同步为 12vw */
+	.home-hero__left-panel {
+		padding-inline-start: 12vw;
 	}
 }
