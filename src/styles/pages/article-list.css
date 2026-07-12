@@ -67,6 +67,10 @@
 	width: 100%;
 }
 
+.article-list-view[hidden] {
+	display: none;
+}
+
 /* ==========================================================================
    单列列表卡片布局 (Background Fusion List Card)
    ========================================================================== */
@@ -87,14 +91,14 @@
 	border-radius: var(--radius-large);
 	background: var(--page-bg);
 	overflow: hidden;
-	transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+	content-visibility: auto;
+	contain-intrinsic-size: auto 9.5rem;
+	contain: layout paint style;
 }
 
 .article-list-row-card:hover,
 .article-list-row-card:focus-within {
-	transform: translateY(-2px);
 	border-color: var(--deep-text);
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .article-list-row-card.is-pinned {
@@ -118,7 +122,6 @@
 	height: 100%;
 	object-fit: cover;
 	opacity: 0;
-	transition: opacity 0.3s ease-in-out, transform 0.5s ease-out;
 }
 
 .article-list-row-card__bg-image.is-loaded {
@@ -130,8 +133,7 @@
 }
 
 .article-list-row-card:hover .article-list-row-card__bg-image.is-loaded {
-	transform: scale(1.03);
-	opacity: 0.45;
+	opacity: 0.35;
 }
 
 :root.dark .article-list-row-card:hover .article-list-row-card__bg-image.is-loaded {
@@ -303,14 +305,14 @@
 	overflow: hidden;
 	text-decoration: none;
 	color: inherit;
-	transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
 	cursor: pointer;
+	content-visibility: auto;
+	contain-intrinsic-size: auto 23rem;
+	contain: layout paint style;
 }
 
 .article-grid-card:hover {
-	transform: translateY(-2px);
 	border-color: var(--deep-text);
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .article-grid-card.is-pinned {
@@ -330,7 +332,6 @@
 	height: 100%;
 	object-fit: cover;
 	opacity: 0;
-	transition: opacity 0.3s ease-in-out, transform 0.5s ease-out;
 }
 
 .article-grid-card__image.is-loaded {
@@ -353,7 +354,6 @@
 	font-size: 0.75rem;
 	font-weight: 800;
 	line-height: 1.4;
-	backdrop-filter: blur(4px);
 }
 
 /* 垂直方向融合线性渐变 */
@@ -481,17 +481,6 @@
 		var(--line-divider, #e5e7eb) 37%,
 		var(--card-bg, #f3f4f6) 63%
 	);
-	background-size: 200% 100%;
-	animation: shimmer 1.5s infinite linear;
-}
-
-@keyframes shimmer {
-	0% {
-		background-position: -200% 0;
-	}
-	100% {
-		background-position: 200% 0;
-	}
 }
 
 
@@ -651,6 +640,7 @@
 	.article-list-row-card {
 		flex-direction: column;
 		min-height: auto;
+		contain-intrinsic-size: auto 15rem;
 	}
 
 	.article-list-row-card__bg-wrapper {

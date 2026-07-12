@@ -143,10 +143,19 @@ function handleLayoutChange(event: Event) {
 }
 
 function goToPage(page: number) {
-	currentPage = Math.max(1, Math.min(totalPages, page));
+	const nextPage = Math.max(1, Math.min(totalPages, page));
+	if (nextPage === currentPage) return;
+
 	if (containerRef) {
-		containerRef.scrollIntoView({ behavior: "smooth", block: "start" });
+		window.scrollTo(
+			0,
+			Math.max(0, window.scrollY + containerRef.getBoundingClientRect().top),
+		);
 	}
+
+	requestAnimationFrame(() => {
+		currentPage = nextPage;
+	});
 }
 
 function handleDetailImageError(event: Event, apiUrls: string[]) {
@@ -223,8 +232,12 @@ $effect(() => {
 		bind:this={containerRef}
 		style={`--article-list-grid-columns: ${gridColumnCount};`}
 	>
-		{#if view === "grid"}
-			<div class="article-list-masonry" style="--cols: {gridColumnCount};" aria-label="文章卡片列表">
+		<div class="article-list-view" hidden={view !== "grid"}>
+			<div
+				class="article-list-masonry"
+				style="--cols: {gridColumnCount};"
+				aria-label="文章卡片列表"
+			>
 				{#each columns as column}
 					<div class="article-list-masonry__col">
 						{#each column as entry (entry.post.id)}
@@ -313,7 +326,9 @@ $effect(() => {
 					</div>
 				{/each}
 			</div>
-		{:else}
+		</div>
+
+		<div class="article-list-view" hidden={view !== "list"}>
 			<div class="article-list-vertical" aria-label="文章列表">
 				{#each paginatedPosts as post, index (post.id)}
 					{@const isPinned = post.pinned}
@@ -324,7 +339,10 @@ $effect(() => {
 					>
 						<!-- Background Image wrapper (right 2/3) -->
 						{#if post.imageUrl}
-							<div 							class="article-list-row-card__bg-wrapper" class:skeleton-shimmer={showLoadingSkeleton && !loadedImages[post.id]}>
+							<div
+								class="article-list-row-card__bg-wrapper"
+								class:skeleton-shimmer={showLoadingSkeleton && !loadedImages[post.id]}
+							>
 								<img
 									class="article-list-row-card__bg-image"
 									class:is-loaded={loadedImages[post.id]}
@@ -403,7 +421,7 @@ $effect(() => {
 					</article>
 				{/each}
 			</div>
-		{/if}
+		</div>
 	</div>
 
 	{#if totalPages > 1}
