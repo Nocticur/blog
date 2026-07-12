@@ -1,6 +1,6 @@
 # Firefly-Mod
 
-> 基于 [Firefly](https://github.com/CuteLeaf/Firefly) 的个人博客魔改版 `V2.5.0`
+> 基于 [Firefly](https://github.com/CuteLeaf/Firefly) 的个人博客魔改版 `V2.5.1`
 
 ![Node.js >= 22](https://img.shields.io/badge/node.js-%3E%3D22-brightgreen)
 ![pnpm >= 9](https://img.shields.io/badge/pnpm-%3E%3D9-blue)
@@ -12,7 +12,13 @@
 ![Swup](https://img.shields.io/badge/Swup-4.x-%237467EF)
 ![Pagefind](https://img.shields.io/badge/Pagefind-1.x-%234B5563)
 
+PC端
+
 <img alt="博客预览" src="./docs/images/image.webp" />
+
+移动端
+
+<img alt="博客预览移动端" src="./docs/images/image-mobile.webp" />
 
 ## 项目概述
 
