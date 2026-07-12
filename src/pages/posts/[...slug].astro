@@ -4,27 +4,29 @@ import * as path from "node:path";
 import Comment from "@components/comment/index.astro";
 import Icon from "@components/common/Icon.astro";
 import Markdown from "@components/common/Markdown.astro";
+import VisitorCount from "@components/common/VisitorCount.astro";
 import EncryptedPost from "@components/features/EncryptedPost.astro";
 import KatexManager from "@components/features/KatexManager.astro";
+import SharePoster from "@components/misc/SharePoster.svelte";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { getCatalogGroups, getSortedPosts } from "@utils/content-utils";
 import {
+	getCategoryUrl,
 	getFileDirFromPath,
 	getPostUrlBySlug,
+	getTagUrl,
 	removeFileExtension,
 } from "@utils/url-utils";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
-import CoverImage from "@/components/common/CoverImage.astro";
-import PostMetadata from "@/components/layout/PostMeta.astro";
 import PostFooterActions from "@/components/misc/PostFooterActions.astro";
 import { coverImageConfig } from "@/config/coverImageConfig";
 import { homeConfig } from "@/config/homeConfig";
 import { siteConfig } from "@/config/siteConfig";
-import { formatDateToYYYYMMDD } from "@/utils/date-utils";
-import { getApiUrlList, processCoverImageSync } from "@/utils/image-utils";
+import { formatDateI18n, formatDateToYYYYMMDD } from "@/utils/date-utils";
+import { processCoverImageSync } from "@/utils/image-utils";
 import { url } from "@/utils/url-utils";
 
 export async function getStaticPaths() {
@@ -52,7 +54,6 @@ const bannerPostMeta = {
 
 // 处理随机图：如果image为"api"，则从配置的API获取随机图
 const processedImage = processCoverImageSync(entry.data.image, entry.id);
-const apiUrls = getApiUrlList(entry.data.image, entry.id);
 
 let posterCoverUrl = processedImage;
 if (processedImage) {
@@ -160,120 +161,122 @@ const catalogGroups = await getCatalogGroups(entry.id);
     type="application/ld+json"
     set:html={JSON.stringify(jsonLd)}
   />
-  <div
-    class="flex w-full rounded-(--radius-large) overflow-hidden relative mb-4"
-  >
-    <div
-      id="post-container"
-      class:list={[
-        "card-base z-10 px-3 md:px-9 pt-4 md:pt-6 pb-4 relative w-full ",
-        {},
-      ]}
-    >
-      <!-- word count and reading time -->
-      <div
-        class="flex flex-row text-black/30 dark:text-white/30 gap-5 mb-3 transition onload-animation"
+  <!-- Layer 1: Title + meta -->
+  <div class="post-hero rounded-(--radius-large) mb-2 onload-animation">
+    <div class="post-hero__content">
+      <h1
+        data-pagefind-body
+        data-pagefind-weight="10"
+        data-pagefind-meta="title"
+        class="post-hero__title"
       >
-        <div class="flex flex-row items-center">
-          <div
-            class="transition h-6 w-6 rounded-md bg-black/5 dark:bg-white/10 text-black/50 dark:text-white/50 flex items-center justify-center mr-2"
-          >
-            <Icon name="material-symbols:notes-rounded" />
-          </div>
-          <div class="text-sm">
-            {remarkPluginFrontmatter.words}
-            {" " + i18n(I18nKey.wordsCount)}
-          </div>
-        </div>
-        <div class="flex flex-row items-center">
-          <div
-            class="transition h-6 w-6 rounded-md bg-black/5 dark:bg-white/10 text-black/50 dark:text-white/50 flex items-center justify-center mr-2"
-          >
-            <Icon name="material-symbols:schedule-outline-rounded" />
-          </div>
-          <div class="text-sm">
-            {remarkPluginFrontmatter.minutes}
-            {
-              " " +
-                i18n(
-                  remarkPluginFrontmatter.minutes === 1
-                    ? I18nKey.minuteCount
-                    : I18nKey.minutesCount
-                )
-            }
-          </div>
-        </div>
-        {entry.data.password && (
-          <div class="flex flex-row items-center">
-            <div
-              class="transition h-6 w-6 rounded-md bg-black/5 dark:bg-white/10 text-black/50 dark:text-white/50 flex items-center justify-center mr-2"
-            >
-              <Icon name="material-symbols:lock-outline" />
-            </div>
-            <div class="text-sm">
-              {i18n(I18nKey.postEncrypted)}
-            </div>
-          </div>
+        {entry.data.title}
+      </h1>
+
+      <div class="post-hero__meta-row">
+        <span class="post-hero__meta-item">
+          {formatDateI18n(entry.data.published, false, true)}
+        </span>
+
+        <span class="post-hero__meta-dot">·</span>
+
+        <a href={getCategoryUrl(entry.data.category || null)} class="post-hero__meta-link">
+          #{entry.data.category || i18n(I18nKey.uncategorized)}
+        </a>
+
+        {entry.data.tags && entry.data.tags.length > 0 && entry.data.tags.map((tag, i) => (
+          <span class="post-hero__meta-tag">
+            {i > 0 && <span class="post-hero__meta-sep">/</span>}
+            <a href={getTagUrl(tag)} class="post-hero__meta-link">{tag.trim()}</a>
+          </span>
+        ))}
+
+        <span class="post-hero__meta-dot">·</span>
+
+        <span class="post-hero__meta-item">
+          {remarkPluginFrontmatter.words} {i18n(I18nKey.wordsCount)} {remarkPluginFrontmatter.minutes} {i18n(remarkPluginFrontmatter.minutes === 1 ? I18nKey.minuteCount : I18nKey.minutesCount)}
+        </span>
+
+        <span class="post-hero__meta-dot">·</span>
+
+        <span class="post-hero__views"><VisitorCount id={entry.id} compact /></span>
+
+        <span class="post-hero__meta-dot">·</span>
+
+        {siteConfig.sharePoster && (
+          <span class="post-hero__share"><SharePoster
+            client:only="svelte"
+            title={entry.data.title}
+            author={homeConfig.name}
+            description={entry.data.description || entry.data.title}
+            pubDate={formatDateToYYYYMMDD(entry.data.published)}
+            coverImage={posterCoverUrl}
+            url={Astro.url.href}
+            siteTitle={siteConfig.title}
+            avatar={posterAvatarUrl}
+          /></span>
         )}
       </div>
+    </div>
+  </div>
 
-      <!-- title -->
-      <div class="relative onload-animation">
-        <div
-          data-pagefind-body
-          data-pagefind-weight="10"
-          data-pagefind-meta="title"
-          class="transition w-full block font-bold mb-3
-                    text-3xl md:text-[2.25rem]/[2.75rem]
-                    text-black/90 dark:text-white/90
-                    md:before:w-1 before:h-5 before:rounded-md before:bg-(--primary)
-                    before:absolute before:top-3 before:-left-4.5"
-        >
-          {entry.data.title}
+  <!-- Layer 2: Introduction card (notebook-style) -->
+  {
+    (entry.data.description || siteConfig.showLastModified) && (() => {
+      const lastModified = dayjs(entry.data.updated || entry.data.published);
+      const dateStr = lastModified.format("YYYY-MM-DD");
+      const outdatedThreshold = siteConfig.outdatedThreshold ?? 1;
+      return (
+        <div class="post-intro-card mb-2">
+          {
+            siteConfig.showLastModified && (
+              <div
+                id="outdated-info"
+                class="post-intro-card__outdated hidden"
+                data-date={lastModified.toISOString()}
+                data-threshold={outdatedThreshold}
+              >
+                <div class="post-intro-card__section">
+                  <div class="post-intro-card__row">
+                    <Icon name="material-symbols:info-outline-rounded" class="post-intro-card__icon" />
+                    <span class="post-intro-card__text">
+                      {i18n(I18nKey.lastModifiedPrefix)}{dateStr}
+                      <span id="days-ago-text-intro" class="outdated-days" data-template={i18n(I18nKey.lastModifiedDaysAgo)}></span>
+                      <span id="outdated-warning-intro" class="outdated-warning hidden">，{i18n(I18nKey.lastModifiedOutdated)}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )
+          }
+          {entry.data.description && (
+            <>
+              {siteConfig.showLastModified && <div class="post-intro-card__divider" />}
+              <div class="post-intro-card__section">
+                <div class="post-intro-card__label">简介</div>
+                <p class="post-intro-card__desc">{entry.data.description}</p>
+              </div>
+            </>
+          )}
         </div>
-      </div>
+      );
+    })()
+  }
 
-      <!-- metadata -->
-      <div class="onload-animation">
-        <PostMetadata
-          className="mb-5"
-          published={entry.data.published}
-          updated={entry.data.updated}
-          category={entry.data.category || undefined}
-          tags={entry.data.tags}
-          id={entry.id}
-          posterTitle={entry.data.title}
-          posterDescription={entry.data.description}
-          posterCoverUrl={posterCoverUrl}
-          posterAvatarUrl={posterAvatarUrl}
-          posterUrl={Astro.url.href}
-        />
-        {
-          !processedImage && (
-            <div class="border-(--line-divider) border-dashed border-b mt-3 mb-5" />
-          )
-        }
-      </div>
+  <!-- Layer 3: Cover image -->
+  {coverImageConfig.enableInPost && posterCoverUrl && (
+    <div class="post-cover mb-2">
+      <img
+        src={posterCoverUrl}
+        alt=""
+        loading="eager"
+        fetchpriority="high"
+      />
+    </div>
+  )}
 
-      <!-- always show cover as long as it has one -->
-
-      {
-        processedImage && coverImageConfig.enableInPost && (
-          <div style="margin-top:1rem;">
-            <CoverImage
-              id="post-cover"
-              src={processedImage}
-              basePath={getFileDirFromPath(entry.filePath || '')}
-              class="mb-8 rounded-xl banner-container onload-animation"
-              preview={false}
-              loading="eager"
-              fetchpriority="high"
-              apiUrls={apiUrls}
-            />
-          </div>
-        )
-      }
-
+  <div class="flex w-full rounded-(--radius-large) overflow-hidden relative mb-4">
+    <div id="post-container" class="card-base z-10 px-3 pb-4 pt-0 relative w-full">
       {entry.data.password ? (
         <EncryptedPost password={entry.data.password} slug={entry.id} hint={entry.data.passwordHint}>
           <Markdown class="mb-6 markdown-content onload-animation">
@@ -310,72 +313,30 @@ const catalogGroups = await getCatalogGroups(entry.id);
     </div>
   </div>
 
-  <!-- 上次编辑时间 -->
-  {
-    siteConfig.showLastModified && (() => {
-      const lastModified = dayjs(entry.data.updated || entry.data.published);
-      const dateStr = lastModified.format("YYYY-MM-DD");
-      const outdatedThreshold = siteConfig.outdatedThreshold ?? 1;
-
-      // 1. 預設加上 hidden 隱藏，並把時間與閾值綁在 data-* 屬性
-      return (
-        <div 
-          id="outdated-card" 
-          class="card-base p-6 mb-4 hidden" 
-          data-date={lastModified.toISOString()} 
-          data-threshold={outdatedThreshold}
-        >
-          <div class="flex items-center gap-2">
-            <div class="transition h-9 w-9 rounded-lg overflow-hidden relative flex items-center justify-center mr-0">
-              <Icon
-                name="material-symbols:history-rounded"
-                class="text-4xl text-(--primary) transition-transform group-hover:translate-x-0.5 bg-(--enter-btn-bg) p-2 rounded-md"
-              />
-            </div>
-
-            <div class="flex flex-col gap-0.1">
-              <div class="text-[1.0rem] leading-tight text-black/75 dark:text-white/75">
-                {i18n(I18nKey.lastModifiedPrefix)}{dateStr}
-                <span id="days-ago-text" data-template={i18n(I18nKey.lastModifiedDaysAgo)}></span>
-              </div>
-              <p id="outdated-warning" class="text-[0.8rem] leading-tight text-black/75 dark:text-white/75 hidden">
-                {i18n(I18nKey.lastModifiedOutdated)}
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    })()
-  }
-
   <script>
     import dayjs from "dayjs";
 
-    const card = document.getElementById('outdated-card');
-    
-    if (card) {
-      // 讀取伺服器給的日期，並用 dayjs 直接算出差異天數
-      const lastModified = dayjs(card.dataset.date);
+    function checkOutdated() {
+      const info = document.getElementById('outdated-info');
+      if (!info) return;
+      const lastModified = dayjs(info.dataset.date);
       const daysDiff = dayjs().diff(lastModified, "day");
-      const threshold = Number(card.dataset.threshold);
+      const threshold = Number(info.dataset.threshold);
 
-      // 如果超過閾值，就顯示卡片與提示文字
       if (daysDiff >= threshold) {
-        card.classList.remove('hidden');
-
+        info.classList.remove('hidden');
         if (daysDiff >= 1) {
-          const textEl = document.getElementById('days-ago-text');
+          const textEl = document.getElementById('days-ago-text-intro');
           if (textEl && textEl.dataset.template) {
             textEl.textContent = `，${textEl.dataset.template.replace("{days}", daysDiff.toString())}`;
           }
-          
-          const warningEl = document.getElementById('outdated-warning');
-          if (warningEl) {
-            warningEl.classList.remove('hidden');
-          }
+          const warningEl = document.getElementById('outdated-warning-intro');
+          if (warningEl) warningEl.classList.remove('hidden');
         }
       }
     }
+
+    document.addEventListener("astro:page-load", checkOutdated);
   </script>
 
   <div

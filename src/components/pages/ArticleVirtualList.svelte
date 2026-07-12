@@ -3,6 +3,7 @@ import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import { onMount } from "svelte";
 import Icon from "@/components/common/Icon.svelte";
+import { coverImageConfig } from "@/config";
 
 type ArticleListView = "list" | "grid";
 
@@ -34,18 +35,56 @@ interface Props {
 	postsPerPage?: number;
 }
 
-let { posts, defaultView = "list", postsPerPage = 10 }: Props = $props();
+let { posts, defaultView = "list", postsPerPage = 9 }: Props = $props();
 
 let containerRef = $state<HTMLElement | null>(null);
 let view = $state<ArticleListView>("list");
-let selectedIndex = $state(0);
-let displayedIndex = $state(0);
-let phase = $state<"idle" | "leaving" | "entering">("idle");
-let gridColumnCount = $state(2);
+let gridColumnCount = $state(3);
 let currentPage = $state(1);
+let loadedImages = $state<Record<string, boolean>>({});
 
-const gridBreakpoint = 720;
-const fadeDuration = 200;
+const showLoadingSkeleton =
+	coverImageConfig.randomCoverImage.showLoading ?? true;
+
+const categoryColorPalette = [
+	"#fbbf24",
+	"#fb7185",
+	"#34d399",
+	"#60a5fa",
+	"#a78bfa",
+	"#f472b6",
+	"#2dd4bf",
+	"#fb923c",
+	"#22d3ee",
+	"#818cf8",
+	"#e879f9",
+	"#a3e635",
+	"#f87171",
+	"#a78bfa",
+	"#06b6d4",
+	"#f59e0b",
+	"#f43f5e",
+	"#10b981",
+];
+
+const categoryColors = $derived.by(() => {
+	const map = new Map<string, string>();
+	const cats = [...new Set(posts.map((p) => p.category).filter(Boolean))].sort(
+		(a, b) => a.localeCompare(b, "zh-CN"),
+	);
+	for (let i = 0; i < cats.length; i++) {
+		map.set(cats[i], categoryColorPalette[i % categoryColorPalette.length]);
+	}
+	return map;
+});
+
+function getCategoryColor(name: string): string {
+	const color = categoryColors.get(name);
+	return color ? `color: ${color}` : "";
+}
+
+const gridBreakpointMedium = 960;
+const gridBreakpointSmall = 640;
 
 const totalPages = $derived(
 	Math.max(1, Math.ceil(posts.length / postsPerPage)),
@@ -53,21 +92,20 @@ const totalPages = $derived(
 const paginatedPosts = $derived(
 	posts.slice((currentPage - 1) * postsPerPage, currentPage * postsPerPage),
 );
-const displayedPost = $derived(posts[displayedIndex] ?? posts[0]);
-const gridRows = $derived(
-	Array.from(
-		{ length: Math.ceil(paginatedPosts.length / Math.max(1, gridColumnCount)) },
-		(_, rowOffset) =>
-			paginatedPosts
-				.slice(rowOffset * gridColumnCount, (rowOffset + 1) * gridColumnCount)
-				.map((post, offset) => ({
-					post,
-					index:
-						(currentPage - 1) * postsPerPage +
-						rowOffset * gridColumnCount +
-						offset,
-				})),
-	),
+
+// Svelte 5 derived property to distribute posts into columns for masonry layout
+const columns = $derived(
+	(() => {
+		const cols = Array.from({ length: gridColumnCount }, () => []);
+		paginatedPosts.forEach((post, idx) => {
+			const colIdx = idx % gridColumnCount;
+			cols[colIdx].push({
+				post,
+				index: (currentPage - 1) * postsPerPage + idx,
+			});
+		});
+		return cols;
+	})(),
 );
 
 function isArticleListView(
@@ -85,9 +123,11 @@ function syncViewFromStorage() {
 }
 
 function getGridColumnCount() {
-	if (typeof window === "undefined") return 2;
+	if (typeof window === "undefined") return 3;
 	const width = containerRef?.clientWidth || window.innerWidth;
-	return width < gridBreakpoint ? 1 : 2;
+	if (width < gridBreakpointSmall) return 1;
+	if (width < gridBreakpointMedium) return 2;
+	return 3;
 }
 
 function updateGridColumns() {
@@ -102,39 +142,11 @@ function handleLayoutChange(event: Event) {
 	updateGridColumns();
 }
 
-function startTransition() {
-	if (phase !== "idle") return;
-	if (selectedIndex === displayedIndex) return;
-	phase = "leaving";
-	setTimeout(() => {
-		displayedIndex = selectedIndex;
-		phase = "entering";
-		setTimeout(() => {
-			phase = "idle";
-			if (selectedIndex !== displayedIndex) {
-				startTransition();
-			}
-		}, fadeDuration);
-	}, fadeDuration);
-}
-
-function selectPost(index: number) {
-	selectedIndex = index;
-}
-
-function selectPostWithTransition(index: number) {
-	if (index === selectedIndex) return;
-	selectedIndex = index;
-	startTransition();
-}
-
 function goToPage(page: number) {
 	currentPage = Math.max(1, Math.min(totalPages, page));
-	selectedIndex = (currentPage - 1) * postsPerPage;
 	if (containerRef) {
 		containerRef.scrollIntoView({ behavior: "smooth", block: "start" });
 	}
-	startTransition();
 }
 
 function handleDetailImageError(event: Event, apiUrls: string[]) {
@@ -212,195 +224,185 @@ $effect(() => {
 		style={`--article-list-grid-columns: ${gridColumnCount};`}
 	>
 		{#if view === "grid"}
-			<div class="article-list-grid" aria-label="文章卡片列表">
-				{#each gridRows as row, rowOffset (`grid-row-${currentPage}-${rowOffset}`)}
-					<div class="article-list-grid__row">
-						{#each row as entry (entry.post.id)}
+			<div class="article-list-masonry" style="--cols: {gridColumnCount};" aria-label="文章卡片列表">
+				{#each columns as column}
+					<div class="article-list-masonry__col">
+						{#each column as entry (entry.post.id)}
+							{@const post = entry.post}
+							{@const isPinned = post.pinned}
 							<a
-								href={entry.post.url}
-								class="post-card-wrapper article-list-card"
-								class:is-selected={entry.index === selectedIndex}
-								data-post-id={entry.post.id}
-								aria-label={`查看文章：${entry.post.title}`}
-								onmouseenter={() => selectPost(entry.index)}
-								onfocus={() => selectPost(entry.index)}
+								href={post.url}
+								class="article-grid-card"
+								class:is-pinned={isPinned}
+								aria-label={`查看文章：${post.title}`}
 							>
-								<span class="post-card-title article-list-card__title">
-									<span class="article-list-card__title-text">
-										{entry.post.title}
-									</span>
-									{#if entry.post.password}
-										<span class="article-list-card__lock" aria-label="加密文章">
-											<Icon icon="material-symbols:lock-outline" size="lg" />
-										</span>
-									{/if}
-								</span>
-
-								<span class="article-list-card__meta">
-									{#if entry.post.pinned}
-										<span class="article-list-card__pinned-badge"><Icon icon="material-symbols:pinboard" />{i18n(I18nKey.pinned)}</span>
-									{/if}
-									<span class="article-list-card__meta-item">
-										<Icon icon="material-symbols:calendar-month-rounded" size="lg" />
-										<time datetime={entry.post.publishedIso}>
-											{entry.post.publishedText}
-										</time>
-									</span>
-									<span class="article-list-card__meta-item">
-										<Icon icon="material-symbols:book-2-outline-rounded" size="lg" />
-										<span>{entry.post.category}</span>
-									</span>
-								</span>
-
-								<span class="article-list-card__description">
-									{entry.post.description}
-								</span>
-
-								<span class="article-list-card__tags" aria-label="标签集合">
-									{#if entry.post.tags.length > 0}
-										{#each entry.post.tags as tag (tag.name)}
-											<span class="post-tag-square article-list-card__tag">
-												#{tag.name}
+								<!-- 上方图片区域 (2/3) -->
+								{#if post.imageUrl}
+									<div class="article-grid-card__image-wrapper" class:skeleton-shimmer={showLoadingSkeleton && !loadedImages[post.id]}>
+										<img
+											class="article-grid-card__image"
+											class:is-loaded={loadedImages[post.id]}
+											src={post.imageUrl}
+											alt={`文章配图：${post.title}`}
+											loading="lazy"
+											decoding="async"
+											data-api-index="0"
+											referrerpolicy={post.imageReferrerPolicy || undefined}
+											onload={(event) => {
+												loadedImages[post.id] = true;
+												try {
+													const img = event.currentTarget as HTMLImageElement;
+													sessionStorage.setItem(`cover_img_${post.id}`, img.currentSrc || img.src);
+												} catch {}
+											}}
+											onerror={(event) => handleDetailImageError(event, post.imageApiUrls)}
+										/>
+										<div class="article-grid-card__gradient-overlay"></div>
+										{#if isPinned}
+											<span class="article-grid-card__pinned-badge article-grid-card__pinned-badge--corner">
+												<Icon icon="material-symbols:pinboard" size="sm" />
+												<span>{i18n(I18nKey.pinned)}</span>
 											</span>
-										{/each}
-									{:else}
-										<span class="article-list-card__no-tags">#无标签</span>
-									{/if}
-								</span>
+										{/if}
+									</div>
+								{/if}
 
-								<span class="post-card-arrow article-list-card__arrow" aria-hidden="true">
-									<Icon icon="material-symbols:arrow-outward-rounded" size="2xl" />
-								</span>
+								<!-- 下方内容区域 (1/3) -->
+								<div class="article-grid-card__content">
+									<!-- 第一层：标题层 -->
+									<div class="article-grid-card__layer-1">
+										<h3 class="article-grid-card__title">
+											{post.title}
+											{#if post.password}
+												<span class="article-grid-card__lock" aria-label="加密文章">
+													<Icon icon="material-symbols:lock-outline" size="sm" />
+												</span>
+											{/if}
+										</h3>
+									</div>
+
+									<!-- 第二层：日期 -->
+									<div class="article-grid-card__layer-2">
+										<span class="article-grid-card__meta-item">
+											<Icon icon="material-symbols:calendar-month-rounded" size="sm" />
+											<time datetime={post.publishedIso}>{post.publishedText}</time>
+										</span>
+									</div>
+
+									<!-- 第三层：分类 + 标签（参考归档页面设计，无图标） -->
+									<div class="article-grid-card__layer-3">
+										<span class="ag-category" style={getCategoryColor(post.category)}>
+											#{post.category}
+										</span>
+										{#if post.tags.length > 0}
+											<span class="ag-meta-gap" aria-hidden="true"></span>
+											{#each post.tags.slice(0, 2) as tag, i (tag.name)}
+												{#if i > 0}
+													<span class="ag-meta-divider" aria-hidden="true">/</span>
+												{/if}
+												<span class="ag-tag">{tag.name}</span>
+											{/each}
+											{#if post.tags.length > 2}
+												<span class="ag-tag-more" aria-hidden="true">+{post.tags.length - 2}</span>
+											{/if}
+										{/if}
+									</div>
+								</div>
 							</a>
 						{/each}
 					</div>
 				{/each}
 			</div>
 		{:else}
-			<div class="article-list-virtual__left" aria-label="文章列表">
+			<div class="article-list-vertical" aria-label="文章列表">
 				{#each paginatedPosts as post, index (post.id)}
+					{@const isPinned = post.pinned}
 					<article
-						class="article-list-row"
-						class:is-active={(currentPage - 1) * postsPerPage + index === selectedIndex}
+						class="article-list-row-card"
+						class:is-pinned={isPinned}
 						data-post-id={post.id}
 					>
-						<button
-							type="button"
-							class="article-list-row__button"
-							aria-pressed={(currentPage - 1) * postsPerPage + index === selectedIndex}
-							onclick={() => selectPostWithTransition((currentPage - 1) * postsPerPage + index)}
-						>
-							<span class="article-list-row__title">
-									{post.title}
-								</span>
-							<span class="article-list-row__meta">
-									{#if post.pinned}
-										<span class="article-list-row__pinned-badge">{i18n(I18nKey.pinned)}</span>
-									{/if}
-									<span class="article-list-row__meta-item article-list-row__meta-item--date">
-										<time datetime={post.publishedIso}>{post.publishedText}</time>
-									</span>
-									<span class="article-list-row__meta-item article-list-row__meta-item--category">
-										<span>{post.category}</span>
-									</span>
-								</span>
-							<span class="article-list-row__tags">
-								{#if post.tags.length > 0}
-									{#each post.tags.slice(0, 3) as tag (tag.name)}
-										<span class="article-list-row__tag">
-											#{tag.name}
-										</span>
-									{/each}
-									{#if post.tags.length > 3}
-										<span class="article-list-row__tags-more" aria-label={`还有 ${post.tags.length - 3} 个标签`}>
-											+{post.tags.length - 3}
-										</span>
-									{/if}
-								{:else}
-									<span class="article-list-row__no-tags">#无标签</span>
-								{/if}
-							</span>
-						</button>
-					</article>
-				{/each}
-			</div>
-
-			<aside class="article-list-virtual__right" aria-live="polite">
-				<a
-					href={displayedPost.url}
-					class="post-card-wrapper article-detail-card"
-					class:is-leaving={phase === "leaving"}
-					class:is-entering={phase === "entering"}
-					aria-label={`查看文章：${displayedPost.title}`}
-				>
-					<div class="article-detail-card__heading">
-						<span class="article-detail-card__title">
-							<span class="article-detail-card__title-text">
-									{displayedPost.title}
-								</span>
-						</span>
-						{#if displayedPost.password}
-							<span class="article-detail-card__lock" aria-label="加密文章">
-								<Icon icon="material-symbols:lock-outline" size="xl" />
-							</span>
-						{/if}
-					</div>
-
-					<div class="article-detail-card__meta">
-						{#if displayedPost.pinned}
-							<span class="article-detail-card__pinned-badge"><Icon icon="material-symbols:pinboard" />{i18n(I18nKey.pinned)}</span>
-						{/if}
-						<span class="article-detail-card__meta-item">
-							<Icon icon="material-symbols:calendar-month-rounded" size="lg" />
-							<time class="article-detail-card__time" datetime={displayedPost.publishedIso}>
-								{displayedPost.publishedText}
-							</time>
-						</span>
-						<span class="article-detail-card__meta-item">
-							<Icon icon="material-symbols:book-2-outline-rounded" size="lg" />
-							<span class="article-detail-card__category">{displayedPost.category}</span>
-						</span>
-					</div>
-
-					<div class="article-detail-card__tags" aria-label="标签集合">
-						{#if displayedPost.tags.length > 0}
-							{#each displayedPost.tags as tag (tag.name)}
-								<span class="post-tag-square article-detail-card__tag">
-									#{tag.name}
-								</span>
-							{/each}
-						{:else}
-							<span class="article-detail-card__no-tags">#无标签</span>
-						{/if}
-					</div>
-
-					<span class="article-detail-card__description">
-						{displayedPost.description}
-					</span>
-
-					{#if displayedPost.imageUrl}
-						{#key displayedPost.id}
-							<span class="article-detail-card__cover">
+						<!-- Background Image wrapper (right 2/3) -->
+						{#if post.imageUrl}
+							<div 							class="article-list-row-card__bg-wrapper" class:skeleton-shimmer={showLoadingSkeleton && !loadedImages[post.id]}>
 								<img
-									class="article-detail-card__image"
-									src={displayedPost.imageUrl}
-									alt={`文章配图：${displayedPost.title}`}
+									class="article-list-row-card__bg-image"
+									class:is-loaded={loadedImages[post.id]}
+									src={post.imageUrl}
+									alt={`文章配图：${post.title}`}
 									loading="lazy"
 									decoding="async"
 									data-api-index="0"
-									referrerpolicy={displayedPost.imageReferrerPolicy || undefined}
-									onerror={(event) =>
-										handleDetailImageError(event, displayedPost.imageApiUrls)}
+									referrerpolicy={post.imageReferrerPolicy || undefined}
+									onload={(event) => {
+										loadedImages[post.id] = true;
+												try {
+													const img = event.currentTarget as HTMLImageElement;
+													sessionStorage.setItem(`cover_img_${post.id}`, img.currentSrc || img.src);
+												} catch {}
+											}}
+											onerror={(event) => handleDetailImageError(event, post.imageApiUrls)}
 								/>
-							</span>
-						{/key}
-					{/if}
+								<div class="article-list-row-card__gradient-overlay"></div>
+							</div>
+						{/if}
 
-					<span class="post-card-arrow article-detail-card__arrow" aria-hidden="true">
-						<Icon icon="material-symbols:arrow-outward-rounded" size="2xl" />
-					</span>
-				</a>
-			</aside>
+						<!-- Card Content Button -->
+						<a
+							href={post.url}
+							class="article-list-row-card__content"
+							aria-label={`查看文章：${post.title}`}
+						>
+							<!-- 第一层：置顶标识 + 标题 -->
+							<div class="article-list-row-card__layer-1">
+								{#if isPinned}
+									<span class="article-list-row-card__pinned-badge" aria-label="置顶文章">
+										<Icon icon="material-symbols:pinboard" size="sm" />
+										<span>{i18n(I18nKey.pinned)}</span>
+									</span>
+								{/if}
+								<h3 class="article-list-row-card__title">
+									{post.title}
+									{#if post.password}
+										<span class="article-list-row-card__lock" aria-label="加密文章">
+											<Icon icon="material-symbols:lock-outline" size="sm" />
+										</span>
+									{/if}
+								</h3>
+							</div>
+
+							<!-- 第二层：分类 + 日期 + 标签 -->
+							<div class="article-list-row-card__layer-2">
+								<span class="al-category" style={getCategoryColor(post.category)}>
+									#{post.category}
+								</span>
+								<span class="article-list-row-card__meta-item">
+									<Icon icon="material-symbols:calendar-month-rounded" size="sm" />
+									<time datetime={post.publishedIso}>{post.publishedText}</time>
+								</span>
+								{#if post.tags.length > 0}
+									{#each post.tags.slice(0, 3) as tag, i (tag.name)}
+										{#if i > 0}
+											<span class="al-meta-divider" aria-hidden="true">/</span>
+										{/if}
+										<span class="al-tag">{tag.name}</span>
+									{/each}
+									{#if post.tags.length > 3}
+										<span class="al-tag-more" aria-hidden="true">+{post.tags.length - 3}</span>
+									{/if}
+								{/if}
+							</div>
+
+							<!-- 第三层：简介 -->
+							<div class="article-list-row-card__layer-3">
+								<p class="article-list-row-card__description">
+									{post.description}
+								</p>
+							</div>
+						</a>
+					</article>
+				{/each}
+			</div>
 		{/if}
 	</div>
 

@@ -149,9 +149,12 @@ const navLinks = navBarConfig.links.map((item) => {
 		let offsetTop = 0;
 		const mainGridRect = mainGrid.getBoundingClientRect();
 
-		// 对齐到文章卡片顶部
+		// 对齐到文章顶部（优先使用 hero，其次 post-container）
+		const heroEl = document.querySelector(".post-hero");
 		const postCard = document.getElementById("post-container");
-		if (postCard) {
+		if (heroEl) {
+			offsetTop = heroEl.getBoundingClientRect().top - mainGridRect.top;
+		} else if (postCard) {
 			offsetTop = postCard.getBoundingClientRect().top - mainGridRect.top;
 		} else {
 			offsetTop = contentWrapper.getBoundingClientRect().top - mainGridRect.top;
@@ -176,8 +179,11 @@ const navLinks = navBarConfig.links.map((item) => {
 		let offsetTop = 0;
 		const mainGridRect = mainGrid.getBoundingClientRect();
 
+		const heroEl = document.querySelector(".post-hero");
 		const postCard = document.getElementById("post-container");
-		if (postCard) {
+		if (heroEl) {
+			offsetTop = heroEl.getBoundingClientRect().top - mainGridRect.top;
+		} else if (postCard) {
 			offsetTop = postCard.getBoundingClientRect().top - mainGridRect.top;
 		} else {
 			offsetTop = contentWrapper.getBoundingClientRect().top - mainGridRect.top;

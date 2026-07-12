@@ -8,9 +8,10 @@ export interface Props {
 	isHome?: boolean;
 	id?: string;
 	path?: string;
+	compact?: boolean;
 }
 
-const { isHome, id, path = "" } = Astro.props;
+const { isHome, id, path = "", compact } = Astro.props;
 
 const type = commentConfig.type;
 const enabled = !isHome && id;
@@ -42,19 +43,35 @@ const config = visitorConfigMap[type];
 
 {enabled && config?.enabled && (
   <div class="flex items-center">
-    <div class="meta-icon">
-      <Icon name="material-symbols:visibility-outline-rounded" class="text-xl" />
-    </div>
-    <span class="text-50 text-sm font-medium mr-1">
-      {i18n(I18nKey.pageViews)}
-    </span>
-    <span
-      class="text-50 text-sm font-medium"
-      id={config.selectorId || undefined}
-      class:list={[config.dataAttr]}
-      data-path={config.dataPath || undefined}
-    >
-      {i18n(I18nKey.pageViewsLoading)}
-    </span>
+    {compact ? (
+      <>
+        <span
+          class="text-50 text-sm font-medium"
+          id={config.selectorId || undefined}
+          class:list={[config.dataAttr]}
+          data-path={config.dataPath || undefined}
+        >-</span>
+        <span class="text-50 text-sm font-medium" style="margin-left:0.15rem">
+          {i18n(I18nKey.pageViews)}
+        </span>
+      </>
+    ) : (
+      <>
+        <div class="meta-icon">
+          <Icon name="material-symbols:visibility-outline-rounded" class="text-xl" />
+        </div>
+        <span class="text-50 text-sm font-medium mr-1">
+          {i18n(I18nKey.pageViews)}
+        </span>
+        <span
+          class="text-50 text-sm font-medium"
+          id={config.selectorId || undefined}
+          class:list={[config.dataAttr]}
+          data-path={config.dataPath || undefined}
+        >
+          {i18n(I18nKey.pageViewsLoading)}
+        </span>
+      </>
+    )}
   </div>
 )}

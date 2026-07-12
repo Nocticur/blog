@@ -172,11 +172,12 @@ const descriptionText = description || remarkPluginFrontmatter.excerpt || "";
           src={processedImage}
           basePath={getFileDirFromPath(entry.filePath || "")}
           alt="Cover Image of the Post"
-          class="w-full h-full transition-transform duration-300 group-hover:scale-110 group-active:scale-115"
+          class="w-full h-full"
           preview={true}
           loading={loading}
           fetchpriority={fetchpriority}
           apiUrls={apiUrls}
+          postId={entry.id}
         />
       </a>
     )

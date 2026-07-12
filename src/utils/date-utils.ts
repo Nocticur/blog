@@ -25,6 +25,7 @@ export function formatDateToYYYYMMDD(date: Date): string {
 export function formatDateI18n(
 	dateInput: Date | string,
 	includeTime?: boolean,
+	includeWeekday?: boolean,
 ): string {
 	const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
 	const lang = siteConfig.lang || "en";
@@ -35,6 +36,10 @@ export function formatDateI18n(
 		month: "long",
 		day: "numeric",
 	};
+
+	if (includeWeekday) {
+		options.weekday = "long";
+	}
 
 	if (includeTime) {
 		options.hour = "2-digit";

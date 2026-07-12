@@ -25,6 +25,8 @@ interface Props {
 	loading?: "lazy" | "eager";
 	fetchpriority?: "high" | "low" | "auto";
 	apiUrls?: string[];
+	postId?: string;
+	deferSrc?: boolean;
 }
 
 const {
@@ -39,6 +41,8 @@ const {
 	loading = "lazy",
 	fetchpriority = "auto",
 	apiUrls = [],
+	postId,
+	deferSrc = false,
 } = Astro.props;
 
 const configQuality = getImageQuality();
@@ -164,12 +168,11 @@ if (needsNativeImg && isLocal && img) {
 	class:list={[className, "cover-image-container overflow-hidden relative"]}
 	data-loading={showLoading ? "true" : "false"}
 	data-api-urls={apiUrls.length > 0 ? JSON.stringify(apiUrls) : undefined}
+	data-post-id={postId || undefined}
 >
-	<!-- 加载动画 -->
+	<!-- 加载动画 (骨架屏) -->
 	{showLoading && (
-		<div class="loading-spinner absolute inset-0 flex items-center justify-center z-10" style="background-color: var(--card-bg);">
-			<div class="spinner"></div>
-		</div>
+		<div class="loading-spinner skeleton-shimmer absolute inset-0 z-10"></div>
 	)}
 
 	<!-- 错误提示（覆盖在回退图片上） -->
@@ -254,7 +257,7 @@ if (needsNativeImg && isLocal && img) {
 	<!-- 远程图片 -->
 	{!isLocal && (
 		<img
-			src={isPublic ? url(src) : src}
+			{...(deferSrc ? { 'data-default-src': isPublic ? url(src) : src } : { src: isPublic ? url(src) : src })}
 			alt={alt || ""}
 			class={imageClass}
 			style={imageStyle}
@@ -272,7 +275,7 @@ if (needsNativeImg && isLocal && img) {
 
 <!-- 样式已迁移至 src/styles/components/cover-image.css -->
 
-<script>
+	<script>
 	function initCoverImages() {
 		const containers = document.querySelectorAll('.cover-image-container');
 		containers.forEach((container) => {
@@ -282,9 +285,24 @@ if (needsNativeImg && isLocal && img) {
 			const img = container.querySelector('img[data-cover-img]') as HTMLImageElement | null;
 			if (!img) return;
 
+			const postId = container.getAttribute('data-post-id');
+			const defaultSrc = img.getAttribute('data-default-src');
+
+			// 对于 data-default-src 模式（详情页 Swup 导航），先确定最终 src 再一次性设置
+			if (defaultSrc && !img.src) {
+				let finalSrc = defaultSrc;
+				if (postId) {
+					const storedUrl = sessionStorage.getItem(`cover_img_${postId}`);
+					if (storedUrl) {
+						finalSrc = storedUrl;
+					}
+				}
+				img.src = finalSrc;
+			}
+
 			// 解析API URL列表，用于按顺序重试
 			let apiUrls: string[] = [];
-			let currentApiIndex = 1; // 0号已由服务端设为img.src
+			let currentApiIndex = 1; // 0号已由服务端设src，若用了 data-default-src 则相当于跳过
 			const apiUrlsAttr = container.getAttribute('data-api-urls');
 			if (apiUrlsAttr) {
 				try { apiUrls = JSON.parse(apiUrlsAttr); } catch (_e) { /* ignore */ }
@@ -292,6 +310,9 @@ if (needsNativeImg && isLocal && img) {
 
 			const hideLoading = () => {
 				container.setAttribute('data-loading', 'false');
+				if (postId && img.dataset.remote === 'true') {
+					try { sessionStorage.setItem(`cover_img_${postId}`, img.currentSrc || img.src); } catch {}
+				}
 			};
 
 			const showError = () => {
@@ -304,7 +325,6 @@ if (needsNativeImg && isLocal && img) {
 				if (img.dataset.remote !== 'true') return;
 
 				if (currentApiIndex < apiUrls.length) {
-					// 先绑定好事件，再更换src
 					img.addEventListener('load', hideLoading, { once: true });
 					img.addEventListener('error', onError, { once: true });
 					img.src = apiUrls[currentApiIndex];

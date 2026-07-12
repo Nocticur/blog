@@ -37,6 +37,14 @@ export function processCoverImageSync(
 	seed?: string,
 ): string {
 	if (!image || image === "") {
+		if (
+			randomCoverImage.enable &&
+			randomCoverImage.apis &&
+			randomCoverImage.apis.length > 0
+		) {
+			const hash = getSeedHash(seed);
+			return appendSeedParam(randomCoverImage.apis[0], hash);
+		}
 		return "";
 	}
 
@@ -67,7 +75,13 @@ export function getApiUrlList(
 	image: string | undefined,
 	seed?: string,
 ): string[] {
-	if (image !== "api" || !randomCoverImage.enable || !randomCoverImage.apis) {
+	const useApi =
+		image === "api" ||
+		(!image &&
+			randomCoverImage.enable &&
+			!!randomCoverImage.apis &&
+			randomCoverImage.apis.length > 0);
+	if (!useApi) {
 		return [];
 	}
 
