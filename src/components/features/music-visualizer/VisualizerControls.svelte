@@ -318,6 +318,14 @@ onDestroy(() => {
 </script>
 
 <div class="music-visualizer__side-panel" data-panel-mode={rightPanelMode}>
+	<div class="music-visualizer__divider-meta" aria-label="当前曲目">
+		<span class="music-visualizer__divider-title">
+			{currentTrack?.name || "未播放"}
+		</span>
+		<span class="music-visualizer__divider-artist">
+			{currentTrack?.artist || "—"}
+		</span>
+	</div>
 	{#if rightPanelMode === "tools"}
 		<section class="music-visualizer__card" aria-label="音乐播放器">
 			<!-- 层 1 · 胶片旋转动效（点击跳转歌单） -->
@@ -331,23 +339,34 @@ onDestroy(() => {
 				aria-label="查看歌单"
 				aria-controls="music-visualizer-playlist-panel"
 			>
-				<span class="music-visualizer__record-disc" aria-hidden="true">
-					<span class="music-visualizer__record-grooves"></span>
-					<span class="music-visualizer__record-label">
-						{#if currentTrack?.pic}
-							<img
-								class="music-visualizer__record-image"
-								src={currentTrack.pic}
-								alt=""
-							/>
-						{:else}
-							<span class="music-visualizer__record-placeholder">
-								<Icon icon="material-symbols:music-note-rounded" size="2xl" />
-							</span>
-						{/if}
+				<span class="music-visualizer__record-disc-shell" aria-hidden="true">
+					<span class="music-visualizer__record-disc">
+						<span class="music-visualizer__record-grooves"></span>
+						<span class="music-visualizer__record-label">
+							{#if currentTrack?.pic}
+								<img
+									class="music-visualizer__record-image"
+									src={currentTrack.pic}
+									alt=""
+								/>
+							{:else}
+								<span class="music-visualizer__record-placeholder">
+									<Icon icon="material-symbols:music-note-rounded" size="2xl" />
+								</span>
+							{/if}
+						</span>
+						<span class="music-visualizer__record-hole"></span>
+						<span class="music-visualizer__record-shine"></span>
 					</span>
-					<span class="music-visualizer__record-hole"></span>
-					<span class="music-visualizer__record-shine"></span>
+				</span>
+				<span class="music-visualizer__record-cover">
+					{#if currentTrack?.pic}
+						<img class="music-visualizer__record-cover-image" src={currentTrack.pic} alt="" />
+					{:else}
+						<span class="music-visualizer__record-cover-placeholder">
+							<Icon icon="material-symbols:music-note-rounded" size="2xl" />
+						</span>
+					{/if}
 				</span>
 				<span class="music-visualizer__record-overlay" aria-hidden="true">
 					<Icon icon="material-symbols:queue-music-rounded" size="2xl" />
@@ -362,17 +381,7 @@ onDestroy(() => {
 				</span>
 			</div>
 
-			<!-- 层 2 · 歌名 + 作曲人（桌面） -->
-			<div class="music-visualizer__now">
-				<div class="music-visualizer__now-title">
-					{currentTrack?.name || "未播放"}
-				</div>
-				<div class="music-visualizer__now-artist">
-					{currentTrack?.artist || "—"}
-				</div>
-			</div>
-
-			<!-- 层 3 · 进度条（桌面） -->
+			<!-- 层 2 · 进度条（桌面） -->
 			<div class="music-visualizer__progress-block">
 				<span class="music-visualizer__progress-time">{currentTimeStr}</span>
 				<div
@@ -407,7 +416,7 @@ onDestroy(() => {
 				<span class="music-visualizer__progress-time">{durationStr}</span>
 			</div>
 
-			<!-- 层 4 · 工具栏（桌面） -->
+			<!-- 层 3 · 工具栏（桌面） -->
 			<div class="music-visualizer__toolbar" aria-label="播放控制">
 				<div class="music-visualizer__tool-wrap" role="group">
 					<span

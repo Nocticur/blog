@@ -28,22 +28,30 @@ const statusText = $derived(
 			: statusLabels.loading,
 );
 const hasLyrics = $derived(lyrics.length > 0);
+const isPlaybackActive = $derived(currentIndex >= 0);
+const visibleLyrics = $derived(lyrics.map((line, index) => ({ line, index })));
 
 // 将文本拆分为单个字符（保留空格），用于逐字发光
 function splitChars(text: string): string[] {
 	return Array.from(text);
 }
 
-// 根据当前行的播放时长计算逐字扫词的步进延迟，使扫词节奏与旋律同步
-function charStep(text: string): number {
+// 让最后一个字的发光在下一行开始前完成，避免歌词切行时扫词被截断。
+function charTiming(text: string) {
 	const count = Array.from(text).length;
-	if (count <= 0) return 0.05;
-	if (currentIndex < 0 || !lyrics[currentIndex]) return 0.05;
+	if (count <= 0 || currentIndex < 0 || !lyrics[currentIndex]) {
+		return { step: 0, glowDuration: 0.42 };
+	}
+
 	const current = lyrics[currentIndex];
 	const next = lyrics[currentIndex + 1];
-	const dur = next && next.time > current.time ? next.time - current.time : 2.4;
-	const step = dur / (count + 2);
-	return Math.min(Math.max(step, 0.03), 0.1);
+	const duration =
+		next && next.time > current.time ? next.time - current.time : 2.4;
+	const glowDuration = Math.min(0.42, Math.max(0.14, duration * 0.35));
+	const step =
+		count > 1 ? Math.max(0, (duration - glowDuration) / (count - 1)) : 0;
+
+	return { step, glowDuration };
 }
 
 function syncLyricOffset() {
@@ -60,7 +68,7 @@ function syncLyricOffset() {
 
 	const lyricCenter = activeEl.offsetTop + activeEl.offsetHeight / 2;
 	const targetCenter =
-		containerEl.clientHeight * (currentIndex >= 0 ? 0.5 : 0.58);
+		containerEl.clientHeight * (currentIndex >= 0 ? 0.42 : 0.58);
 	offsetY = targetCenter - lyricCenter;
 }
 
@@ -107,29 +115,36 @@ onDestroy(() => {
 });
 </script>
 
-<div bind:this={containerEl} class="music-visualizer__lyrics">
+<div
+	bind:this={containerEl}
+	class="music-visualizer__lyrics"
+	class:music-visualizer__lyrics--playing={isPlaybackActive}
+>
 	<div class="music-visualizer__lyrics-stage">
-		<div class="music-visualizer__lyrics-timeline"></div>
 		{#if hasLyrics}
 		<div
 			bind:this={trackEl}
 			class="music-visualizer__lyrics-inner"
 			style={`transform: translateY(${offsetY}px)`}
 		>
-			{#each lyrics as line, i}
+			{#each visibleLyrics as entry (entry.index)}
+				{@const line = entry.line}
+				{@const index = entry.index}
 			<div
 				class="music-visualizer__lyric-line"
-				class:music-visualizer__lyric-line--active={i === currentIndex}
-				class:music-visualizer__lyric-line--past={i < currentIndex}
-				data-lyric-index={i}
+				class:music-visualizer__lyric-line--active={index === currentIndex}
+				class:music-visualizer__lyric-line--past={index < currentIndex}
+				data-lyric-index={index}
 			>
-				<span class="music-visualizer__lyric-marker"></span>
-				{#if i === currentIndex}
+				{#if index <= currentIndex}
+					{@const timing = index === currentIndex ? charTiming(line.text) : null}
 					<span class="music-visualizer__lyric-text music-visualizer__lyric-text--ktv">
 						{#each splitChars(line.text) as char, j}
 							<span
 								class="music-visualizer__lyric-char"
-								style={`animation-delay: ${(j * charStep(line.text)).toFixed(3)}s`}
+								style={timing
+									? `animation-delay: ${(j * timing.step).toFixed(3)}s; animation-duration: ${timing.glowDuration.toFixed(3)}s`
+									: undefined}
 							>{char}</span>
 						{/each}
 					</span>
@@ -141,7 +156,6 @@ onDestroy(() => {
 		</div>
 		{:else}
 			<div class="music-visualizer__lyrics-empty" aria-live="polite">
-				<span class="music-visualizer__lyric-marker music-visualizer__lyric-marker--empty"></span>
 				<span>{statusText}</span>
 			</div>
 		{/if}

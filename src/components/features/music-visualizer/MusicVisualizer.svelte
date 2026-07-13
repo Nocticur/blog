@@ -68,8 +68,10 @@ onDestroy(() => {
 
 <div class="music-visualizer" style={`background: ${backgroundColor};`}>
 	{#if sceneReady}
-		<VisualizerControls />
-		<LyricsOverlay />
+		<div class="music-visualizer__desktop-layout">
+			<VisualizerControls />
+			<LyricsOverlay />
+		</div>
 	{/if}
 	<ThreeScene
 		{audioAnalyzer}

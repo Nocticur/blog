@@ -97,18 +97,18 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 		// 想要红色：用 #ff4444
 		// 想要透明度：别塞进 rippleColor，单独加一个 rippleOpacity 或 rippleAlpha
 		theme: {
-			base1: "#050810",
-			base2: "#0a0f1a",
-			coolCore: "#2255ff",
-			coolEdge: "#8844ff",
-			warmCore: "#ff4422",
-			warmEdge: "#ffaa00",
-			rippleColor: "#44ddff",
+			base1: "#000000",
+			base2: "#000000",
+			coolCore: "#16b8c9",
+			coolEdge: "#69dce7",
+			warmCore: "#8be8ee",
+			warmEdge: "#d9ffff",
+			rippleColor: "#3bcbd9",
 			// 波纹冷暖锚点：安静/低频偏冷、明亮/高频偏暖，与地形冷暖同步联动
-			rippleCool: "#44ddff",
-			rippleWarm: "#ff8844",
+			rippleCool: "#3bcbd9",
+			rippleWarm: "#d9ffff",
 			fogColor: "#050810",
-			glowIntensity: 1.2,
+			glowIntensity: 0.86,
 		},
 	},
 };
