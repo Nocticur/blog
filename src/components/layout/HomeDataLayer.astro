@@ -210,9 +210,15 @@ const statsShareId = umamiConfig?.shareId ?? "";
 			.fetch(async () => {
 				const res = await fetch(`${statsBaseUrl}/api/share/${statsShareId}`);
 				if (!res.ok) throw new Error("获取 Umami 分享信息失败");
-				const share = await res.json();
+				const share = (await res.json()) as {
+					websiteId?: string;
+					entityId?: string;
+					token?: string;
+				};
+				const websiteId = share.websiteId || share.entityId;
+				if (!websiteId) throw new Error("Umami 分享信息缺少 websiteId");
 				return {
-					websiteId: share.websiteId || share.entityId,
+					websiteId,
 					token: share.token || statsShareId,
 				};
 			})
@@ -231,8 +237,14 @@ const statsShareId = umamiConfig?.shareId ?? "";
 			})
 			.then((r) => r.json())
 			.then((data) => {
-				const uvRaw = data.uv || data.visitors || 0;
-				const pvRaw = data.pv || data.pageviews || 0;
+				const stats = data as {
+					uv?: number;
+					visitors?: number;
+					pv?: number;
+					pageviews?: number;
+				};
+				const uvRaw = stats.uv || stats.visitors || 0;
+				const pvRaw = stats.pv || stats.pageviews || 0;
 				const uvCompact = formatCompactNumber(uvRaw);
 				const pvCompact = formatCompactNumber(pvRaw);
 				const uvFull = Number(uvRaw).toLocaleString();

@@ -34,8 +34,8 @@ export class RateLimiter extends DurableObject<Env> {
 		}
 
 		const row = this.ctx.storage.sql
-			.exec<RateLimitRow>("SELECT count, reset_at FROM rate_limit WHERE id = 1")
-			.toArray()[0];
+			.exec("SELECT count, reset_at FROM rate_limit WHERE id = 1")
+			.toArray()[0] as unknown as RateLimitRow | undefined;
 		const nextReset = now + windowSeconds * 1000;
 
 		if (!row || row.reset_at <= now) {

@@ -40,7 +40,9 @@ async function fetchContributions(
 		);
 		clearTimeout(timer);
 		if (!response.ok) throw new Error(`API: ${response.status}`);
-		const data = await response.json();
+		const data = (await response.json()) as {
+			contributions?: ContributionDay[];
+		};
 		const days = data.contributions || [];
 		return days.map((d: { date: string; count: number; level: number }) => ({
 			date: d.date,

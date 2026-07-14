@@ -188,7 +188,11 @@ async function getEmbedding(
 		return embedding;
 	}
 	try {
-		const result = await env.AI.run("@cf/baai/bge-large-en-v1.5", { text });
+		const result = (await env.AI.run("@cf/baai/bge-large-en-v1.5", {
+			text,
+		})) as {
+			data?: number[][];
+		};
 		return Array.isArray(result.data?.[0]) ? result.data[0] : null;
 	} catch (error) {
 		logError("ai_embedding_upstream_error", error, { provider: "workers-ai" });
