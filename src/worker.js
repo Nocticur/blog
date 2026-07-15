@@ -1,5 +1,4 @@
 import { handleAIChat } from "./workers/ai-chat.ts";
-import { handleGuestbook } from "./workers/guestbook.js";
 
 export { RateLimiter } from "./workers/rate-limiter.ts";
 
@@ -77,10 +76,6 @@ function plainNotFound() {
 export default {
 	async fetch(request, env, ctx) {
 		const url = new URL(request.url);
-
-		if (url.pathname.startsWith("/api/guestbook")) {
-			return handleGuestbook(request, env, url);
-		}
 
 		if (url.pathname === "/api/ai-chat") {
 			return handleAIChat(request, env, ctx);

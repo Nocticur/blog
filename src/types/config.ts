@@ -386,6 +386,7 @@ export type CommentConfig = {
 		serverURL: string;
 		lang?: string;
 		emoji: string[];
+		imageUploadURL?: string;
 		login?: "enable" | "force" | "disable";
 		visitorCount?: boolean; // 是否统计访问量，true 启用访问量，false 关闭
 	};
@@ -501,6 +502,18 @@ export type AnnouncementConfig = {
 	items: AnnouncementItem[]; // 公告列表
 	icon?: string; // 公告栏图标
 	closable?: boolean; // 是否可关闭
+};
+
+export type GuestbookAnnouncementItem = {
+	id: string;
+	title: string;
+	summary: string;
+	lead?: string;
+	rules: string[];
+};
+
+export type GuestbookConfig = {
+	announcements: GuestbookAnnouncementItem[];
 };
 
 // 单个字体配置

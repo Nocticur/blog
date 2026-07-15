@@ -1,49 +1,43 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "my-blog",
-  "main": "src/worker.js",
-  "compatibility_date": "2026-05-07",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": {
-    "directory": "./dist",
-    "binding": "ASSETS",
-    "html_handling": "force-trailing-slash",
-    "not_found_handling": "404-page"
-  },
-  "vars": {
-    "NODE_VERSION": "22"
-  },
-  "kv_namespaces": [
-    {
-      "binding": "VISITOR_KV",
-      "id": "2720087758cb476eb24fd8dd4efb3e4c"
-    }
-  ],
-  "vectorize": [
-    {
-      "binding": "VECTORIZE",
-      "index_name": "blog-ai-search"
-    }
-  ],
-  "ai": {
-    "binding": "AI"
-  },
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "AI_RATE_LIMITER",
-        "class_name": "RateLimiter"
-      }
-    ]
-  },
-  "migrations": [
-    {
-      "tag": "v1-ai-rate-limiter",
-      "new_sqlite_classes": ["RateLimiter"]
-    }
-  ],
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 1
-  }
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "my-blog",
+	"main": "src/worker.js",
+	"compatibility_date": "2026-05-07",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS",
+		"html_handling": "force-trailing-slash",
+		"not_found_handling": "404-page"
+	},
+	"vars": {
+		"NODE_VERSION": "22"
+	},
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "blog-ai-search"
+		}
+	],
+	"ai": {
+		"binding": "AI"
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "AI_RATE_LIMITER",
+				"class_name": "RateLimiter"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1-ai-rate-limiter",
+			"new_sqlite_classes": ["RateLimiter"]
+		}
+	],
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	}
 }

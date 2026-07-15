@@ -21,6 +21,8 @@ export type {
 	FriendSiteInfo,
 	GalleryAlbum,
 	GalleryConfig,
+	GuestbookAnnouncementItem,
+	GuestbookConfig,
 	HolidayItem,
 	HomeConfig,
 	HomeDisplayLayerConfig,
@@ -54,6 +56,7 @@ export { fontConfig } from "./fontConfig"; // 字体配置
 export { footerConfig } from "./footerConfig"; // 页脚配置
 export { friendsPageConfig, getEnabledFriends } from "./friendsConfig"; // 友链配置
 export { galleryConfig } from "./galleryConfig"; // 相册配置
+export { guestbookConfig } from "./guestbookConfig"; // 留言聊天室配置
 export { homeConfig } from "./homeConfig"; // 首页与用户资料配置
 export { licenseConfig } from "./licenseConfig"; // 许可证配置
 // 组件配置

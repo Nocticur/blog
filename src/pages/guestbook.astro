@@ -1,11 +1,6 @@
 ---
-import { getEntry } from "astro:content";
-import GuestbookComposeButton from "@components/features/GuestbookComposeButton.svelte";
-import GuestbookComposeModal from "@components/features/GuestbookComposeModal.astro";
-import GuestbookDetailModal from "@components/features/GuestbookDetailModal.astro";
-import GuestbookListModal from "@components/features/GuestbookListModal.svelte";
-import GuestbookViewContainer from "@components/features/GuestbookViewContainer.svelte";
-import PageTitle from "@/components/common/PageTitle.astro";
+import GuestbookChat from "@components/features/GuestbookChat.svelte";
+import GuestbookChatFallback from "@components/features/GuestbookChatFallback.astro";
 import { siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
@@ -16,46 +11,15 @@ if (!siteConfig.pages.guestbook) {
 	return Astro.redirect("/404/");
 }
 
-const guestbookPost = await getEntry("spec", "guestbook");
-
-if (!guestbookPost) {
-	throw new Error("guestbook page content not found");
-}
-
 // 页面标题和描述
 const title = i18n(I18nKey.guestbook);
 const description = i18n(I18nKey.guestbookDescription);
 ---
 
 <MainGridLayout title={title} description={description}>
-	<div class="flex w-full rounded-(--radius-large) relative min-h-32">
-		<div class="card-base z-10 px-4 py-6 md:px-9 relative w-full">
-			<!-- 页面标题和描述 -->
-			<div class="mb-4">
-				<div class="flex items-start justify-between gap-4 mb-3">
-					<PageTitle title={title} eyebrow="Guestbook" variant="stacked" />
-					<div>
-						<GuestbookComposeButton client:load />
-					</div>
-				</div>
-				{description && (
-					<p class="text-base text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
-						{description}
-					</p>
-				)}
-			</div>
-
-			<!-- 视图容器：卡片视图 -->
-			<GuestbookViewContainer client:only="svelte">
-				<div slot="fallback" class="flex items-center justify-center" style="min-height: 70vh;">
-					<div class="text-neutral-400 dark:text-neutral-500 text-sm animate-pulse">加载中...</div>
-				</div>
-			</GuestbookViewContainer>
-		</div>
+	<div class="guestbook-page">
+		<GuestbookChat client:only="svelte">
+			<GuestbookChatFallback slot="fallback" />
+		</GuestbookChat>
 	</div>
-
-	<!-- 页面级弹窗 -->
-	<GuestbookDetailModal />
-	<GuestbookComposeModal />
-	<GuestbookListModal client:only="svelte" />
 </MainGridLayout>

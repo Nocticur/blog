@@ -25,6 +25,8 @@ export const commentConfig: CommentConfig = {
 			"https://unpkg.com/@waline/emojis@1.4.0/bilibili",
 			"https://unpkg.com/@waline/emojis@1.4.0/bmoji",
 		],
+		// Waline 客户端默认图片上传服务，可替换为兼容的自建接口
+		imageUploadURL: "https://7bu.top/api/upload",
 		// 评论登录模式。可选值如下：
 		//   'enable'   —— 默认，允许访客匿名评论和用第三方 OAuth 登录评论，兼容性最佳。
 		//   'force'    —— 强制必须登录后才能评论，适合严格社区，关闭匿名评论。

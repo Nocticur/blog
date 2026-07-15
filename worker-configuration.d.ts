@@ -7,7 +7,6 @@ declare global {
 		AI_RATE_LIMITER: DurableObjectNamespace<RateLimiter>;
 		ASSETS: Fetcher;
 		VECTORIZE: VectorizeIndex;
-		VISITOR_KV: KVNamespace;
 		AI_API_KEY?: string;
 		ALLOWED_ORIGINS?: string;
 		NODE_VERSION?: string;
