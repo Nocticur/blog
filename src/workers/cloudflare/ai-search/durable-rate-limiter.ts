@@ -1,12 +1,12 @@
 import { DurableObject } from "cloudflare:workers";
-
-export interface RateLimitResult {
-	allowed: boolean;
-	remaining: number;
-	retryAfter: number;
-}
+import { aiSearchConfig } from "@/config/aiSearchConfig";
+import type {
+	RateLimiter as RateLimiterContract,
+	RateLimitResult,
+} from "@/server/ai-search/contracts";
 
 interface RateLimitRow {
+	[key: string]: SqlStorageValue;
 	count: number;
 	reset_at: number;
 }
@@ -34,8 +34,8 @@ export class RateLimiter extends DurableObject<Env> {
 		}
 
 		const row = this.ctx.storage.sql
-			.exec("SELECT count, reset_at FROM rate_limit WHERE id = 1")
-			.toArray()[0] as unknown as RateLimitRow | undefined;
+			.exec<RateLimitRow>("SELECT count, reset_at FROM rate_limit WHERE id = 1")
+			.toArray()[0];
 		const nextReset = now + windowSeconds * 1000;
 
 		if (!row || row.reset_at <= now) {
@@ -62,5 +62,39 @@ export class RateLimiter extends DurableObject<Env> {
 			remaining: Math.max(0, max - nextCount),
 			retryAfter: 0,
 		};
+	}
+}
+
+function getClientIp(request: Request): string {
+	return request.headers.get("CF-Connecting-IP") || "development";
+}
+
+async function hashRateLimitKey(value: string): Promise<string> {
+	const digest = await crypto.subtle.digest(
+		"SHA-256",
+		new TextEncoder().encode(value),
+	);
+	const bytes = new Uint8Array(digest);
+	let binary = "";
+	for (const byte of bytes) binary += String.fromCharCode(byte);
+	return btoa(binary)
+		.replace(/\+/g, "-")
+		.replace(/\//g, "_")
+		.replace(/=+$/, "");
+}
+
+export class DurableRateLimiter implements RateLimiterContract {
+	constructor(
+		private readonly namespace: DurableObjectNamespace<RateLimiter>,
+	) {}
+
+	async check(request: Request): Promise<RateLimitResult> {
+		const key = await hashRateLimitKey(`ai-chat:${getClientIp(request)}`);
+		return this.namespace
+			.getByName(key)
+			.check(
+				aiSearchConfig.rateLimit.maxRequests,
+				aiSearchConfig.rateLimit.windowSeconds,
+			);
 	}
 }

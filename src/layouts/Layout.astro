@@ -247,7 +247,7 @@ const siteLang = lang.replace("_", "-");
       if (!aiMountPromise) {
         aiMountPromise = Promise.all([
           import("svelte"),
-          import("@/components/controls/AISearch.svelte"),
+          import("@/components/controls/ai-search/AISearch.svelte"),
         ]).then(async ([{ mount, tick }, { default: AISearch }]) => {
           const target = document.getElementById("ai-search-root");
           if (!target) throw new Error("AI search root is missing");

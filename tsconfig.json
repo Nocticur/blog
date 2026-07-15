@@ -42,7 +42,8 @@
   "include": [
     ".astro/types.d.ts",
     "worker-configuration.d.ts",
-    "src/**/*"
+    "src/**/*",
+    "scripts/ai-search/**/*.ts"
   ],
   "exclude": [
     "dist"

@@ -1,6 +1,6 @@
-import { handleAIChat } from "./workers/ai-chat.ts";
+import { handleCloudflareAiSearch } from "./workers/cloudflare/ai-search/runtime";
 
-export { RateLimiter } from "./workers/rate-limiter.ts";
+export { RateLimiter } from "./workers/cloudflare/ai-search/durable-rate-limiter";
 
 const STATIC_SECURITY_HEADERS = {
 	"Content-Security-Policy-Report-Only": [
@@ -24,9 +24,9 @@ const STATIC_SECURITY_HEADERS = {
 	"Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
 	"X-Content-Type-Options": "nosniff",
 	"X-Frame-Options": "SAMEORIGIN",
-};
+} satisfies Record<string, string>;
 
-function withStaticSecurityHeaders(response) {
+function withStaticSecurityHeaders(response: Response): Response {
 	const headers = new Headers(response.headers);
 	for (const [name, value] of Object.entries(STATIC_SECURITY_HEADERS)) {
 		headers.set(name, value);
@@ -38,8 +38,7 @@ function withStaticSecurityHeaders(response) {
 	});
 }
 
-/** ASSETS 不可用时的兜底 HTML，避免纯文本 "Not Found" */
-function plainNotFound() {
+function plainNotFound(): Response {
 	return new Response(
 		`<!DOCTYPE html>
 <html lang="zh-CN">
@@ -74,19 +73,15 @@ function plainNotFound() {
 }
 
 export default {
-	async fetch(request, env, ctx) {
+	async fetch(request, env): Promise<Response> {
 		const url = new URL(request.url);
-
 		if (url.pathname === "/api/ai-chat") {
-			return handleAIChat(request, env, ctx);
+			return handleCloudflareAiSearch(request, env);
 		}
 
-		// 静态资源：html_handling / not_found_handling 由 ASSETS binding 处理
-		// not_found_handling = "404-page" 时未命中会返回 dist/404.html
 		if (env.ASSETS) {
 			return withStaticSecurityHeaders(await env.ASSETS.fetch(request));
 		}
-
 		return withStaticSecurityHeaders(plainNotFound());
 	},
-};
+} satisfies ExportedHandler<Env>;

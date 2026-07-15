@@ -1,49 +1,36 @@
 <script lang="ts">
 import { onMount, tick } from "svelte";
 import Icon from "@/components/common/Icon.svelte";
-import { aiSearchConfig } from "@/config";
+import { aiSearchPublicConfig } from "@/config/aiSearchConfig";
 import "@/styles/components/ai-search.css";
+import { AiSearchClientError, streamAiSearch } from "./api-client";
+import { renderSimpleMarkdown } from "./markdown";
+import {
+	type AiSearchMessage,
+	type AiSearchSessionMeta,
+	clearStoredSessions,
+	deleteStoredSession,
+	generateSessionId,
+	loadSessionList,
+	loadSessionMessages,
+	saveSession,
+	saveSessionList,
+} from "./session-store";
 
-interface Message {
-	role: "user" | "assistant";
-	content: string;
-	refs?: { title: string; path: string; published?: string; excerpt: string }[];
-	streaming?: boolean;
-}
-
-interface SessionMeta {
-	id: string;
-	title: string;
-	updatedAt: number;
-}
-
-const STORAGE_SESSIONS_KEY = "ai-chat:sessions";
-const STORAGE_SESSION_PREFIX = "ai-chat:session:";
-const STORAGE_VERSION = 1;
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_SESSIONS = 20;
-
-const SUGGESTIONS = ["博客的技术栈是什么？", "介绍一下自己"];
+const SUGGESTIONS = ["这个博客是怎么做的？", "介绍一下自己"];
 const FOLLOW_UP_SUGGESTIONS = ["说说最近的文章", "有什么推荐的项目？"];
 
 let isOpen = $state(false);
 let inputVal = $state("");
-let messages = $state<Message[]>([]);
+let messages = $state<AiSearchMessage[]>([]);
 let isLoading = $state(false);
 let messagesEl: HTMLDivElement;
 let inputEl: HTMLTextAreaElement;
 let abortCtrl: AbortController | null = null;
-let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 let sessionId = $state("");
-let sessionList = $state<SessionMeta[]>([]);
+let sessionList = $state<AiSearchSessionMeta[]>([]);
 let showSessionList = $state(false);
 let scrollFrame: number | null = null;
-
-interface StoredValue<T> {
-	version: number;
-	expiresAt: number;
-	data: T;
-}
 
 const TEXTAREA_MIN_HEIGHT = 128;
 const TEXTAREA_MAX_HEIGHT = 256;
@@ -76,113 +63,14 @@ function startResize(e: MouseEvent | TouchEvent) {
 	document.addEventListener("touchend", onEnd);
 }
 
-function generateSessionId(): string {
-	return `sess_${crypto.randomUUID()}`;
-}
-
-function getSessionTitle(msgs: Message[]): string {
-	const firstUser = msgs.find((m) => m.role === "user");
-	if (!firstUser) return "新对话";
-	return firstUser.content.length > 20
-		? `${firstUser.content.slice(0, 20)}...`
-		: firstUser.content;
-}
-
-function loadSessionListFromStorage(): SessionMeta[] {
-	const list = readStoredValue<SessionMeta[]>(STORAGE_SESSIONS_KEY);
-	return Array.isArray(list)
-		? list.filter(
-				(item) =>
-					item &&
-					typeof item.id === "string" &&
-					typeof item.title === "string" &&
-					typeof item.updatedAt === "number",
-			)
-		: [];
-}
-
-function saveSessionListToStorage(list: SessionMeta[]) {
-	writeStoredValue(STORAGE_SESSIONS_KEY, list);
-}
-
-function readStoredValue<T>(key: string): T | null {
-	try {
-		const raw = localStorage.getItem(key);
-		if (!raw) return null;
-		const parsed = JSON.parse(raw) as StoredValue<T>;
-		if (
-			parsed.version !== STORAGE_VERSION ||
-			typeof parsed.expiresAt !== "number" ||
-			parsed.expiresAt <= Date.now()
-		) {
-			localStorage.removeItem(key);
-			return null;
-		}
-		return parsed.data;
-	} catch {
-		localStorage.removeItem(key);
-		return null;
-	}
-}
-
-function writeStoredValue<T>(key: string, data: T): void {
-	try {
-		const value: StoredValue<T> = {
-			version: STORAGE_VERSION,
-			expiresAt: Date.now() + SESSION_TTL_MS,
-			data,
-		};
-		localStorage.setItem(key, JSON.stringify(value));
-	} catch {}
-}
-
 function saveCurrentSession() {
-	if (!sessionId || messages.length === 0) return;
-	if (messages.some((m) => m.streaming)) return;
-	try {
-		writeStoredValue(STORAGE_SESSION_PREFIX + sessionId, messages);
-		const existing = sessionList.find((s) => s.id === sessionId);
-		if (existing) {
-			existing.title = getSessionTitle(messages);
-			existing.updatedAt = Date.now();
-		} else {
-			sessionList.unshift({
-				id: sessionId,
-				title: getSessionTitle(messages),
-				updatedAt: Date.now(),
-			});
-		}
-		if (sessionList.length > MAX_SESSIONS) {
-			const removed = sessionList.splice(MAX_SESSIONS);
-			for (const s of removed) {
-				try {
-					localStorage.removeItem(STORAGE_SESSION_PREFIX + s.id);
-				} catch {}
-			}
-		}
-		sessionList = [...sessionList];
-		saveSessionListToStorage(sessionList);
-	} catch {}
-}
-
-function loadSessionMessages(id: string): Message[] {
-	const stored = readStoredValue<Message[]>(STORAGE_SESSION_PREFIX + id);
-	return Array.isArray(stored)
-		? stored.filter(
-				(message) =>
-					message &&
-					(message.role === "user" || message.role === "assistant") &&
-					typeof message.content === "string",
-			)
-		: [];
+	sessionList = saveSession(sessionId, messages, sessionList);
 }
 
 function deleteSession(id: string) {
-	try {
-		localStorage.removeItem(STORAGE_SESSION_PREFIX + id);
-	} catch {}
+	deleteStoredSession(id);
 	sessionList = sessionList.filter((s) => s.id !== id);
-	saveSessionListToStorage(sessionList);
+	saveSessionList(sessionList);
 	if (id === sessionId) {
 		sessionId = generateSessionId();
 		messages = [];
@@ -200,17 +88,7 @@ function startNewSession() {
 
 function clearAllSessions() {
 	stop();
-	try {
-		for (let index = localStorage.length - 1; index >= 0; index -= 1) {
-			const key = localStorage.key(index);
-			if (
-				key === STORAGE_SESSIONS_KEY ||
-				key?.startsWith(STORAGE_SESSION_PREFIX)
-			) {
-				localStorage.removeItem(key);
-			}
-		}
-	} catch {}
+	clearStoredSessions();
 	sessionList = [];
 	sessionId = generateSessionId();
 	messages = [];
@@ -266,32 +144,6 @@ function scrollToBottom() {
 	});
 }
 
-function isSafeUrl(value: string): boolean {
-	return /^(https?:|mailto:|tel:|\/|#|\.\/|\.\.\/|\?)/i.test(value.trim());
-}
-
-function renderSimpleMd(text: string): string {
-	let html = text
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;")
-		.replace(/'/g, "&#039;");
-
-	html = html.replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>");
-	html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-	html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-	html = html.replace(/(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g, "<em>$1</em>");
-	html = html.replace(/~~([^~]+)~~/g, "<del>$1</del>");
-	html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
-		if (!isSafeUrl(url)) return `[${label}](${url})`;
-		return `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;
-	});
-	html = html.replace(/\n/g, "<br>");
-
-	return html;
-}
-
 async function send(text?: string) {
 	const q = (text || inputVal).trim();
 	if (!q || isLoading) return;
@@ -314,7 +166,8 @@ async function send(text?: string) {
 	scrollToBottom();
 
 	isLoading = true;
-	abortCtrl = new AbortController();
+	const controller = new AbortController();
+	abortCtrl = controller;
 
 	const aiIdx = messages.length;
 	messages = [
@@ -323,7 +176,7 @@ async function send(text?: string) {
 	];
 	scrollToBottom();
 	let pendingText = "";
-	let pendingRefs: Message["refs"] | null = null;
+	let pendingRefs: AiSearchMessage["refs"] | null = null;
 	let flushTimer: ReturnType<typeof setTimeout> | null = null;
 	const flushStreamUpdate = () => {
 		if (flushTimer) {
@@ -351,68 +204,26 @@ async function send(text?: string) {
 			.slice(0, -2)
 			.slice(-6)
 			.map((m) => ({ role: m.role, content: m.content }));
-		const res = await fetch("/api/ai-chat", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ question: q, history, sessionId }),
-			signal: abortCtrl.signal,
-		});
-
-		if (!res.ok) {
-			let errMsg = `请求失败 (${res.status})`;
-			try {
-				const errBody = await res.json();
-				if (errBody.error) errMsg = errBody.error;
-			} catch {}
-			throw new Error(errMsg);
-		}
-
-		reader = res.body?.getReader() ?? null;
-		if (!reader) throw new Error("无法读取响应流");
-
-		const decoder = new TextDecoder();
-		let buffer = "";
-
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-
-			buffer += decoder.decode(value, { stream: true });
-			const lines = buffer.split("\n");
-			buffer = lines.pop() || "";
-
-			for (const line of lines) {
-				if (!line.startsWith("data: ")) continue;
-				const json = line.slice(6);
-				try {
-					const data: unknown = JSON.parse(json);
-					if (!data || typeof data !== "object") continue;
-					const type = Reflect.get(data, "type");
-
-					if (type === "chunk") {
-						const chunk = Reflect.get(data, "text");
-						if (typeof chunk === "string") {
-							pendingText += chunk;
-							scheduleStreamUpdate();
-						}
-					} else if (type === "refs") {
-						const refs = Reflect.get(data, "articles");
-						if (Array.isArray(refs)) {
-							pendingRefs = refs as Message["refs"];
-							scheduleStreamUpdate();
-						}
-					} else if (type === "error") {
-						const errorText = Reflect.get(data, "error");
-						pendingText += `\n\n> 错误：${typeof errorText === "string" ? errorText : "响应中断"}`;
-						flushStreamUpdate();
-					} else if (type === "done") {
-						flushStreamUpdate();
-					}
-				} catch {
-					// 忽略解析错误
+		await streamAiSearch({
+			question: q,
+			history,
+			sessionId,
+			signal: controller.signal,
+			onEvent(event) {
+				if (event.type === "chunk") {
+					pendingText += event.text;
+					scheduleStreamUpdate();
+				} else if (event.type === "refs") {
+					pendingRefs = event.articles;
+					scheduleStreamUpdate();
+				} else if (event.type === "error") {
+					pendingText += `\n\n> 错误：${event.error}`;
+					flushStreamUpdate();
+				} else {
+					flushStreamUpdate();
 				}
-			}
-		}
+			},
+		});
 		flushStreamUpdate();
 	} catch (err: unknown) {
 		const e = err instanceof Error ? err : new Error(String(err));
@@ -425,9 +236,8 @@ async function send(text?: string) {
 			pendingText = "";
 			pendingRefs = null;
 			console.error("AI chat error:", e);
-			if (/429|insufficient_quota|quota/i.test(e.message)) {
-				messages[aiIdx].content =
-					"抱歉喵~喵墩今天收藏的 token 被爸爸偷偷用光了，请明天再来~";
+			if (e instanceof AiSearchClientError && e.code === "RATE_LIMITED") {
+				messages[aiIdx].content = "请求太频繁了喵，请稍后再试~";
 			} else {
 				messages[aiIdx].content = "抱歉，请求出错了，请稍后再试喵~";
 			}
@@ -439,7 +249,6 @@ async function send(text?: string) {
 		messages = [...messages];
 		isLoading = false;
 		abortCtrl = null;
-		reader = null;
 		scrollToBottom();
 		saveCurrentSession();
 	}
@@ -447,7 +256,6 @@ async function send(text?: string) {
 
 function stop() {
 	abortCtrl?.abort();
-	reader?.cancel().catch(() => {});
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -465,7 +273,7 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 onMount(() => {
-	sessionList = loadSessionListFromStorage();
+	sessionList = loadSessionList();
 	if (sessionList.length > 0) {
 		const latest = sessionList[0];
 		sessionId = latest.id;
@@ -498,7 +306,7 @@ onMount(() => {
 						class="ai-header__avatar"
 					/>
 					<span class="ai-header__name">喵墩</span>
-					<span class="ai-header__model">{aiSearchConfig.modelName}</span>
+					<span class="ai-header__model">{aiSearchPublicConfig.modelName}</span>
 				</div>
 				<div class="ai-header__actions">
 					{#if sessionList.length > 0}
@@ -606,7 +414,7 @@ onMount(() => {
 									<span class="ai-msg__text ai-msg__text--streaming">{msg.content}</span>
 									<span class="ai-cursor"></span>
 								{:else}
-									<span class="ai-msg__text">{@html renderSimpleMd(msg.content)}</span>
+									<span class="ai-msg__text">{@html renderSimpleMarkdown(msg.content)}</span>
 								{/if}
 								{#if msg.role === "assistant" && msg.refs && msg.refs.length > 0}
 									<div class="ai-refs">
