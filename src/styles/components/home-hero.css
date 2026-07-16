@@ -386,6 +386,20 @@ html:has(.home-hero) #top-row {
 
 /* 联系徽章 — 白色半透明底 + 黑色文字，轻微上移压在字体下半部 */
 .home-hero__name-badge {
+	--name-badge-surface: rgba(255, 255, 255, 0.72);
+	--name-badge-surface-solid: #ffffff;
+	--name-badge-surface-fade: rgba(255, 255, 255, 0.42);
+	--name-badge-rainbow: linear-gradient(
+		90deg,
+		#ff4d5e,
+		#ffb224,
+		#f6ed35,
+		#42dc83,
+		#19cce6,
+		#4385ff,
+		#d946ef,
+		#ff4d5e
+	);
 	display: flex;
 	position: relative;
 	z-index: 3;
@@ -396,24 +410,68 @@ html:has(.home-hero) #top-row {
 	min-width: clamp(9.5rem, 13vw, 13.5rem);
 	margin-top: clamp(-1.6rem, -2vw, -0.9rem);
 	padding: 0.34rem 1rem;
+	border: 2px solid transparent;
 	border-radius: 3px;
-	background: rgba(255, 255, 255, 0.72);
+	background:
+		linear-gradient(var(--name-badge-surface), var(--name-badge-surface)) padding-box,
+		linear-gradient(
+			var(--name-badge-surface-solid) 50%,
+			var(--name-badge-surface-fade) 80%,
+			transparent
+		) border-box,
+		var(--name-badge-rainbow) border-box;
+	background-size: 200% 100%;
 	color: #000000;
 	font-size: clamp(0.82rem, 1.05vw, 1.06rem);
 	font-weight: 950;
 	letter-spacing: 0.22em;
 	line-height: 1;
+	overflow: visible;
+	isolation: isolate;
+	animation: name-badge-rainbow 2s linear infinite;
 	box-shadow:
 		0 3px 0 rgba(0, 0, 0, 0.65),
 		0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
+.home-hero__name-badge::before {
+	content: "";
+	position: absolute;
+	z-index: -1;
+	left: 50%;
+	bottom: -24%;
+	width: 64%;
+	height: 24%;
+	transform: translateX(-50%);
+	background: var(--name-badge-rainbow);
+	background-size: 200% 100%;
+	filter: blur(0.75rem);
+	opacity: 0.95;
+	pointer-events: none;
+	animation: name-badge-rainbow 2s linear infinite;
+}
+
 [data-theme="light"] .home-hero__name-badge {
-	background: rgba(0, 0, 0, 0.78);
+	--name-badge-surface: rgba(0, 0, 0, 0.78);
+	--name-badge-surface-solid: #000000;
+	--name-badge-surface-fade: rgba(0, 0, 0, 0.48);
 	color: #ffffff;
 	box-shadow:
 		0 3px 0 rgba(255, 255, 255, 0.85),
 		0 10px 22px rgba(0, 0, 0, 0.16);
+}
+
+@keyframes name-badge-rainbow {
+	0% { background-position: 0% 50%; }
+	100% { background-position: 200% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.home-hero__name-badge,
+	.home-hero__name-badge::before {
+		animation: none;
+		background-position: 50% 50%;
+	}
 }
 
 /* 职业 */
