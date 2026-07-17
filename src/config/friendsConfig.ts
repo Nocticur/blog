@@ -281,8 +281,8 @@ export const friendsConfig: FriendLink[] = [
 	},
 	{
 		title: "拾玖的博客",
-		imgurl: "https://shijiucode.cn/favicon.ico?favicon.0x3dzn~oxb6tn.ico",
-		desc: "拾玖的博客",
+		imgurl: "https://shijiucode.cn/avatar.jpg",
+		desc: "人间风情千万般，值得觊觎一眼。",
 		siteurl: "https://shijiucode.cn/",
 		tags: ["Blog"],
 		weight: 5,
