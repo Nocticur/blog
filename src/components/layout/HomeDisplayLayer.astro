@@ -888,6 +888,6 @@ async function hydrateLazyImages(root: HTMLElement) {
 	}
 
 	bootHomeDisplayLayer();
-	document.addEventListener("astro:page-load", bootHomeDisplayLayer, { once: true });
-	document.addEventListener("astro:before-swap", teardownDisplay, { once: true });
+	document.addEventListener("astro:page-load", bootHomeDisplayLayer);
+	document.addEventListener("astro:before-swap", teardownDisplay);
 </script>
