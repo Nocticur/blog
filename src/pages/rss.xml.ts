@@ -21,7 +21,9 @@ function stripInvalidXmlChars(str: string): string {
 	);
 }
 
-async function createRssContainer(renderers: Awaited<ReturnType<typeof loadRenderers>>) {
+async function createRssContainer(
+	renderers: Awaited<ReturnType<typeof loadRenderers>>,
+) {
 	const originalConsoleWarn = console.warn;
 	console.warn = (...args: Parameters<typeof console.warn>) => {
 		const [message] = args;
