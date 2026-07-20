@@ -298,6 +298,15 @@ export const friendsConfig: FriendLink[] = [
 		weight: 5,
 		enabled: true,
 	},
+	{
+		title: "Aimerting",
+		imgurl: "https://blog.xuioo.com/avatar.jpg",
+		desc: "「纯粹祈愿皆成真」",
+		siteurl: "https://blog.xuioo.com/",
+		tags: ["Blog"],
+		weight: 5,
+		enabled: true,
+	},
 ];
 
 // 获取启用的友链并进行排序
