@@ -154,7 +154,7 @@ const tags = await getTagList();
 		<Icon name="material-symbols:format-list-bulleted" class="dock-drawer-title-icon" />
 		<span>{i18n(I18nKey.tableOfContents)}</span>
 	</div>
-	<div id="dock-toc-content" class="text-sm leading-relaxed"></div>
+	<div id="dock-toc-content" class="toc-content text-sm leading-relaxed"></div>
 </div>
 
 <!-- 样式已迁移至 src/styles/components/floating-dock.css -->
@@ -348,6 +348,8 @@ const tags = await getTagList();
 		updatePathDependent();
 		window.addEventListener("scroll", updateScrollDependent, { passive: true, signal: dockSignal });
 		document.addEventListener("astro:page-load", () => {
+			window.__floatingDockTOC?.cleanup();
+			window.__floatingDockTOC = null;
 			closeAllDrawers();
 			collapseDock();
 			updatePathDependent();
@@ -359,12 +361,15 @@ const tags = await getTagList();
 		tocBtn?.addEventListener("click", () => {
 			import("@/utils/toc-utils").then(({ TOCManager }) => {
 				try {
-					const mgr = new (TOCManager as any)({
+					window.__floatingDockTOC?.cleanup();
+					const mgr = new TOCManager({
 						contentId: "dock-toc-content",
+						indicatorId: "dock-active-indicator",
 						maxLevel: 3,
 						scrollOffset: 80,
 					});
 					mgr.init();
+					window.__floatingDockTOC = mgr;
 				} catch (err) {
 					console.error("TOC init failed:", err);
 				}

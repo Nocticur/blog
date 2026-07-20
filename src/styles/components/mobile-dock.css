@@ -126,6 +126,13 @@
 		pointer-events: none;
 	}
 
+	.mobile-dock.is-keyboard-open {
+		transform: translateX(-50%) translateY(120%);
+		opacity: 0;
+		visibility: hidden;
+		pointer-events: none;
+	}
+
 	/* ── 遮罩（工具栏 sheet 打开时） ── */
 	.mobile-dock__overlay {
 		position: fixed;

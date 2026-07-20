@@ -608,7 +608,6 @@ html:has(.guestbook-page) #category-bar-wrapper {
 	animation: guestbook-skeleton 1.4s ease-in-out infinite;
 }
 
-.guestbook-chat__fallback-identities span,
 .guestbook-chat__fallback-textarea,
 .guestbook-chat__fallback-tool,
 .guestbook-chat__fallback-count,
@@ -654,27 +653,6 @@ html:has(.guestbook-page) #category-bar-wrapper {
 	border-radius: var(--radius-full);
 	background: var(--guestbook-editor-line);
 	content: "";
-}
-
-.guestbook-chat__fallback-identities {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: var(--space-2);
-	margin-bottom: var(--space-2);
-}
-
-.guestbook-chat__fallback-identities > div {
-	min-width: 0;
-	padding: var(--space-3);
-	border: 1px solid var(--guestbook-editor-line);
-	border-radius: var(--radius-full);
-}
-
-.guestbook-chat__fallback-identities span {
-	display: block;
-	width: 42%;
-	height: 0.75rem;
-	border-radius: var(--radius-small);
 }
 
 .guestbook-chat__fallback-textarea {
@@ -1925,19 +1903,15 @@ html:has(.guestbook-page) #category-bar-wrapper {
 		padding-left: var(--space-3);
 	}
 
+	html.guestbook-composer-focused .guestbook-composer {
+		padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+	}
+
 	.guestbook-chat__fallback-composer {
 		padding-top: var(--space-2);
 		padding-bottom: calc(
 			var(--guestbook-mobile-dock-clearance) + env(safe-area-inset-bottom)
 		);
-	}
-
-	.guestbook-chat__fallback-identities {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-
-	.guestbook-chat__fallback-identities > div:nth-child(3) {
-		grid-column: 1 / -1;
 	}
 
 	.guestbook-composer textarea {

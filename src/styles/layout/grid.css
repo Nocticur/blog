@@ -1,6 +1,5 @@
 /* ============================================
    主网格布局 — 来自 MainGridLayout.astro
-   Swup 容器结构和文章页浮动目录
    ============================================ */
 
 #main-grid {
@@ -13,76 +12,3 @@
 }
 
 /* .onload-animation 统一定义在 transition.css 中，避免 CSS 冲突 */
-
-/* 文章页外部浮动目录 - 独立于主内容区域 */
-.article-toc-wrapper {
-	position: absolute;
-	left: calc(50% + 32rem);
-	top: 0;
-	width: 20rem;
-	max-width: 20rem;
-	pointer-events: none;
-	z-index: 10;
-	transition: transform 0.3s ease;
-}
-
-.article-toc-wrapper:has(.article-toc-container:hover) {
-	transform: translateX(-0.5rem);
-}
-
-.article-toc-container {
-	position: sticky;
-	top: 6rem;
-	pointer-events: auto;
-	max-height: calc(100vh - 7rem);
-	display: flex;
-	flex-direction: column;
-	border-radius: 1rem;
-	border: 1px solid var(--line-divider);
-	background: var(--card-bg);
-	overflow: hidden;
-	transition: transform 0.25s ease, border-color 0.25s ease;
-}
-
-.article-toc-container:hover {
-	transform: translateX(-6px);
-	border-color: var(--deep-text);
-}
-
-/* 暗色模式下 hover 使用纯白边框，与左侧目录 hover 风格一致 */
-:root.dark .article-toc-container:hover {
-	border-color: #fff;
-}
-
-.article-toc-header {
-	padding: 0.75rem 1rem;
-	border-bottom: 1px solid color-mix(in oklab, var(--line-divider) 50%, transparent);
-	flex-shrink: 0;
-}
-
-.article-toc-title {
-	font-size: 0.85rem;
-	font-weight: 700;
-	color: var(--primary);
-	letter-spacing: 0.05em;
-	text-transform: uppercase;
-}
-
-.article-toc-body {
-	flex: 1;
-	overflow-y: auto;
-	max-height: calc(100vh - 11rem);
-	padding: 0.5rem;
-}
-
-@media (max-width: 1280px) {
-	.article-toc-wrapper {
-		display: none !important;
-	}
-}
-
-/* 文章页显示外部浮动目录时，隐藏侧边栏中的目录组件避免重复 */
-:global(#sidebar-toc:has(~ #main-grid-wrapper #article-toc-wrapper)),
-:global(#article-toc-wrapper ~ * #sidebar-toc) {
-	display: none !important;
-}

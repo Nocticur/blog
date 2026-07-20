@@ -47,7 +47,7 @@
 		"@vfx-js/core": "^1.1.0",
 		"@waline/api": "^1.1.2",
 		"astro": "6.4.6",
-		"astro-expressive-code": "^0.41.7",
+		"astro-expressive-code": "^0.44.0",
 		"astro-icon": "^1.1.5",
 		"dayjs": "^1.11.20",
 		"expressive-code-collapsible": "^0.1.0",

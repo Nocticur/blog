@@ -21,10 +21,33 @@ function stripInvalidXmlChars(str: string): string {
 	);
 }
 
+async function createRssContainer(renderers: Awaited<ReturnType<typeof loadRenderers>>) {
+	const originalConsoleWarn = console.warn;
+	console.warn = (...args: Parameters<typeof console.warn>) => {
+		const [message] = args;
+		// Astro 6 validates its own legacy container defaults, not this project's processor.
+		if (
+			typeof message === "string" &&
+			message.startsWith(
+				"[astro] `markdown.gfm` and `markdown.smartypants` are deprecated.",
+			)
+		) {
+			return;
+		}
+		originalConsoleWarn(...args);
+	};
+
+	try {
+		return await AstroContainer.create({ renderers });
+	} finally {
+		console.warn = originalConsoleWarn;
+	}
+}
+
 export async function GET(context: APIContext): Promise<Response> {
 	const blog = await getSortedPosts();
 	const renderers = await loadRenderers([getMDXRenderer()]);
-	const container = await AstroContainer.create({ renderers });
+	const container = await createRssContainer(renderers);
 	const feedItems: RSSFeedItem[] = [];
 	for (const post of blog) {
 		if (post.data.password) {

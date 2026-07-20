@@ -1,6 +1,7 @@
 ---
 import Live2DWidget from "@components/features/Live2DWidget.astro";
 import SpineModel from "@components/features/SpineModel.astro";
+import ArticleOutlineRail from "@components/layout/ArticleOutlineRail.astro";
 import Footer from "@components/layout/Footer.astro";
 import Navbar from "@components/layout/Navbar.astro";
 import NavMenuPanel from "@components/layout/NavMenuPanel.astro";
@@ -8,8 +9,6 @@ import CategoryBar from "@/components/layout/CategoryBar.astro";
 
 import { live2dModelConfig, navBarConfig, siteConfig } from "@/config";
 import { LinkPresets } from "@/constants/link-presets";
-import I18nKey from "@/i18n/i18nKey";
-import { i18n } from "@/i18n/translation";
 import Layout from "./Layout.astro";
 
 import "@/styles/markdown.css";
@@ -56,186 +55,43 @@ const navLinks = navBarConfig.links.map((item) => {
 ---
 
 <Layout title={title} banner={banner} description={description} lang={lang} setOGTypeArticle={setOGTypeArticle} postSlug={postSlug}>
+	<slot slot="head" name="head"></slot>
 
-<slot slot="head" name="head"></slot>
-
-{/* Navbar — 三段式椭圆 sticky 顶栏，顶部留距 */}
-<div
-	id="top-row"
-	class="z-50 pointer-events-none relative mx-auto"
-	class:list={[
-		"sticky top-0 left-0 right-0 z-80 pt-2.5",
-		navbarWidthFull ? "w-full" : "w-full max-w-(--page-width) px-0 md:px-4",
-	]}
->
-	<div id="navbar-wrapper" class="pointer-events-auto bg-transparent">
-		<Navbar></Navbar>
+	<div
+		id="top-row"
+		class="z-50 pointer-events-none relative mx-auto"
+		class:list={[
+			"sticky top-0 left-0 right-0 z-80 pt-2.5",
+			navbarWidthFull ? "w-full" : "w-full max-w-(--page-width) px-0 md:px-4",
+		]}
+	>
+		<div id="navbar-wrapper" class="pointer-events-auto bg-transparent">
+			<Navbar></Navbar>
+		</div>
 	</div>
-</div>
 
-<NavMenuPanel links={navLinks} />
+	<NavMenuPanel links={navLinks} />
 
-{/* 主内容容器 — 单列居中，无壁纸/三栏 */}
-<div class="relative w-full" id="main-grid-wrapper">
-	<div class="mx-auto max-w-5xl px-4 md:px-6" data-sidebar-position="none" id="main-grid">
-		{/* Swup 占位：保留 left/right sidebar 容器以满足 swup containers 协议 */}
-		<div id="left-sidebar-dynamic" class="hidden transition-swup-main"></div>
-		<div id="right-sidebar-dynamic" class="hidden transition-swup-main"></div>
+	<div class="relative w-full" id="main-grid-wrapper">
+		<div class="mx-auto max-w-5xl px-4 md:px-6" data-sidebar-position="none" id="main-grid">
+			<div id="left-sidebar-dynamic" class="hidden transition-swup-main"></div>
+			<div id="right-sidebar-dynamic" class="hidden transition-swup-main"></div>
 
-		<main id="swup-container" class="transition-swup-main" data-current-post-category={postCategory || ""}>
-			{isPostPage && (
-				<div id="article-toc-wrapper" class="article-toc-wrapper catalog-fade-in hidden xl:block">
-					<div id="article-toc-container" class="article-toc-container">
-						<div class="article-toc-header">
-							<span class="article-toc-title">{i18n(I18nKey.tableOfContents)}</span>
-						</div>
-						<div class="toc-scroll-container custom-scrollbar article-toc-body">
-							<div class="toc-content" id="article-toc-content"></div>
-						</div>
-					</div>
+			<main id="swup-container" class="transition-swup-main" data-current-post-category={postCategory || ""}>
+				{isPostPage && <ArticleOutlineRail />}
+				{shouldRenderCategoryBar && <div id="category-bar-wrapper"><CategoryBar title={title} postSlug={postSlug} postCategory={postCategory} /></div>}
+				<h1 class="sr-only">{title}</h1>
+
+				<div id="content-wrapper" class="onload-animation">
+					<slot></slot>
 				</div>
-			)}
-			{shouldRenderCategoryBar && <div id="category-bar-wrapper"><CategoryBar title={title} postSlug={postSlug} postCategory={postCategory} /></div>}
-			<h1 class="sr-only">{title}</h1>
+				<div class="footer onload-animation mt-16 pt-8 border-t">
+					<Footer></Footer>
+				</div>
+			</main>
 
-
-
-
-
-			<div id="content-wrapper" class="onload-animation">
-				<slot></slot>
-			</div>
-			<div class="footer onload-animation mt-16 pt-8 border-t">
-				<Footer></Footer>
-			</div>
-		</main>
-
-		{/* Live2D / Spine — 由悬浮坞控制显隐 */}
-		<SpineModel></SpineModel>
-		{live2dModelConfig.enable && <Live2DWidget config={live2dModelConfig} />}
+			<SpineModel></SpineModel>
+			{live2dModelConfig.enable && <Live2DWidget config={live2dModelConfig} />}
+		</div>
 	</div>
-</div>
-
-{/* 全局持久化组件（FloatingDock / MobileDock / AISearch / SearchModal / PrivacyModal）
-    已下沉至 Layout.astro，确保所有页面（含自定义布局页）共享 */}
-
 </Layout>
-<!-- 样式已迁移至 src/styles/layout/grid.css -->
-
-<script>
-	import { TOCManager } from "@/utils/toc-utils";
-	import { isPostPage } from "@/utils/navigation-utils";
-
-	let articleTocManager: TOCManager | null = null;
-	let tocClickHandler: ((e: Event) => void) | null = null;
-
-	function alignTOCCoverImage() {
-		const wrapper = document.getElementById("article-toc-wrapper");
-		if (!wrapper) return;
-
-		const mainGrid = document.getElementById("main-grid");
-		if (!mainGrid) return;
-
-		const contentWrapper = document.getElementById("content-wrapper");
-		if (!contentWrapper) return;
-
-		let offsetTop = 0;
-		const mainGridRect = mainGrid.getBoundingClientRect();
-
-		// 对齐到文章顶部（优先使用 hero，其次 post-container）
-		const heroEl = document.querySelector(".post-hero");
-		const postCard = document.getElementById("post-container");
-		if (heroEl) {
-			offsetTop = heroEl.getBoundingClientRect().top - mainGridRect.top;
-		} else if (postCard) {
-			offsetTop = postCard.getBoundingClientRect().top - mainGridRect.top;
-		} else {
-			offsetTop = contentWrapper.getBoundingClientRect().top - mainGridRect.top;
-		}
-
-		wrapper.style.top = `${offsetTop}px`;
-		// 让 wrapper 高度撑满剩余内容区域，sticky 才能全程跟随
-		wrapper.style.height = `${mainGrid.offsetHeight - offsetTop}px`;
-	}
-
-	function alignAllFloatingWrappers() {
-		alignTOCCoverImage();
-	}
-
-	function initArticleTOC() {
-		cleanupArticleTOC();
-		if (!isPostPage()) return;
-
-		const tocContent = document.getElementById("article-toc-content");
-		const wrapper = document.getElementById("article-toc-wrapper");
-		if (!tocContent || !wrapper) return;
-
-		try {
-			if (articleTocManager) {
-				articleTocManager.cleanup();
-			}
-
-			articleTocManager = new TOCManager({
-				contentId: "article-toc-content",
-				indicatorId: "article-active-indicator",
-				maxLevel: 3,
-				scrollOffset: 80,
-			});
-
-			articleTocManager.init();
-
-			tocClickHandler = (e: Event) => {
-				const target = e.target as Element | null;
-				const anchor = target?.closest('a[href^="#"]');
-				if (anchor) {
-					window.tocInternalNavigation = true;
-				}
-			};
-			tocContent.addEventListener("click", tocClickHandler, { capture: true });
-
-			alignAllFloatingWrappers();
-		} catch (error) {
-			console.error("Failed to init ArticleTOC:", error);
-		}
-	}
-
-	function cleanupArticleTOC() {
-		if (articleTocManager) {
-			articleTocManager.cleanup();
-			articleTocManager = null;
-		}
-		if (tocClickHandler) {
-			const tocContent = document.getElementById("article-toc-content");
-			if (tocContent) tocContent.removeEventListener("click", tocClickHandler);
-			tocClickHandler = null;
-		}
-	}
-
-	initArticleTOC();
-
-	document.addEventListener("astro:page-load", () => setTimeout(initArticleTOC, 100));
-	document.addEventListener("password:decrypted", () => setTimeout(initArticleTOC, 200));
-
-	let resizeTimer: ReturnType<typeof setTimeout>;
-	window.addEventListener("resize", () => {
-		clearTimeout(resizeTimer);
-		resizeTimer = setTimeout(alignAllFloatingWrappers, 150);
-	});
-
-	// 监听 main-grid 高度变化（图片加载、内容展开等），实时更新 wrapper 高度
-	const mainGridEl = document.getElementById("main-grid");
-	if (mainGridEl) {
-		const ro = new ResizeObserver(() => alignAllFloatingWrappers());
-		ro.observe(mainGridEl);
-	}
-
-	// TOC 容器背景与阴影：由 CSS 控制边框，JS 仅确保背景透明、无阴影
-	function updateTOCBorder() {
-		const el = document.getElementById("article-toc-container");
-		if (!el) return;
-		el.style.setProperty("background-color", "transparent");
-		el.style.setProperty("box-shadow", "none");
-	}
-	updateTOCBorder();
-	new MutationObserver(updateTOCBorder).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-</script>

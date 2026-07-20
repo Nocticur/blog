@@ -230,6 +230,43 @@ const showSpine = !!spineModelConfig?.enable;
 			isOverlayOpen = false;
 		}
 
+		function setGuestbookComposerFocus(active: boolean) {
+			document.documentElement.classList.toggle(
+				"guestbook-composer-focused",
+				active,
+			);
+			dock.classList.toggle("is-keyboard-open", active);
+			if (active) closeSheet();
+		}
+
+		document.addEventListener("focusin", (event) => {
+			const target = event.target;
+			if (
+				target instanceof HTMLTextAreaElement &&
+				target.matches(".guestbook-composer textarea")
+			) {
+				setGuestbookComposerFocus(true);
+			}
+		});
+
+		document.addEventListener("focusout", (event) => {
+			const target = event.target;
+			if (
+				!(target instanceof HTMLTextAreaElement) ||
+				!target.matches(".guestbook-composer textarea")
+			) {
+				return;
+			}
+
+			requestAnimationFrame(() => {
+				const activeElement = document.activeElement;
+				setGuestbookComposerFocus(
+					activeElement instanceof HTMLTextAreaElement &&
+						activeElement.matches(".guestbook-composer textarea"),
+				);
+			});
+		});
+
 		toolsBtn?.addEventListener("click", (e) => {
 			e.stopPropagation();
 			if (sheet.classList.contains("is-open")) {
@@ -312,6 +349,7 @@ const showSpine = !!spineModelConfig?.enable;
 		// ── Swup 页面加载后重新初始化路径相关状态 ──
 		document.addEventListener("astro:page-load", () => {
 			closeSheet();
+			setGuestbookComposerFocus(false);
 			updatePathDependent();
 			// 重置滚动隐藏状态
 			lastScrollY = window.scrollY;

@@ -19,11 +19,13 @@ export class TOCManager {
 	private minDepth = 10;
 	private maxLevel: number;
 	private scrollTimeout: number | null = null;
+	private activeUpdateFrame: number | null = null;
 	private contentId: string;
 	private indicatorId: string;
 	private scrollOffset: number;
 	private boundClickHandlers: Map<HTMLElement, (event: Event) => void> =
 		new Map();
+	private boundScrollHandler: (() => void) | null = null;
 	private boundMouseMoveHandler: ((e: MouseEvent) => void) | null = null;
 	private boundMouseLeaveHandler: (() => void) | null = null;
 
@@ -218,46 +220,37 @@ export class TOCManager {
 	}
 
 	/**
-	 * 获取可见的标题ID
+	 * 返回阅读线以上最近的一个目录标题，避免将同屏的多个标题同时标为活动项。
 	 */
-	private getVisibleHeadingIds(): string[] {
-		const headings = this.getAllHeadings();
-		const visibleHeadingIds: string[] = [];
+	private getActiveHeadingId(): string | null {
+		const tocHeadingIds = new Set(
+			this.tocItems
+				.map((item) => item.dataset.headingId)
+				.filter((id): id is string => Boolean(id)),
+		);
+		const headings = this.getAllHeadings().filter(
+			(heading) => heading.id && tocHeadingIds.has(heading.id),
+		);
+		if (headings.length === 0) return null;
 
-		headings.forEach((heading) => {
-			if (heading.id) {
-				const rect = heading.getBoundingClientRect();
-				const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+		const readingPosition = window.scrollY + this.scrollOffset;
+		let activeHeadingId = headings[0].id;
 
-				if (isVisible) {
-					visibleHeadingIds.push(heading.id);
-				}
-			}
-		});
-
-		// 如果没有可见标题，选择最接近屏幕顶部的标题
-		if (visibleHeadingIds.length === 0 && headings.length > 0) {
-			let closestHeading: string | null = null;
-			let minDistance = Number.POSITIVE_INFINITY;
-
-			headings.forEach((heading) => {
-				if (heading.id) {
-					const rect = heading.getBoundingClientRect();
-					const distance = Math.abs(rect.top);
-
-					if (distance < minDistance) {
-						minDistance = distance;
-						closestHeading = heading.id;
-					}
-				}
-			});
-
-			if (closestHeading) {
-				visibleHeadingIds.push(closestHeading);
-			}
+		for (const heading of headings) {
+			const headingTop = heading.getBoundingClientRect().top + window.scrollY;
+			if (headingTop > readingPosition) break;
+			activeHeadingId = heading.id;
 		}
 
-		return visibleHeadingIds;
+		return activeHeadingId;
+	}
+
+	private scheduleActiveStateUpdate(): void {
+		if (this.activeUpdateFrame !== null) return;
+		this.activeUpdateFrame = requestAnimationFrame(() => {
+			this.activeUpdateFrame = null;
+			this.updateActiveState();
+		});
 	}
 
 	/**
@@ -271,12 +264,12 @@ export class TOCManager {
 			item.classList.remove("visible");
 		});
 
-		const visibleHeadingIds = this.getVisibleHeadingIds();
+		const activeHeadingId = this.getActiveHeadingId();
 
-		// 找到对应的TOC项并添加活动状态
+		// 目录只保留一个活动项，避免同屏标题拉出过高的活动框。
 		const activeItems = this.tocItems.filter((item) => {
 			const headingId = item.dataset.headingId;
-			return headingId && visibleHeadingIds.includes(headingId);
+			return headingId === activeHeadingId;
 		});
 
 		// 添加活动状态
@@ -457,7 +450,7 @@ export class TOCManager {
 
 		this.observer = new IntersectionObserver(
 			() => {
-				this.updateActiveState();
+				this.scheduleActiveStateUpdate();
 			},
 			{
 				rootMargin: "0px 0px 0px 0px",
@@ -469,6 +462,11 @@ export class TOCManager {
 			if (heading.id) {
 				this.observer?.observe(heading);
 			}
+		});
+
+		this.boundScrollHandler = () => this.scheduleActiveStateUpdate();
+		window.addEventListener("scroll", this.boundScrollHandler, {
+			passive: true,
 		});
 	}
 
@@ -502,6 +500,14 @@ export class TOCManager {
 		if (this.scrollTimeout) {
 			clearTimeout(this.scrollTimeout);
 			this.scrollTimeout = null;
+		}
+		if (this.activeUpdateFrame !== null) {
+			cancelAnimationFrame(this.activeUpdateFrame);
+			this.activeUpdateFrame = null;
+		}
+		if (this.boundScrollHandler) {
+			window.removeEventListener("scroll", this.boundScrollHandler);
+			this.boundScrollHandler = null;
 		}
 		this.unbindClickEvents();
 		const tocContent = document.getElementById(this.contentId);

@@ -30,7 +30,7 @@ let displayedProgress: number | null = null;
 let displayedGithub: number | null = null;
 let githubStatus: GithubStatus = "idle";
 let progressTarget: number | null = null;
-let animationFrames = new Set<number>();
+let animationFrames: number[] = [];
 
 $: progressTarget =
 	annualPostGoal > 0
@@ -88,7 +88,7 @@ function getRuntimeYear(): number {
 	const year = new Intl.DateTimeFormat("en-US", {
 		timeZone: timezone,
 		year: "numeric",
-	}).format(new Date());
+	}).format(Date.now());
 	return Number(year);
 }
 
@@ -106,23 +106,26 @@ function animateNumber(
 	const startedAt = performance.now();
 	const duration = 900;
 	const frame = (now: number) => {
-		if (frameId) animationFrames.delete(frameId);
+		if (frameId) {
+			const index = animationFrames.indexOf(frameId);
+			if (index >= 0) animationFrames.splice(index, 1);
+		}
 		const progress = Math.min(1, (now - startedAt) / duration);
 		const eased = 1 - (1 - progress) ** 3;
 		setter(Math.round(target * eased));
 		if (progress < 1) {
 			frameId = requestAnimationFrame(frame);
-			animationFrames.add(frameId);
+			animationFrames.push(frameId);
 		}
 	};
 
 	frameId = requestAnimationFrame(frame);
-	animationFrames.add(frameId);
+	animationFrames.push(frameId);
 }
 
 function cancelAnimations(): void {
 	for (const frameId of animationFrames) cancelAnimationFrame(frameId);
-	animationFrames.clear();
+	animationFrames = [];
 }
 
 onMount(() => {

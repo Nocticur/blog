@@ -1,0 +1,42 @@
+---
+import I18nKey from "@/i18n/i18nKey";
+import { i18n } from "@/i18n/translation";
+
+const outlineLabel = i18n(I18nKey.tableOfContents);
+---
+
+<aside
+	class="article-outline-rail is-pending"
+	id="article-outline-rail"
+	aria-label={outlineLabel}
+	tabindex="0"
+>
+	<div class="article-outline-rail__details" data-outline-details>
+		<div class="article-outline-rail__path" data-outline-path>
+			<div class="article-outline-rail__path-item is-empty" data-outline-detail="1">
+				<span class="article-outline-rail__path-title" data-outline-detail-title></span>
+			</div>
+			<div class="article-outline-rail__path-item is-empty" data-outline-detail="2">
+				<span class="article-outline-rail__path-title" data-outline-detail-title></span>
+			</div>
+			<div class="article-outline-rail__path-item is-empty" data-outline-detail="3">
+				<span class="article-outline-rail__path-title" data-outline-detail-title></span>
+			</div>
+		</div>
+
+		<div class="article-outline-rail__progress" data-outline-progress-region>
+			<div class="article-outline-rail__progress-track" aria-hidden="true">
+				<span class="article-outline-rail__progress-value"></span>
+			</div>
+			<span class="article-outline-rail__progress-label" data-outline-progress-label>0%</span>
+		</div>
+	</div>
+
+	<nav class="article-outline-rail__browse" aria-hidden="true" aria-label={outlineLabel} data-outline-browse>
+		<div class="article-outline-rail__browse-list" data-outline-browse-list></div>
+	</nav>
+
+	<div class="article-outline-rail__minimap" aria-hidden="true" data-outline-minimap></div>
+</aside>
+
+<!-- 样式已迁移至 src/styles/components/article-outline-rail.css -->
