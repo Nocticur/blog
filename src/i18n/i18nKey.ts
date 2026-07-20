@@ -330,6 +330,13 @@ enum I18nKey {
 	githubHeatmap = "githubHeatmap",
 	githubContributions = "githubContributions",
 	githubCommits = "githubCommits",
+	archiveStatsGithub = "archiveStatsGithub",
+	archiveStatsTotalPosts = "archiveStatsTotalPosts",
+	archiveStatsYearPosts = "archiveStatsYearPosts",
+	archiveStatsProgress = "archiveStatsProgress",
+	archiveStatsLoading = "archiveStatsLoading",
+	archiveStatsUnavailable = "archiveStatsUnavailable",
+	archiveStatsGoal = "archiveStatsGoal",
 
 	// 日历页面
 	calendar = "calendar",

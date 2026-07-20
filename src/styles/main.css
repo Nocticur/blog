@@ -30,7 +30,7 @@
 /* === 侧边栏组件层 === */
 @import './widgets/calendar.css';
 @import './widgets/sidebar-toc.css';
-@import './widgets/archive-heatmap.css';
+@import './widgets/archive-stats.css';
 @import './widgets/terrarium-model.css';
 @import './widgets/announcement.css';
 

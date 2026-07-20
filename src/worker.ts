@@ -1,4 +1,5 @@
 import { handleCloudflareAiSearch } from "./workers/cloudflare/ai-search/runtime";
+import { handleGithubContributions } from "./workers/cloudflare/github-contributions/handler";
 
 export { RateLimiter } from "./workers/cloudflare/ai-search/durable-rate-limiter";
 
@@ -73,10 +74,13 @@ function plainNotFound(): Response {
 }
 
 export default {
-	async fetch(request, env): Promise<Response> {
+	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
 		if (url.pathname === "/api/ai-chat") {
 			return handleCloudflareAiSearch(request, env);
+		}
+		if (url.pathname === "/api/github-contributions") {
+			return handleGithubContributions(request, env, ctx);
 		}
 
 		if (env.ASSETS) {

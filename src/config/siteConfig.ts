@@ -243,8 +243,10 @@ export const siteConfig: SiteConfig = {
 		},
 	},
 
-	// 热力图配置
-	heatmap: {
+	// 归档统计配置
+	archiveStats: {
+		// 年度文章目标，用于计算归档页的完成率
+		annualPostGoal: 50,
 		github: {
 			enabled: true,
 			username: "MmzMing", // 填写 GitHub 用户名后启用

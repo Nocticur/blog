@@ -4,14 +4,12 @@ import SpineModel from "@components/features/SpineModel.astro";
 import Footer from "@components/layout/Footer.astro";
 import Navbar from "@components/layout/Navbar.astro";
 import NavMenuPanel from "@components/layout/NavMenuPanel.astro";
-import ArticleCatalog from "@components/misc/ArticleCatalog.astro";
 import CategoryBar from "@/components/layout/CategoryBar.astro";
 
 import { live2dModelConfig, navBarConfig, siteConfig } from "@/config";
 import { LinkPresets } from "@/constants/link-presets";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import type { CatalogGroup } from "@/utils/content-utils";
 import Layout from "./Layout.astro";
 
 import "@/styles/markdown.css";
@@ -27,7 +25,6 @@ interface Props {
 	setOGTypeArticle?: boolean;
 	postSlug?: string;
 	postCategory?: string;
-	catalogGroups?: CatalogGroup[];
 	bannerPostMeta?: {
 		title: string;
 		published: Date;
@@ -45,7 +42,6 @@ const {
 	setOGTypeArticle,
 	postSlug,
 	postCategory,
-	catalogGroups,
 	bannerPostMeta: _bannerPostMeta,
 } = Astro.props;
 
@@ -87,9 +83,6 @@ const navLinks = navBarConfig.links.map((item) => {
 		<div id="right-sidebar-dynamic" class="hidden transition-swup-main"></div>
 
 		<main id="swup-container" class="transition-swup-main" data-current-post-category={postCategory || ""}>
-			{isPostPage && catalogGroups && (
-				<ArticleCatalog groups={catalogGroups} currentPostId={postSlug || ""} />
-			)}
 			{isPostPage && (
 				<div id="article-toc-wrapper" class="article-toc-wrapper catalog-fade-in hidden xl:block">
 					<div id="article-toc-container" class="article-toc-container">
@@ -165,37 +158,8 @@ const navLinks = navBarConfig.links.map((item) => {
 		wrapper.style.height = `${mainGrid.offsetHeight - offsetTop}px`;
 	}
 
-	// 对齐左侧「全部文章」目录（镜像 alignTOCCoverImage）
-	function alignCatalogCoverImage() {
-		const wrapper = document.getElementById("article-catalog-wrapper");
-		if (!wrapper) return;
-
-		const mainGrid = document.getElementById("main-grid");
-		if (!mainGrid) return;
-
-		const contentWrapper = document.getElementById("content-wrapper");
-		if (!contentWrapper) return;
-
-		let offsetTop = 0;
-		const mainGridRect = mainGrid.getBoundingClientRect();
-
-		const heroEl = document.querySelector(".post-hero");
-		const postCard = document.getElementById("post-container");
-		if (heroEl) {
-			offsetTop = heroEl.getBoundingClientRect().top - mainGridRect.top;
-		} else if (postCard) {
-			offsetTop = postCard.getBoundingClientRect().top - mainGridRect.top;
-		} else {
-			offsetTop = contentWrapper.getBoundingClientRect().top - mainGridRect.top;
-		}
-
-		wrapper.style.top = `${offsetTop}px`;
-		wrapper.style.height = `${mainGrid.offsetHeight - offsetTop}px`;
-	}
-
 	function alignAllFloatingWrappers() {
 		alignTOCCoverImage();
-		alignCatalogCoverImage();
 	}
 
 	function initArticleTOC() {

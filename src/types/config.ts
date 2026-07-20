@@ -135,10 +135,11 @@ export type SiteConfig = {
 		workDays?: number[];
 	};
 
-	// 热力图配置
-	heatmap?: {
+	// 归档统计配置
+	archiveStats?: {
+		annualPostGoal: number; // 年度文章目标
 		github?: {
-			enabled: boolean; // 是否启用 GitHub 贡献热力图
+			enabled: boolean; // 是否启用 GitHub 贡献统计
 			username: string; // GitHub 用户名，为空则不渲染
 		};
 	};

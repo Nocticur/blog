@@ -11,9 +11,8 @@ import SharePoster from "@components/misc/SharePoster.svelte";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
-import "@/styles/components/article-catalog.css";
 import "@/styles/components/post-hero.css";
-import { getCatalogGroups, getSortedPosts } from "@utils/content-utils";
+import { getSortedPosts } from "@utils/content-utils";
 import {
 	getCategoryUrl,
 	getFileDirFromPath,
@@ -146,7 +145,6 @@ const jsonLd = {
 		: siteConfig.lang.replace("_", "-"),
 };
 
-const catalogGroups = await getCatalogGroups(entry.id);
 const serializedJsonLd = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
 ---
 
@@ -158,7 +156,6 @@ const serializedJsonLd = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
   setOGTypeArticle={true}
   postSlug={entry.id}
   postCategory={entry.data.category || undefined}
-  catalogGroups={catalogGroups}
   bannerPostMeta={bannerPostMeta}
 >
   <!-- KaTeX 按需加载 - 仅在文章页面 -->
