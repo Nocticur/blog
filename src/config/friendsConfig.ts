@@ -307,6 +307,15 @@ export const friendsConfig: FriendLink[] = [
 		weight: 5,
 		enabled: true,
 	},
+	{
+		title: "静かな森",
+		imgurl: "https://avatars.githubusercontent.com/u/41265413?v=4",
+		desc: "致虚极，守静笃。",
+		siteurl: "https://innei.in/",
+		tags: ["Blog"],
+		weight: 5,
+		enabled: true,
+	},
 ];
 
 // 获取启用的友链并进行排序

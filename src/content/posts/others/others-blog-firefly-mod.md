@@ -169,26 +169,49 @@ fetch(`${serverURL}/api/token?lang=${lang}`, {
 ### 登录流程
 
 ```mermaid
-flowchart TD
-    A[用户点击"登录"] --> B{调用 login()}
-    B -->|桌面端| C[打开 Waline 登录弹窗]
-    B -->|移动端| D[直接跳转到 Waline 登录页]
-    C --> E[用户在 Waline 完成 OAuth 认证]
-    D --> E
-    E --> F[Waline 服务端生成 token]
-    F --> G[通过 URL 参数 ?token=... 重定向回博客]
-    G --> H{页面解析 URL 中的 token}
-    H --> I[调用 GET /api/token 验证身份]
-    I --> J{验证结果}
-    J -->|失败| K[清除本地 Token，提示重新登录]
-    J -->|成功| L{用户身份}
-    L -->|管理员| M[存入 sessionStorage]
-    L -->|普通用户| N{是否勾选"记住登录"}
-    N -->|是| O[存入 localStorage]
-    N -->|否| P[存入 sessionStorage]
-    M --> Q[登录完成，刷新留言列表]
-    O --> Q
-    P --> Q
+sequenceDiagram
+    participant User as 用户
+    participant Page as 博客页面
+    participant Waline as Waline 服务端
+    participant Window as 浏览器窗口
+
+    Note over User, Page: 桌面端：弹窗 + postMessage
+    User->>Page: 点击"登录"
+    Page->>Waline: 打开登录弹窗 (window.open)
+    Waline->>Waline: 用户完成 OAuth 认证
+    Waline-->>Window: postMessage ({ type: "userInfo", data: UserInfo })
+    Page->>Page: 验证 UserInfo 合法性
+
+    alt 验证成功
+        Page->>Page: 进入存储策略
+    else 验证失败
+        Page->>Page: 清除 Token，提示重新登录
+    end
+
+    Note over User, Page: 移动端：跳转 + token 回传
+    User->>Page: 点击"登录"
+    Page->>Waline: location.href 跳转到登录页
+    Waline->>Waline: 用户完成 OAuth 认证
+    Waline-->>Page: 302 重定向回博客 (?token=...)
+    Page->>Waline: GET /api/token (Authorization: Bearer <token>)
+    alt 验证成功
+        Waline-->>Page: 返回用户信息
+        Page->>Page: 进入存储策略
+    else 验证失败
+        Waline-->>Page: 返回错误
+        Page->>Page: 清除 Token，提示重新登录
+    end
+
+    Note over Page: 存储策略
+    alt 管理员
+        Page->>Page: 存入 sessionStorage
+    else 普通用户 + 勾选"记住登录"
+        Page->>Page: 存入 localStorage
+    else 普通用户 + 未勾选"记住登录"
+        Page->>Page: 存入 sessionStorage
+    end
+
+    Page->>Page: 刷新留言列表
 ```
 
 ## 关于
@@ -416,4 +439,3 @@ fetchGithubContributionSummary(
 
 说句实话，UI修改的时候，给我一种当年那个QQ空间那种复制神秘代码的时代，可能这个梗过时你不了解。
 
-比如这个博客[https://innei.in/](https://innei.in/)，可惜在遇到它之前先遇到了firefly，所谓开弓没有回头鸟，先用着吧。
