@@ -414,6 +414,6 @@ fetchGithubContributionSummary(
 
 当然是写博客啦，同时站点有BUG我也会及时修复，如果大家有好的建议可以在下方评论哦。
 
-说句实话，UI修改的时候，给我一种当年那个QQ空间那种复制神秘代码的时代，可能这个梗过时你不了解。虽然也学到很多风格，后面才知道 more is less ，并不是靠堆积UI，而是精简到位且实用。
+说句实话，UI修改的时候，给我一种当年那个QQ空间那种复制神秘代码的时代，可能这个梗过时你不了解。
 
-比如这个博客[https://yohaku.innei.dev](https://yohaku.innei.dev/)，可惜在遇到它之前先遇到了firefly，所谓开弓没有回头鸟，先用着吧。
+比如这个博客[https://innei.in/](https://innei.in/)，可惜在遇到它之前先遇到了firefly，所谓开弓没有回头鸟，先用着吧。
