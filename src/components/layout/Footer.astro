@@ -5,7 +5,6 @@ import { footerConfig, homeConfig, siteConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import { getSortedPosts } from "@/utils/content-utils";
-import { url } from "@/utils/url-utils";
 
 const currentYear = new Date().getFullYear();
 const siteStartDate = siteConfig.siteStartDate || "";
@@ -114,27 +113,6 @@ const opensInNewTab = (href: string) => !/^(mailto:|tel:)/i.test(href);
 						</li>
 					))}
 				</ul>
-				<div class="site-footer__utility-links">
-					<a href={url("sitemap-index.xml")} target="_blank" rel="noreferrer">Sitemap</a>
-					<span aria-hidden="true">/</span>
-					<a href={url("rss/")} target="_blank" rel="noreferrer">RSS</a>
-					<span aria-hidden="true">/</span>
-					<button
-						class="site-footer__utility-button"
-						onclick="window.openPrivacyModal && window.openPrivacyModal()"
-						type="button"
-					>
-						{i18n(I18nKey.privacyPolicy)}
-					</button>
-					<span aria-hidden="true">/</span>
-					<button
-						class="site-footer__utility-button"
-						onclick="window.openUserAgreementModal && window.openUserAgreementModal()"
-						type="button"
-					>
-						{i18n(I18nKey.userAgreement)}
-					</button>
-				</div>
 			</nav>
 		</div>
 

@@ -39,13 +39,36 @@
 
 .site-footer__signature-art {
 	display: block;
-	width: min(100%, 21rem);
+	width: min(100%, 25rem);
 	height: auto;
 	color: var(--deep-text);
+	overflow: visible;
 }
 
-.site-footer__signature-dot {
-	opacity: 1;
+.site-footer__signature-group {
+	transform-origin: 50% 50%;
+}
+
+.site-footer__signature-word {
+	fill: currentColor;
+	font-family: "Segoe Print", "Bradley Hand", "Brush Script MT", cursive;
+	font-size: 4.35rem;
+	font-style: italic;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+
+.site-footer__signature-moon {
+	color: var(--primary);
+	fill: color-mix(in oklch, var(--primary) 14%, transparent);
+}
+
+.site-footer__signature-star {
+	color: var(--primary);
+}
+
+.site-footer__signature-underline {
+	opacity: 0.72;
 }
 
 .site-footer__tagline {
@@ -54,6 +77,7 @@
 	color: var(--content-meta);
 	font-size: 0.9375rem;
 	line-height: 1.65;
+	white-space: pre-line;
 }
 
 .site-footer__contact {
@@ -265,32 +289,19 @@
 	flex: 0 0 auto;
 }
 
-.site-footer.is-signature-pending .site-footer__signature-mask {
-	stroke-dasharray: 1 1;
-	stroke-dashoffset: 1;
-}
-
-.site-footer.is-signature-pending .site-footer__signature-dot {
+.site-footer.is-signature-pending .site-footer__signature-group {
 	opacity: 0;
+	transform: translateY(0.4rem) scale(0.98);
 }
 
-.site-footer.is-signature-pending.is-signature-drawn .site-footer__signature-mask {
-	animation: site-footer-signature-draw 1.2s cubic-bezier(0.35, 0, 0.15, 1) forwards;
-}
-
-.site-footer.is-signature-pending.is-signature-drawn .site-footer__signature-dot {
-	animation: site-footer-signature-dot 180ms ease-out 1s forwards;
+.site-footer.is-signature-pending.is-signature-drawn .site-footer__signature-group {
+	animation: site-footer-signature-draw 900ms cubic-bezier(0.35, 0, 0.15, 1) forwards;
 }
 
 @keyframes site-footer-signature-draw {
 	to {
-		stroke-dashoffset: 0;
-	}
-}
-
-@keyframes site-footer-signature-dot {
-	to {
 		opacity: 1;
+		transform: translateY(0) scale(1);
 	}
 }
 
@@ -315,7 +326,7 @@
 	}
 
 	.site-footer__signature-art {
-		width: min(100%, 18rem);
+		width: min(100%, 21rem);
 	}
 
 	.site-footer__contact {
@@ -358,14 +369,10 @@
 		transition: none;
 	}
 
-	.site-footer.is-signature-pending .site-footer__signature-mask {
-		stroke-dasharray: none;
-		stroke-dashoffset: 0;
+	.site-footer.is-signature-pending .site-footer__signature-group {
+		opacity: 1;
+		transform: none;
 		animation: none;
 	}
 
-	.site-footer.is-signature-pending .site-footer__signature-dot {
-		opacity: 1;
-		animation: none;
-	}
 }

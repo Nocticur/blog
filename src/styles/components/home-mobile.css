@@ -85,6 +85,7 @@
 	line-height: 1.7;
 	color: var(--content-meta);
 	opacity: 0.9;
+	white-space: pre-line;
 }
 
 .home-mobile-hero__foot {

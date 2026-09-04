@@ -5,7 +5,7 @@ export const footerConfig: FooterConfig = {
 	socialLinks: [
 		{
 			label: "GitHub",
-			href: "https://github.com/MmzMing",
+			href: "https://github.com/Nocticur",
 			icon: "fa7-brands:github",
 		},
 		{
@@ -15,20 +15,20 @@ export const footerConfig: FooterConfig = {
 		},
 		{
 			label: "B站",
-			href: "https://space.bilibili.com/15446538",
+			href: "https://space.bilibili.com/645892937",
 			icon: "fa7-brands:bilibili",
 		},
 		{
 			label: "邮箱",
-			href: "mailto:784774835@qq.com",
+			href: "mailto:nocticur@mourn.top",
 			icon: "material-symbols:mail",
 		},
 	],
 
 	// 备案信息（icp/police 留空则不显示对应条目）
 	beian: {
-		icp: "粤ICP备2026073665号-1",
-		police: "粤公网安备44060602003342号",
+		icp: "",
+		police: "",
 		policeIcon: "/assets/images/备案图标.png",
 		icpUrl: "https://beian.miit.gov.cn/#/Integrated/index",
 		policeUrl: "https://beian.mps.gov.cn/#/query/webSearch?code=44060602003342",

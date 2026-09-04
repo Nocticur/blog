@@ -16,7 +16,13 @@ export const commentConfig: CommentConfig = {
 	//waline评论系统配置
 	waline: {
 		// waline 后端服务地址
-		serverURL: "https://waline.mmzhiku.xyz/",
+		// waline 后端服务地址（新 Waline 实例，旧评论不迁移，旧数据由旧服务管理员处理）
+		serverURL: "https://waline.noctis.eu.cc/",
+		// 自定义图片上传接口：指向本站服务端代理 /api/image-upload（代理固定调用图床
+		// https://mourn.eu.cc/，token 仅存于服务端环境变量）。
+		// 图床真实上传 API（鉴权头、文件字段、返回 JSON）尚未确认，暂不启用。
+		// 确认并部署代理后再取消注释，避免上线不可用接口：
+		// imageUploadURL: "/api/image-upload",
 		// 设置 Waline 评论系统语言
 		lang: "zh-CN",
 		// 设置 Waline 评论系统表情地址
@@ -48,7 +54,7 @@ export const commentConfig: CommentConfig = {
 	//giscus评论系统配置
 	giscus: {
 		// 设置 Giscus 评论系统仓库
-		repo: "MmzMing/my-blog",
+		repo: "Nocticur/my-blog",
 		// 设置 Giscus 评论系统仓库ID
 		repoId: "R_kgDOSXWjBQ",
 		// 设置 Giscus 评论系统分类

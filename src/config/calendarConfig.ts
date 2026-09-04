@@ -70,7 +70,7 @@ export const calendarConfig: CalendarConfig = {
 			name: "建站日",
 			date: { type: "solar", month: 5, day: 7 },
 			icon: "material-symbols:rocket-launch",
-			note: "MmzMing的博客上线纪念日",
+			note: "Nocticur的博客上线纪念日",
 		},
 	],
 };

@@ -70,7 +70,7 @@ export const LinkPresets: { [key in LinkPreset]: NavBarLink } = {
 	},
 	[LinkPreset.Feibichi]: {
 		name: i18n(I18nKey.feibichi),
-		url: "https://www.mmzhiku.xyz/",
+		url: "https://blog.mourn.top/sponsor/",
 		icon: "material-symbols:link",
 		external: true,
 	},

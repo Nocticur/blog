@@ -7,21 +7,21 @@ const SITE_LANG = "zh_CN";
 
 export const siteConfig: SiteConfig = {
 	// 站点标题
-	title: "MmzMing的博客",
+	title: "Nocticur的博客",
 
 	// 站点副标题
-	subtitle: "MmzMing",
+	subtitle: "Nocticur",
 
 	// 站点 URL
-	site_url: "https://tblog.mmzhiku.xyz",
+	site_url: "https://blog.mourn.top",
 
 	// 站点描述
 	description:
-		"一个记录学习、工作实践、开发经验与生活随笔的个人博客，持续整理值得分享的知识、项目和思考。",
+		"Nocticur的博客，记录个人学习、工作、AI相关的内容",
 
 	// 站点关键词
 	keywords: [
-		"MmzMing",
+		"Nocticur",
 		"JAVA",
 		"AI",
 		"Astro",
@@ -108,17 +108,17 @@ export const siteConfig: SiteConfig = {
 		// 4. 网络图片: { type: "url", value: "https://example.com/logo.png", alt: "Logo" }
 		logo: {
 			type: "image",
-			value: "assets/images/logo.png",
+			value: "assets/images/logo-nocticur.png",
 			alt: "logo",
 		},
 		// 导航栏标题
-		title: "MmzMing的博客",
+		title: "Nocticur的博客",
 		// 全宽导航栏，导航栏是否占满屏幕宽度
 		widthFull: false,
 	},
 
 	// 站点开始日期，用于统计运行天数
-	siteStartDate: "2026-05-07",
+	siteStartDate: "2026-07-26",
 
 	// 站点时区（IANA 时区字符串），用于格式化bangumi、rss里的构建日期时间等等..
 	// 示例："Asia/Shanghai", "UTC", 如果为空，则按照构建服务器的时区进行时区转换

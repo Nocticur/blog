@@ -9,19 +9,19 @@ export const homeConfig: HomeConfig = {
 	avatar: "assets/images/avatar.webp",
 
 	// 名字
-	name: "MmzMing",
+	name: "Nocticur",
 
 	// 首页展示名字（留空则使用 name）
-	displayName: "MmzMing",
+	displayName: "Nocticur",
 
 	// 职业/身份标签
-	occupation: "[全干工程师 / 技术博主]",
+	occupation: "[零手戳/三无产品制图师]",
 
 	// 个人签名（支持多条，会循环打字+删除效果）
-	bio: ["且视他人之疑目如盏盏鬼火，大胆地去走你的夜路"],
+	bio: "向 夜 驰 行 ， 不 问 喧 嚣\n身 沉 暮 色 ， 心 赴 归 途",
 
 	hero: {
-		backgroundImage: "/assets/images/home/home.avif",
+		backgroundImage: "/assets/images/home/character-profile.png",
 		mosaic: {
 			rows: 4,
 			columns: 6,
@@ -49,7 +49,7 @@ export const homeConfig: HomeConfig = {
 		},
 		contact: {
 			platform: "B站",
-			handle: "Mmz明崽",
+			handle: "属于夜幕之人",
 		},
 		sticker: {
 			image: "/assets/images/home/character.avif",
@@ -75,7 +75,7 @@ export const homeConfig: HomeConfig = {
 		},
 		// galgame 对话框（写死暗黑主题）。内容全部由此驱动，可自由增删
 		dialogue: {
-			enabled: true,
+			enabled: false,
 			speakers: {
 				host: "哈基墩",
 				visitor: "访客",
@@ -89,7 +89,7 @@ export const homeConfig: HomeConfig = {
 				{ speaker: "host", text: "我是喵墩，老爸在摸鱼，这儿归我管了喵～" },
 				{
 					speaker: "host",
-					text: "对了喵，得搬上简介了~喵找找：且视他人之疑目如盏盏鬼火，大胆地去走你的夜路。",
+					text: "对了喵，得搬上简介了~喵找找：向 夜 驰 行，不问喧嚣；身沉暮色，心赴归途。",
 				},
 				{ speaker: "host", text: "想打听啥喵？戳戳下面的话题，喵跟你慢慢唠～" },
 			],
@@ -101,11 +101,11 @@ export const homeConfig: HomeConfig = {
 						{ speaker: "visitor", text: "你爸是哪方面选手呀？" },
 						{
 							speaker: "host",
-							text: "嘛……算个半桶水全栈喵，外加一个不务正业的博客写手。",
+							text: "嘛……平时做零手戳和三无产品制图，也写点博客喵～",
 						},
 						{
 							speaker: "host",
-							text: "前端后端都摸一点，俗称「全干工程师」喵～",
+							text: "前端后端也会摸一点，偶尔折腾些有趣的小项目喵～",
 						},
 						{ speaker: "visitor", text: "听起来很忙的样子。" },
 						{
@@ -232,13 +232,13 @@ export const homeConfig: HomeConfig = {
 		{
 			name: "B站",
 			icon: "fa7-brands:bilibili",
-			url: "https://space.bilibili.com/15446538",
+			url: "https://space.bilibili.com/645892937",
 			showName: false,
 		},
 		{
 			name: "GitHub",
 			icon: "fa7-brands:github",
-			url: "https://github.com/MmzMing",
+			url: "https://github.com/Nocticur",
 			showName: false,
 		},
 		{

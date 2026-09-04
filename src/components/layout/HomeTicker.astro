@@ -20,7 +20,14 @@ const items = [...announcementConfig.items].sort((a, b) => b.sort - a.sort);
 						<div class="home-ticker__sequence" data-ticker-source>
 							{items.map((item) => (
 								<span class="home-ticker__item">
-									<span class="home-ticker__text">[{item.tag}] {item.content}</span>
+									<span
+										class="home-ticker__text"
+										data-visitor-welcome={item.tag === "欢迎" ? true : undefined}
+									>
+										{item.tag === "欢迎"
+											? "[欢迎] 欢迎来到我的博客"
+											: `[${item.tag}] ${item.content}`}
+									</span>
 									<span class="home-ticker__sep" aria-hidden="true">×</span>
 								</span>
 							))}
@@ -33,6 +40,8 @@ const items = [...announcementConfig.items].sort((a, b) => b.sort - a.sort);
 }
 
 <script>
+	import { getVisitorWelcome } from "@/utils/visitor-location";
+
 	class HomeTicker extends HTMLElement {
 		private track: HTMLElement | null = null;
 		private inner: HTMLElement | null = null;
@@ -72,6 +81,8 @@ const items = [...announcementConfig.items].sort((a, b) => b.sort - a.sort);
 			);
 			this.visibilityObserver.observe(this);
 
+			void this.updateVisitorWelcome().catch(() => {});
+
 			document.fonts?.ready.then(() => {
 				if (this.isConnected) this.scheduleLayout();
 			});
@@ -88,6 +99,18 @@ const items = [...announcementConfig.items].sort((a, b) => b.sort - a.sort);
 		private scheduleLayout() {
 			cancelAnimationFrame(this.layoutFrame);
 			this.layoutFrame = requestAnimationFrame(() => this.layout());
+		}
+
+		private async updateVisitorWelcome() {
+			const welcome = await getVisitorWelcome();
+			if (!this.sourceSequence) return;
+
+			this.sourceSequence
+				.querySelectorAll<HTMLElement>("[data-visitor-welcome]")
+				.forEach((node) => {
+					node.textContent = `[欢迎] ${welcome}`;
+				});
+			this.scheduleLayout();
 		}
 
 		private layout() {
