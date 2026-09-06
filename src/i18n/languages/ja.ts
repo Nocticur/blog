@@ -64,6 +64,8 @@ export const ja: Translation = {
 	[Key.guestbook]: "ゲストブック",
 	[Key.guestbookDescription]:
 		"留言板で感想、提案、交流のメッセージを残し、ほかの訪問者と交流できます。コミュニティのルールを守り、安心して話せる場づくりにご協力ください。",
+	[Key.guestbookSubtitle]: "何かあれば、メッセージをどうぞ~",
+	[Key.guestbookOpenFullPage]: "完全なページを開く",
 	[Key.commentSection]: "コメント",
 	[Key.commentSubtitle]: "お気軽にコメントして議論に参加してください",
 	[Key.commentNotConfigured]:
@@ -171,6 +173,12 @@ export const ja: Translation = {
 	[Key.siteStatsTagCount]: "タグ",
 	[Key.siteStatsVisitors]: "訪問者",
 	[Key.siteStatsSource]: "ソース",
+	[Key.siteStatsLoading]: "--",
+	[Key.siteStatsVisitorPrefix]: "あなたは",
+	[Key.siteStatsVisitorSuffix]: "人目の訪問者です",
+	[Key.siteStatsPageViewPrefix]: "総アクセス数:",
+	[Key.siteStatsPageViewSuffix]: "",
+	[Key.siteStatsTotalWords]: "総文字数",
 	[Key.footerRunningDays]: "運用 {days} 日",
 	[Key.footerRunningTime]:
 		"運用 {days} 日 {hours} 時間 {minutes} 分 {seconds} 秒",
@@ -264,6 +272,7 @@ export const ja: Translation = {
 	[Key.navPosts]: "記事",
 	[Key.navMy]: "その他",
 	[Key.navLinks]: "リンク",
+	[Key.writing]: "執筆",
 	// ===== 通用操作 =====
 	[Key.close]: "閉じる",
 	[Key.expand]: "展開",

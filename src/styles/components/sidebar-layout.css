@@ -1,0 +1,71 @@
+/* ===== 侧边栏布局（由 #main-grid[data-sidebar-position] 驱动） =====
+   - none（默认）：单列居中，侧栏容器隐藏
+   - left / right / both：CSS Grid 两栏/三栏
+   断点与全站一致：≥769px 显示单侧栏（both 时取 tabletSidebar=left），≥1280px 双侧栏 */
+
+#left-sidebar-dynamic,
+#right-sidebar-dynamic {
+	display: none;
+	min-width: 0;
+}
+
+#main-grid[data-sidebar-position="left"],
+#main-grid[data-sidebar-position="right"],
+#main-grid[data-sidebar-position="both"] {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1rem;
+	align-items: start;
+	/* grid.css 将 #main-grid 上的 --page-width 局部改写为 64rem（单列宽度），
+	   侧边栏页在此恢复全站页宽，否则三栏会被压在 1024px 里 */
+	--page-width: 100rem;
+	max-width: var(--page-width);
+}
+
+@media (min-width: 769px) {
+	#main-grid[data-sidebar-position="left"],
+	#main-grid[data-sidebar-position="right"],
+	#main-grid[data-sidebar-position="both"] {
+		grid-template-columns: 17.5rem minmax(0, 1fr);
+	}
+
+	#main-grid[data-sidebar-position="left"] #left-sidebar-dynamic,
+	#main-grid[data-sidebar-position="both"] #left-sidebar-dynamic,
+	#main-grid[data-sidebar-position="right"] #right-sidebar-dynamic {
+		display: block;
+	}
+
+	#main-grid[data-sidebar-position="left"] #left-sidebar-dynamic,
+	#main-grid[data-sidebar-position="both"] #left-sidebar-dynamic {
+		grid-column: 1;
+		grid-row: 1;
+	}
+
+	#main-grid[data-sidebar-position="left"] #swup-container,
+	#main-grid[data-sidebar-position="both"] #swup-container {
+		grid-column: 2;
+		grid-row: 1;
+	}
+
+	#main-grid[data-sidebar-position="right"] #swup-container {
+		grid-column: 1;
+		grid-row: 1;
+	}
+
+	#main-grid[data-sidebar-position="right"] #right-sidebar-dynamic {
+		grid-column: 2;
+		grid-row: 1;
+	}
+}
+
+@media (min-width: 1280px) {
+	#main-grid[data-sidebar-position="both"] {
+		grid-template-columns: 17.5rem minmax(0, 1fr) 17.5rem;
+	}
+
+	#main-grid[data-sidebar-position="both"] #right-sidebar-dynamic {
+		display: block;
+		grid-column: 3;
+		grid-row: 1;
+	}
+}

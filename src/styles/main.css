@@ -30,6 +30,9 @@
 
 /* === 侧边栏组件层 === */
 @import './widgets/announcement.css';
+@import './widgets/calendar.css';
+@import './components/widget-layout.css';
+@import './components/sidebar-layout.css';
 
 
 @plugin '@tailwindcss/typography';

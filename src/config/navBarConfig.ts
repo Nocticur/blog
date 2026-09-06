@@ -26,6 +26,9 @@ const buildNavBarConfig = (): NavBarConfig => {
 	if (siteConfig.pages.categories) {
 		postsChildren.push(LinkPreset.Categories);
 	}
+	if (siteConfig.pages.writing) {
+		postsChildren.push(LinkPreset.Writing);
+	}
 
 	// 子项全部关闭时不渲染空的下拉菜单
 	const postsNav: NavBarLink | null =
@@ -38,12 +41,10 @@ const buildNavBarConfig = (): NavBarConfig => {
 			: null;
 
 	// 2. 构建联系我下拉菜单
+	// 留言板不再走导航入口：全站由 dock 按钮唤起弹窗（FloatingDock / MobileDock）
 	const contactChildren: (NavBarLink | LinkPreset)[] = [];
 	if (siteConfig.pages.friends) {
 		contactChildren.push(LinkPreset.Friends);
-	}
-	if (siteConfig.pages.guestbook) {
-		contactChildren.push(LinkPreset.Guestbook);
 	}
 
 	const contactNav: NavBarLink | null =

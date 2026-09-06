@@ -54,6 +54,8 @@ const showMusic = musicPlayerConfig.showInNavbar !== false;
 const showAnnouncement = announcements.length > 0;
 const showSpine = !!spineModelConfig?.enable;
 const isHomePath = Astro.url.pathname === "/" || Astro.url.pathname === "";
+// 留言板完整页上隐藏弹窗入口，避免与页面本体重复
+const isGuestbookPage = /^\/guestbook\/?$/.test(Astro.url.pathname);
 ---
 
 <div class="mobile-dock__overlay" id="mobile-dock-overlay" aria-hidden="true"></div>
@@ -317,6 +319,19 @@ const isHomePath = Astro.url.pathname === "/" || Astro.url.pathname === "";
 					<Icon name="material-symbols:dark-mode-outline-rounded" is:inline class="mobile-dock__theme-dark is-hidden" />
 					<span>{i18n(I18nKey.theme)}</span>
 				</button>
+				{siteConfig.pages.guestbook && (
+					<button
+						class={isGuestbookPage ? "is-hidden" : undefined}
+						type="button"
+						id="mobile-dock-guestbook-btn"
+						aria-label={i18n(I18nKey.guestbook)}
+						aria-hidden={isGuestbookPage ? "true" : "false"}
+						tabindex={isGuestbookPage ? -1 : 0}
+					>
+						<Icon name="material-symbols:edit-note" is:inline />
+						<span>{i18n(I18nKey.guestbook)}</span>
+					</button>
+				)}
 				<button type="button" data-view-target="calendar" aria-label={i18n(I18nKey.calendar)}>
 					<Icon name="material-symbols:calendar-month-rounded" is:inline />
 					<span>{i18n(I18nKey.calendar)}</span>
@@ -368,6 +383,7 @@ const isHomePath = Astro.url.pathname === "/" || Astro.url.pathname === "";
 	import I18nKey from "@/i18n/i18nKey";
 	import { i18n } from "@/i18n/translation";
 	import { requestSearchModalToggle } from "@/utils/search-modal-controller";
+	import { requestGuestbookModalToggle } from "@/utils/guestbook-modal-controller";
 	import { getStoredTheme, setTheme } from "@/utils/setting-utils";
 	import { onNavigation, preloadUrl } from "@/utils/swup-lifecycle";
 
@@ -767,6 +783,11 @@ const isHomePath = Astro.url.pathname === "/" || Astro.url.pathname === "";
 			announcementButton?.classList.toggle("is-hidden", !isHome);
 			announcementButton?.setAttribute("aria-hidden", String(!isHome));
 			announcementButton?.setAttribute("tabindex", isHome ? "0" : "-1");
+			const guestbookButton = document.getElementById("mobile-dock-guestbook-btn");
+			const isGuestbook = /^\/guestbook\/?$/.test(pathname);
+			guestbookButton?.classList.toggle("is-hidden", isGuestbook);
+			guestbookButton?.setAttribute("aria-hidden", String(isGuestbook));
+			guestbookButton?.setAttribute("tabindex", isGuestbook ? "-1" : "0");
 			tocButton?.classList.toggle("is-hidden", !isPost);
 			commentButton?.classList.toggle("is-hidden", !(isPost || isFriends) || !hasComment);
 			topButton?.classList.toggle("is-hidden", window.scrollY <= 200);
@@ -853,6 +874,11 @@ const isHomePath = Astro.url.pathname === "/" || Astro.url.pathname === "";
 		document.getElementById("mobile-dock-search-btn")?.addEventListener("click", () => {
 			closeCard();
 			requestSearchModalToggle();
+		}, { signal });
+
+		document.getElementById("mobile-dock-guestbook-btn")?.addEventListener("click", () => {
+			closeCard();
+			requestGuestbookModalToggle();
 		}, { signal });
 
 		document.getElementById("mobile-dock-theme-btn")?.addEventListener("click", () => {

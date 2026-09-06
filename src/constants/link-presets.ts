@@ -70,7 +70,7 @@ export const LinkPresets: { [key in LinkPreset]: NavBarLink } = {
 	},
 	[LinkPreset.Feibichi]: {
 		name: i18n(I18nKey.feibichi),
-		url: "https://blog.mourn.top/sponsor/",
+		url: "https://home.mourn.top/",
 		icon: "material-symbols:link",
 		external: true,
 	},
@@ -99,6 +99,11 @@ export const LinkPresets: { [key in LinkPreset]: NavBarLink } = {
 		name: i18n(I18nKey.music),
 		url: "/music/",
 		icon: "material-symbols:graphic-eq-rounded",
+	},
+	[LinkPreset.Writing]: {
+		name: i18n(I18nKey.writing),
+		url: "/writing/",
+		icon: "material-symbols:edit-square",
 	},
 	[LinkPreset.NavLinks]: {
 		name: i18n(I18nKey.navLinks),

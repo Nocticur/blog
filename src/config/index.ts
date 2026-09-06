@@ -64,6 +64,7 @@ export { musicPlayerConfig } from "./musicConfig"; // 音乐播放器配置
 export { navBarConfig } from "./navBarConfig"; // 导航栏配置
 export { live2dModelConfig, spineModelConfig } from "./pioConfig"; // 看板娘配置
 export { plantumlConfig } from "./plantumlConfig"; // PlantUML 图表配置
+export { sidebarLayoutConfig } from "./sidebarConfig"; // 侧边栏布局配置
 // 布局配置
 export { siteConfig } from "./siteConfig"; // 站点基础配置
 export { sponsorConfig } from "./sponsorConfig"; // 赞助配置

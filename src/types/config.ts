@@ -86,6 +86,7 @@ export type SiteConfig = {
 		archive: boolean; // 归档页面开关
 		about: boolean; // 关于页面开关
 		categories: boolean; // 图谱页面开关（/categories/，导航栏显示为「图谱」）
+		writing: boolean; // 写作页面开关（/writing/，导航栏显示为「写作」）
 	};
 
 	// 分页配置
@@ -202,6 +203,7 @@ export enum LinkPreset {
 	NavMy = 17,
 	Music = 18,
 	NavLinks = 19,
+	Writing = 20,
 }
 
 export type NavBarLink = {
@@ -1005,4 +1007,50 @@ export type CalendarConfig = {
 
 	// 生日 / 纪念日
 	birthdays: BirthdayItem[];
+};
+
+// ===== 侧边栏布局类型（自 d59725cb 恢复，广告系统未随恢复移除） =====
+export type WidgetComponentType =
+	| "profile"
+	| "announcement"
+	| "categories"
+	| "tags"
+	| "sidebarToc"
+	| "stats"
+	| "calendar"
+	| "music";
+
+export type WidgetComponentConfig = {
+	type: WidgetComponentType; // 组件类型
+	enable: boolean; // 是否启用该组件
+	position: "top" | "sticky"; // 组件位置：top=固定在顶部，sticky=粘性定位（可滚动）
+	showOnPostPage?: boolean; // 是否在文章详情页显示
+	showOnNonPostPage?: boolean; // 是否在非文章详情页显示
+	responsive?: {
+		hidden?: ("mobile" | "tablet" | "desktop")[]; // 在指定设备上隐藏
+		collapseThreshold?: number; // 折叠阈值
+	};
+	customProps?: Record<string, unknown>; // 自定义属性，用于扩展组件功能
+};
+
+export type MobileBottomComponentConfig = {
+	type: WidgetComponentType; // 组件类型
+	enable: boolean; // 是否启用该组件
+	showOnPostPage?: boolean; // 是否在文章详情页显示
+	showOnNonPostPage?: boolean; // 是否在非文章详情页显示
+	responsive?: {
+		hidden?: ("mobile" | "tablet" | "desktop")[]; // 在指定设备上隐藏
+		collapseThreshold?: number; // 折叠阈值
+	};
+	customProps?: Record<string, unknown>; // 自定义属性，用于扩展组件功能
+};
+
+export type SidebarLayoutConfig = {
+	enable: boolean; // 是否启用侧边栏
+	position: "left" | "right" | "both"; // 侧边栏位置：左侧、右侧或双侧
+	tabletSidebar?: "left" | "right"; // 平板端(769-1279px)显示哪侧侧边栏，仅position为both时生效，默认left
+	showBothSidebarsOnPostPage?: boolean; // 当position为left或right时，是否在文章详情页显示双侧边栏
+	leftComponents: WidgetComponentConfig[]; // 左侧边栏组件配置列表
+	rightComponents: WidgetComponentConfig[]; // 右侧边栏组件配置列表
+	mobileBottomComponents: MobileBottomComponentConfig[]; // 移动端底部组件配置列表（<768px显示）
 };

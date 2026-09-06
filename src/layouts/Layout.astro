@@ -259,6 +259,7 @@ const siteLang = lang.replace("_", "-");
     <FloatingDock />
     <MobileDock />
     <div id="search-modal-root"></div>
+    {siteConfig.pages.guestbook && <div id="guestbook-modal-root"></div>}
     <PrivacyModal />
     <UserAgreementModal />
     <FancyboxManager />
@@ -321,6 +322,54 @@ const siteLang = lang.replace("_", "-");
       if ((event.ctrlKey || event.metaKey) && event.code === "KeyK") {
         event.preventDefault();
         requestSearchModalToggle();
+      }
+    });
+  }
+</script>
+
+<script>
+  // 留言板弹窗：惰性挂载到 Swup 容器外的持久根节点（与搜索弹窗同模式），
+  // 首次触发时才动态加载 Svelte 组件，之后由组件内控制器接管 toggle。
+  import { siteConfig } from "@/config";
+  import {
+    requestGuestbookModalToggle,
+    GUESTBOOK_MODAL_TOGGLE_EVENT,
+  } from "@/utils/guestbook-modal-controller";
+
+  if (siteConfig.pages.guestbook && !window.__guestbookLoadersReady) {
+    window.__guestbookLoadersReady = true;
+    let guestbookMountPromise: Promise<void> | null = null;
+
+    const mountGuestbookModal = () => {
+      if (window.__guestbookModalMounted) return Promise.resolve();
+      if (!guestbookMountPromise) {
+        guestbookMountPromise = Promise.all([
+          import("svelte"),
+          import("@/components/features/GuestbookModal.svelte"),
+        ]).then(async ([{ mount, tick }, { default: GuestbookModal }]) => {
+          const target = document.getElementById("guestbook-modal-root");
+          if (!target) throw new Error("Guestbook modal root is missing");
+          mount(GuestbookModal, { target });
+          await tick();
+          window.__guestbookModalMounted = true;
+        }).catch((error) => {
+          guestbookMountPromise = null;
+          console.error("Failed to load guestbook modal:", error);
+        });
+      }
+      return guestbookMountPromise;
+    };
+
+    window.addEventListener(GUESTBOOK_MODAL_TOGGLE_EVENT, () => {
+      void mountGuestbookModal();
+    });
+
+    // 键盘无障碍入口：Alt+G 唤起留言板弹窗
+    document.addEventListener("keydown", (event) => {
+      if (window.__guestbookModalMounted) return;
+      if (event.altKey && !event.ctrlKey && !event.metaKey && event.code === "KeyG") {
+        event.preventDefault();
+        requestGuestbookModalToggle();
       }
     });
   }

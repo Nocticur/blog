@@ -5,10 +5,12 @@ import ArticleOutlineRail from "@components/layout/ArticleOutlineRail.astro";
 import Footer from "@components/layout/Footer.astro";
 import Navbar from "@components/layout/Navbar.astro";
 import NavMenuPanel from "@components/layout/NavMenuPanel.astro";
+import SideBar from "@components/layout/SideBar.astro";
 
 import {
 	live2dModelConfig,
 	navBarConfig,
+	sidebarLayoutConfig,
 	siteConfig,
 	spineModelConfig,
 } from "@/config";
@@ -30,8 +32,8 @@ interface Props {
 	robots?: string;
 	postCategory?: string;
 	bannerPostMeta?: {
-		title: string;
-		published: Date;
+		title?: string;
+		published?: Date;
 		updated?: Date;
 		words?: number;
 		minutes?: number;
@@ -43,6 +45,8 @@ interface Props {
 		category?: string;
 		tags?: string[];
 	};
+	/** 本页侧边栏模式；缺省读 sidebarLayoutConfig（全站默认双侧栏） */
+	sidebarPosition?: "left" | "right" | "both" | "none";
 }
 
 const {
@@ -57,10 +61,17 @@ const {
 	postCategory,
 	bannerPostMeta: _bannerPostMeta,
 	articleMeta,
+	sidebarPosition: sidebarPositionProp,
 } = Astro.props;
 
 const isPostPage = !!postSlug;
 const navbarWidthFull = siteConfig.navbar.widthFull ?? false;
+
+// 侧边栏：页面可覆盖全站默认；全站开关关闭时强制 none
+const sidebarPosition: "left" | "right" | "both" | "none" =
+	sidebarPositionProp ??
+	(sidebarLayoutConfig.enable ? sidebarLayoutConfig.position : "none");
+const renderSidebarContent = sidebarLayoutConfig.enable;
 
 const navLinks = navBarConfig.links.map((item) => {
 	if (typeof item === "number") return LinkPresets[item];
@@ -87,11 +98,17 @@ const navLinks = navBarConfig.links.map((item) => {
 	<NavMenuPanel links={navLinks} />
 
 	<div class="relative w-full" id="main-grid-wrapper">
-		<div class="mx-auto max-w-5xl px-4 md:px-6" data-sidebar-position="none" id="main-grid">
-			<div id="left-sidebar-dynamic" class="hidden"></div>
-			<div id="right-sidebar-dynamic" class="hidden"></div>
+		<div class="mx-auto max-w-5xl px-4 md:px-6" data-sidebar-position={sidebarPosition} id="main-grid">
+			{/* 侧边栏容器：内容页面无关（常驻 DOM，跨 Swup 导航持久），
+			    显隐与栅格由 #main-grid[data-sidebar-position] 的 CSS 驱动 */}
+			<div id="left-sidebar-dynamic">
+				{renderSidebarContent && <SideBar side="left" />}
+			</div>
+			<div id="right-sidebar-dynamic">
+				{renderSidebarContent && <SideBar side="right" />}
+			</div>
 
-			<main id="swup-container" class="transition-swup-main" data-current-post-category={postCategory || ""}>
+			<main id="swup-container" class="transition-swup-main" data-current-post-category={postCategory || ""} data-sidebar-position={sidebarPosition}>
 				{isPostPage && <ArticleOutlineRail />}
 				{/* 页面组件有自己的 H1 时不再输出布局兜底标题，确保每页只有一个 H1。 */}
 				{!isPostPage && !hasOwnH1 && <h1 class="sr-only">{title}</h1>}
@@ -107,3 +124,20 @@ const navLinks = navBarConfig.links.map((item) => {
 		<Footer></Footer>
 	</div>
 </Layout>
+
+<script>
+	// Swup 导航后同步侧边栏布局：新页面 #swup-container 上的 data-sidebar-position
+	// 会随容器交换进入 DOM，据此更新 #main-grid 的属性，CSS 据此切换栅格。
+	function applySidebarLayout() {
+		const container = document.getElementById("swup-container");
+		const grid = document.getElementById("main-grid");
+		if (!container || !grid) return;
+		const position = container.getAttribute("data-sidebar-position") ?? "none";
+		if (grid.getAttribute("data-sidebar-position") !== position) {
+			grid.setAttribute("data-sidebar-position", position);
+		}
+	}
+
+	applySidebarLayout();
+	document.addEventListener("astro:after-swap", applySidebarLayout);
+</script>

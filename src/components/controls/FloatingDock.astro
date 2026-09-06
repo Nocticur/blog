@@ -6,12 +6,14 @@ import CalendarWidget from "@/components/controls/CalendarWidget.astro";
  * 桌面端工具默认常驻显示，重组件通过图标按钮打开抽屉。
  */
 import MusicPlayer from "@/components/features/MusicPlayer.astro";
-import { announcementConfig, spineModelConfig } from "@/config";
+import { announcementConfig, siteConfig, spineModelConfig } from "@/config";
 import { musicPlayerConfig } from "@/config/musicConfig";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 
 const isHomePath = Astro.url.pathname === "/" || Astro.url.pathname === "";
+// 留言板完整页上隐藏弹窗入口，避免与页面本体重复
+const isGuestbookPage = /^\/guestbook\/?$/.test(Astro.url.pathname);
 ---
 
 <div class="floating-dock" id="floating-dock">
@@ -20,6 +22,21 @@ const isHomePath = Astro.url.pathname === "/" || Astro.url.pathname === "";
 			<button class="dock-btn dock-btn-music" id="dock-music-btn" aria-label={i18n(I18nKey.music)} type="button" data-tooltip={i18n(I18nKey.music)}>
 				<span class="dock-btn-icon"><Icon name="material-symbols:music-note-rounded" class="text-3xl" /></span>
 				<span class="dock-btn-label">{i18n(I18nKey.music)}</span>
+			</button>
+		)}
+
+		{siteConfig.pages.guestbook && (
+			<button
+				class={`dock-btn dock-btn-guestbook${isGuestbookPage ? " hide" : ""}`}
+				id="dock-guestbook-btn"
+				aria-label={i18n(I18nKey.guestbook)}
+				aria-hidden={isGuestbookPage ? "true" : "false"}
+				tabindex={isGuestbookPage ? -1 : 0}
+				type="button"
+				data-tooltip={i18n(I18nKey.guestbook)}
+			>
+				<span class="dock-btn-icon"><Icon name="material-symbols:edit-note" class="text-3xl" /></span>
+				<span class="dock-btn-label">{i18n(I18nKey.guestbook)}</span>
 			</button>
 		)}
 
@@ -123,6 +140,7 @@ const isHomePath = Astro.url.pathname === "/" || Astro.url.pathname === "";
 	import I18nKey from "@/i18n/i18nKey";
 	import { i18n } from "@/i18n/translation";
 	import { getStoredTheme, setTheme } from "@/utils/setting-utils";
+	import { requestGuestbookModalToggle } from "@/utils/guestbook-modal-controller";
 	import { definePersistentIsland, onNavigation } from "@/utils/swup-lifecycle";
 
 	// 悬浮坞在 Swup 容器之外，DOM 与监听跨导航持久存在，只需初始化一次
@@ -260,6 +278,12 @@ const isHomePath = Astro.url.pathname === "/" || Astro.url.pathname === "";
 			event.stopPropagation();
 			document.getElementById("post-comments")?.scrollIntoView({ behavior: "smooth", block: "start" });
 		}, { signal: dockSignal });
+
+		// 留言板按钮：唤起全局留言板弹窗（组件惰性挂载，见 Layout.astro）
+		document.getElementById("dock-guestbook-btn")?.addEventListener("click", (event) => {
+			event.stopPropagation();
+			requestGuestbookModalToggle();
+		}, { signal: dockSignal });
 		function updateScrollDependent() {
 			const topButton = document.getElementById("dock-top-btn");
 			if (!topButton) return;
@@ -278,6 +302,7 @@ const isHomePath = Astro.url.pathname === "/" || Astro.url.pathname === "";
 
 			setButtonVisibility("dock-announcement-btn", isHome);
 			setButtonVisibility("dock-comment-btn", (isPost || isFriends) && hasComment);
+			setButtonVisibility("dock-guestbook-btn", !/^\/guestbook\/?$/.test(pathname));
 			if (!isHome && document.getElementById("dock-drawer-announcement") && !document.getElementById("dock-drawer-announcement")?.classList.contains("dock-drawer-closed")) {
 				closeAllDrawers();
 			}

@@ -64,6 +64,8 @@ export const en: Translation = {
 	[Key.guestbook]: "Guestbook",
 	[Key.guestbookDescription]:
 		"Use the guestbook to leave ideas, suggestions, and messages for other visitors. Please follow the community rules to help keep the conversation respectful and welcoming.",
+	[Key.guestbookSubtitle]: "Something to say? Leave a message~",
+	[Key.guestbookOpenFullPage]: "Open full page",
 	[Key.commentSection]: "Comments",
 	[Key.commentSubtitle]: "Feel free to leave a comment and join the discussion",
 	[Key.commentNotConfigured]:
@@ -171,6 +173,12 @@ export const en: Translation = {
 	[Key.siteStatsTagCount]: "Tags",
 	[Key.siteStatsVisitors]: "Visitors",
 	[Key.siteStatsSource]: "Source",
+	[Key.siteStatsLoading]: "--",
+	[Key.siteStatsVisitorPrefix]: "You are the",
+	[Key.siteStatsVisitorSuffix]: "th visitor",
+	[Key.siteStatsPageViewPrefix]: "Total views:",
+	[Key.siteStatsPageViewSuffix]: "",
+	[Key.siteStatsTotalWords]: "Total Words",
 	[Key.footerRunningDays]: "Running for {days} days",
 	[Key.footerRunningTime]: "Running for {days}d {hours}h {minutes}m {seconds}s",
 	[Key.footerLastUpdate]: "Last updated {days} days ago",
@@ -263,6 +271,7 @@ export const en: Translation = {
 	[Key.navPosts]: "Posts",
 	[Key.navMy]: "Others",
 	[Key.navLinks]: "Links",
+	[Key.writing]: "Writing",
 	// ===== 通用操作 =====
 	[Key.close]: "Close",
 	[Key.expand]: "Expand",

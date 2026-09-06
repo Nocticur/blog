@@ -12,7 +12,7 @@ if (!siteConfig.pages.music) {
 ---
 
 
-<MainGridLayout title={`${i18n(I18nKey.music)} - ${i18n(I18nKey.musicVisualizer3D)}`} description={i18n(I18nKey.musicVisualizerDescription)} hasOwnH1={true}>
+<MainGridLayout title={`${i18n(I18nKey.music)} - ${i18n(I18nKey.musicVisualizer3D)}`} description={i18n(I18nKey.musicVisualizerDescription)} hasOwnH1={true} sidebarPosition="none">
 	<h1 class="sr-only">{`${i18n(I18nKey.music)} ${i18n(I18nKey.musicVisualizer3D)}`}</h1>
 	<div class="music-visualizer-page">
 		<MusicVisualizer client:only="svelte" />

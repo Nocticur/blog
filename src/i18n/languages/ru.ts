@@ -64,6 +64,8 @@ export const ru: Translation = {
 	[Key.guestbook]: "Гостевая книга",
 	[Key.guestbookDescription]:
 		"Оставляйте в гостевой книге идеи, предложения и сообщения для общения с другими посетителями. Соблюдайте правила сообщества, чтобы сохранить доброжелательную атмосферу.",
+	[Key.guestbookSubtitle]: "Есть что сказать? Оставьте сообщение~",
+	[Key.guestbookOpenFullPage]: "Открыть полную страницу",
 	[Key.commentSection]: "Комментарии",
 	[Key.commentSubtitle]: "Оставляйте комментарии и участвуйте в обсуждении",
 	[Key.commentNotConfigured]:
@@ -172,6 +174,12 @@ export const ru: Translation = {
 	[Key.siteStatsTagCount]: "Теги",
 	[Key.siteStatsVisitors]: "Посетители",
 	[Key.siteStatsSource]: "Источник",
+	[Key.siteStatsLoading]: "--",
+	[Key.siteStatsVisitorPrefix]: "Вы",
+	[Key.siteStatsVisitorSuffix]: "-й посетитель",
+	[Key.siteStatsPageViewPrefix]: "Всего просмотров:",
+	[Key.siteStatsPageViewSuffix]: "",
+	[Key.siteStatsTotalWords]: "Всего слов",
 	[Key.footerRunningDays]: "Работает {days} дней",
 	[Key.footerRunningTime]:
 		"Работает {days} д. {hours} ч. {minutes} мин. {seconds} сек.",
@@ -265,6 +273,7 @@ export const ru: Translation = {
 	[Key.navPosts]: "Статьи",
 	[Key.navMy]: "Другое",
 	[Key.navLinks]: "Навигация",
+	[Key.writing]: "Написание",
 	// ===== 通用操作 =====
 	[Key.close]: "Закрыть",
 	[Key.expand]: "Развернуть",

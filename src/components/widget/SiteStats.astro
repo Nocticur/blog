@@ -1,0 +1,348 @@
+---
+import Icon from "@components/common/Icon.astro";
+import I18nKey from "@/i18n/i18nKey";
+import { i18n } from "@/i18n/translation";
+import {
+	getCategoryList,
+	getSortedPosts,
+	getTagList,
+} from "@/utils/content-utils";
+
+interface Props {
+	class?: string;
+	style?: string;
+}
+
+const { class: className, style } = Astro.props;
+
+const posts = await getSortedPosts();
+const categories = await getCategoryList();
+const tags = await getTagList();
+
+let totalWords = 0;
+for (const post of posts) {
+	if (post.body) {
+		const text = post.body
+			.replace(/```[\s\S]*?```/g, "")
+			.replace(/`[^`]*`/g, "")
+			.replace(/\s+/g, " ")
+			.trim();
+		const cn = text.match(/[一-龥]/g) || [];
+		const en = text.match(/[a-zA-Z]/g) || [];
+		totalWords += cn.length + en.length;
+	}
+}
+
+const postCount = posts.length;
+const categoryCount = categories.length;
+const tagCount = tags.length;
+const wordCountFormatted = totalWords.toLocaleString();
+
+const textLine1 = `${i18n(I18nKey.siteStatsVisitorPrefix)}${i18n(I18nKey.siteStatsLoading)}${i18n(I18nKey.siteStatsVisitorSuffix)}`;
+const textLine2 = `${i18n(I18nKey.siteStatsPageViewPrefix)}${i18n(I18nKey.siteStatsLoading)}${i18n(I18nKey.siteStatsPageViewSuffix)}`;
+const revealLine1 = `${i18n(I18nKey.siteStatsPostCount)} ${postCount}`;
+---
+
+<div class={className} style={style}>
+	<div class="text-reveal-card relative w-full overflow-hidden cursor-pointer select-none"
+		id="text-reveal-container"
+		data-posts={postCount}
+		data-categories={categoryCount}
+		data-tags={tagCount}
+		data-words={totalWords}
+	>
+		{/* 粒子背景 */}
+		<div class="stars-container absolute inset-0 z-10 pointer-events-none overflow-hidden [mask-image:radial-gradient(ellipse_at_center,rgba(0,0,0,0.8)_20%,transparent_70%)]" id="stars-container"></div>
+
+		{/* 内容区域 */}
+		<div class="relative flex flex-col items-center justify-center py-14">
+			{/* 底层文字 - 灰色（默认显示：访客/访问量） */}
+			<div class="reveal-base text-center">
+				<p class="text-xl sm:text-2xl font-bold text-neutral-300 dark:text-neutral-600 leading-relaxed" id="text-line-1"
+					data-visitor-prefix={i18n(I18nKey.siteStatsVisitorPrefix)}
+					data-visitor-suffix={i18n(I18nKey.siteStatsVisitorSuffix)}
+				>
+					{textLine1}
+				</p>
+				<p class="text-base sm:text-lg font-bold text-neutral-300 dark:text-neutral-600 mt-2 leading-relaxed" id="text-line-2"
+					data-pageview-prefix={i18n(I18nKey.siteStatsPageViewPrefix)}
+					data-pageview-suffix={i18n(I18nKey.siteStatsPageViewSuffix)}
+				>
+					{textLine2}
+				</p>
+			</div>
+
+			{/* 上层遮罩 - 鼠标悬停时揭示第二层数据 */}
+			<div class="reveal-overlay absolute inset-0 z-20 pointer-events-none will-change-transform"
+				style="clip-path: inset(0 100% 0 0);">
+				<div class="absolute inset-0 flex flex-col items-center justify-center bg-(--page-bg)">
+					<div class="flex items-center gap-2 text-xl sm:text-2xl font-bold text-neutral-800 dark:text-neutral-100 leading-relaxed" id="reveal-line-1">
+						<Icon name="material-symbols:article-outline" class="text-xl sm:text-2xl" />
+						<span>{revealLine1}</span>
+					</div>
+					<div class="flex items-center gap-3 text-base sm:text-lg font-bold text-neutral-600 dark:text-neutral-300 mt-2 leading-relaxed flex-wrap justify-center" id="reveal-line-2">
+						<span class="inline-flex items-center gap-1"><Icon name="material-symbols:folder-outline" class="text-base sm:text-lg" />{i18n(I18nKey.siteStatsCategoryCount)} {categoryCount}</span>
+						<span class="text-neutral-400 dark:text-neutral-500">·</span>
+						<span class="inline-flex items-center gap-1"><Icon name="material-symbols:label-outline" class="text-base sm:text-lg" />{i18n(I18nKey.siteStatsTagCount)} {tagCount}</span>
+						<span class="text-neutral-400 dark:text-neutral-500">·</span>
+						<span class="inline-flex items-center gap-1"><Icon name="material-symbols:description-rounded" class="text-base sm:text-lg" />{i18n(I18nKey.siteStatsTotalWords)} {wordCountFormatted}</span>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		{/* 竖线光标 */}
+		<div class="reveal-cursor absolute top-0 bottom-0 w-[4px] z-30 pointer-events-none opacity-0 will-change-transform"
+			style="left: 0%; background: linear-gradient(to bottom, transparent, var(--primary), transparent);">
+		</div>
+	</div>
+</div>
+
+<!-- 样式已迁移至 src/styles/widgets/site-stats.css -->
+
+<script is:inline>
+(function() {
+	var cleanupTasks = [];
+	function addCleanup(cleanup) {
+		cleanupTasks.push(cleanup);
+	}
+	function cleanupSiteStats() {
+		cleanupTasks.forEach(function(cleanup) {
+			cleanup();
+		});
+		cleanupTasks = [];
+	}
+	document.addEventListener('swup:willReplaceContent', cleanupSiteStats, { once: true });
+	window.addEventListener('beforeunload', cleanupSiteStats, { once: true });
+
+	// ========== Stars (粒子) ==========
+	var isMobile = window.innerWidth < 1024;
+
+	function initStars() {
+		if (isMobile) return;
+		if (!document.getElementById('stars-container')) return;
+		var containers = document.querySelectorAll('.stars-container');
+		containers.forEach(function(container) {
+			if (container.dataset.starsInitialized) return;
+			container.dataset.starsInitialized = 'true';
+
+			var starCount = 100;
+			for (var i = 0; i < starCount; i++) {
+				var star = document.createElement('span');
+				star.className = 'star';
+				var startX = Math.random() * 100;
+				var startY = Math.random() * 100;
+				star.style.left = startX + '%';
+				star.style.top = startY + '%';
+				star.style.opacity = '1';
+				star.dataset.startX = String(startX);
+				star.dataset.startY = String(startY);
+				star.dataset.moveX = String((Math.random() * 8 - 4));
+				star.dataset.moveY = String((Math.random() * 8 - 4));
+				star.dataset.speed = String(Math.random() * 10 + 20);
+				star.dataset.delay = String(Math.random() * 5);
+				container.appendChild(star);
+			}
+		});
+	}
+
+	var animateStarsRunning = false;
+	var starAnimFrameId = 0;
+	function animateStars() {
+		if (isMobile) return;
+		if (animateStarsRunning) return;
+		animateStarsRunning = true;
+		// 初始化时缓存 DOM 查询，避免每帧查询
+		var stars = document.querySelectorAll('.star');
+		var firstStar = stars[0];
+		var containerEl = firstStar ? firstStar.parentElement : null;
+		var cw = containerEl ? containerEl.clientWidth : 0;
+		var ch = containerEl ? containerEl.clientHeight : 0;
+		// resize 时更新容器尺寸
+		function updateStarContainer() {
+			if (containerEl) {
+				cw = containerEl.clientWidth;
+				ch = containerEl.clientHeight;
+			}
+		}
+		window.addEventListener('resize', updateStarContainer);
+		addCleanup(function() {
+			window.removeEventListener('resize', updateStarContainer);
+			if (starAnimFrameId) {
+				cancelAnimationFrame(starAnimFrameId);
+				starAnimFrameId = 0;
+			}
+			animateStarsRunning = false;
+		});
+		function tick() {
+		if (containerEl) {
+			cw = containerEl.clientWidth;
+			ch = containerEl.clientHeight;
+		}
+		var now = Date.now() / 1000;
+		stars.forEach(function(star) {
+			var startX = parseFloat(star.dataset.startX || '0');
+			var startY = parseFloat(star.dataset.startY || '0');
+			var moveX = parseFloat(star.dataset.moveX || '0');
+			var moveY = parseFloat(star.dataset.moveY || '0');
+			var speed = parseFloat(star.dataset.speed || '20');
+			var delay = parseFloat(star.dataset.delay || '0');
+			var t = (now + delay) % speed / speed;
+			var x = startX + moveX * Math.sin(t * Math.PI * 2);
+			var y = startY + moveY * Math.sin(t * Math.PI * 2);
+			var isDark = document.documentElement.classList.contains('dark');
+			var minOpacity = isDark ? 0.2 : 0.4;
+			var maxOpacity = isDark ? 0.6 : 1.0;
+			var opacity = minOpacity + (maxOpacity - minOpacity) * Math.abs(Math.sin(t * Math.PI * 2));
+			// Use transform instead of left/top to avoid layout thrashing
+			var dx = (x - startX) / 100 * cw;
+			var dy = (y - startY) / 100 * ch;
+			star.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+			star.style.opacity = String(opacity);
+		});
+		starAnimFrameId = requestAnimationFrame(tick);
+		}
+		tick();
+	}
+
+	// ========== Text Reveal Card ==========
+	function initTextReveal() {
+		var cards = document.querySelectorAll('.text-reveal-card');
+		cards.forEach(function(card) {
+			if (card.dataset.revealInitialized) return;
+			card.dataset.revealInitialized = 'true';
+
+			var overlay = card.querySelector('.reveal-overlay');
+			var cursor = card.querySelector('.reveal-cursor');
+			if (!overlay || !cursor) return;
+
+			var targetPercentage = 0;
+			var currentPercentage = 0;
+			var isMouseOver = false;
+			var left = 0;
+			var localWidth = 0;
+			var revealAnimFrameId = 0;
+			var isAnimating = false;
+
+			function updateRect() {
+				var rect = card.getBoundingClientRect();
+				left = rect.left;
+				localWidth = rect.width;
+			}
+			updateRect();
+			window.addEventListener('resize', updateRect);
+			addCleanup(function() {
+				window.removeEventListener('resize', updateRect);
+				card.removeEventListener('mousemove', mouseMoveHandler);
+				card.removeEventListener('mouseleave', mouseLeaveHandler);
+				card.removeEventListener('mouseenter', mouseEnterHandler);
+				if (revealAnimFrameId) {
+					cancelAnimationFrame(revealAnimFrameId);
+					revealAnimFrameId = 0;
+				}
+				isAnimating = false;
+			});
+
+			function animate() {
+				var ease = isMouseOver ? 0.3 : 0.08;
+				var diff = targetPercentage - currentPercentage;
+				currentPercentage += diff * ease;
+
+				if (!isMouseOver && Math.abs(diff) < 0.5) {
+					currentPercentage = 0;
+					isAnimating = false;
+				}
+
+				var clipValue = 'inset(0 ' + (100 - currentPercentage) + '% 0 0)';
+				overlay.style.clipPath = clipValue;
+
+				var rotateDeg = (currentPercentage - 50) * 0.1;
+				cursor.style.left = currentPercentage + '%';
+				cursor.style.transform = 'translateX(-50%) rotate(' + rotateDeg + 'deg)';
+				cursor.style.opacity = currentPercentage > 0 ? '1' : '0';
+
+				if (isAnimating) {
+					revealAnimFrameId = requestAnimationFrame(animate);
+				}
+			}
+
+			function startAnimate() {
+				if (!isAnimating) {
+					isAnimating = true;
+					revealAnimFrameId = requestAnimationFrame(animate);
+				}
+			}
+
+			function mouseMoveHandler(e) {
+				e.preventDefault();
+				var relativeX = e.clientX - left;
+				targetPercentage = (relativeX / localWidth) * 100;
+				targetPercentage = Math.max(0, Math.min(100, targetPercentage));
+				startAnimate();
+			}
+
+			function mouseLeaveHandler() {
+				isMouseOver = false;
+				targetPercentage = 0;
+				startAnimate();
+			}
+
+			function mouseEnterHandler() {
+				isMouseOver = true;
+				updateRect();
+				startAnimate();
+			}
+
+			card.addEventListener('mousemove', mouseMoveHandler);
+			card.addEventListener('mouseleave', mouseLeaveHandler);
+			card.addEventListener('mouseenter', mouseEnterHandler);
+		});
+	}
+
+	function fetchStats() {
+		var textLine1 = document.getElementById('text-line-1');
+		var textLine2 = document.getElementById('text-line-2');
+		// 组件不在 DOM 中时跳过请求（已离开首页）
+		if (!textLine1 && !textLine2) return;
+
+		fetch('/api/count', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ path: location.pathname }),
+		})
+		.then(function(r) { return r.json(); })
+		.then(function(data) {
+			var uv = data.uv != null ? Number(data.uv).toLocaleString() : '--';
+			var pv = data.pv != null ? Number(data.pv).toLocaleString() : '--';
+			if (textLine1) {
+				var prefix1 = textLine1.dataset.visitorPrefix || '你是造访本站的第 ';
+				var suffix1 = textLine1.dataset.visitorSuffix || ' 位旅人，很高兴与你相遇。';
+				textLine1.textContent = prefix1 + uv + suffix1;
+			}
+			if (textLine2) {
+				var prefix2 = textLine2.dataset.pageviewPrefix || '小破站访问量为 ';
+				var suffix2 = textLine2.dataset.pageviewSuffix || '';
+				textLine2.textContent = prefix2 + pv + suffix2;
+			}
+		})
+		.catch(function() {
+			if (textLine1) {
+				var prefix1 = textLine1.dataset.visitorPrefix || '你是造访本站的第 ';
+				var suffix1 = textLine1.dataset.visitorSuffix || ' 位旅人，很高兴与你相遇。';
+				textLine1.textContent = prefix1 + '--' + suffix1;
+			}
+			if (textLine2) {
+				var prefix2 = textLine2.dataset.pageviewPrefix || '小破站访问量为 ';
+				var suffix2 = textLine2.dataset.pageviewSuffix || '';
+				textLine2.textContent = prefix2 + '--' + suffix2;
+			}
+		});
+	}
+
+	// is:inline 脚本在每次 Swup 导航到本页时都会重新执行，无需额外监听
+	initStars();
+	animateStars();
+	initTextReveal();
+	fetchStats();
+})();
+</script>

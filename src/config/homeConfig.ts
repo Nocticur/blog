@@ -212,7 +212,7 @@ export const homeConfig: HomeConfig = {
 					date: "2026 / 09 / 01",
 				},
 			],
-			standImages: ["/assets/images/home-blinds/act4/1.webp"],
+			standImages: ["/assets/images/home-blinds/act4/hutao.png"],
 		},
 	},
 
@@ -239,12 +239,6 @@ export const homeConfig: HomeConfig = {
 			name: "GitHub",
 			icon: "fa7-brands:github",
 			url: "https://github.com/Nocticur",
-			showName: false,
-		},
-		{
-			name: "站内留言",
-			icon: "material-symbols:chat-rounded",
-			url: "/guestbook/",
 			showName: false,
 		},
 		{

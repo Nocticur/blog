@@ -64,6 +64,8 @@ export const zh_CN: Translation = {
 	[Key.guestbook]: "留言",
 	[Key.guestbookDescription]:
 		"在留言板留下想法、建议和交流内容，与其他访客互动；请遵守社区规则，共同维护友善的讨论环境。",
+	[Key.guestbookSubtitle]: "有什么想说的，留个言吧~",
+	[Key.guestbookOpenFullPage]: "打开完整页面",
 	[Key.commentSection]: "评论区",
 	[Key.commentSubtitle]: "欢迎在评论区留言交流",
 	[Key.commentNotConfigured]: "评论功能未配置，请在后台设置评论系统。",
@@ -167,6 +169,12 @@ export const zh_CN: Translation = {
 	[Key.siteStatsTagCount]: "标签",
 	[Key.siteStatsVisitors]: "访客",
 	[Key.siteStatsSource]: "来源",
+	[Key.siteStatsLoading]: "--",
+	[Key.siteStatsVisitorPrefix]: "您是造访本站的第 ",
+	[Key.siteStatsVisitorSuffix]: " 位旅人，很高兴与您相遇。",
+	[Key.siteStatsPageViewPrefix]: "小破站访问量为 ",
+	[Key.siteStatsPageViewSuffix]: "",
+	[Key.siteStatsTotalWords]: "总字数",
 	[Key.footerRunningDays]: "已运行 {days} 天",
 	[Key.footerRunningTime]:
 		"本站已苟活 {days} 天 {hours} 时 {minutes} 分 {seconds} 秒",
@@ -258,6 +266,7 @@ export const zh_CN: Translation = {
 	[Key.navPosts]: "文章",
 	[Key.navMy]: "其他",
 	[Key.navLinks]: "导航",
+	[Key.writing]: "写作",
 
 	// ===== 通用操作 =====
 	[Key.close]: "关闭",

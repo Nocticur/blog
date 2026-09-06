@@ -64,6 +64,8 @@ export const zh_TW: Translation = {
 	[Key.guestbook]: "留言",
 	[Key.guestbookDescription]:
 		"在留言板留下想法、建議和交流內容，與其他訪客互動；請遵守社群規則，共同維護友善的討論環境。",
+	[Key.guestbookSubtitle]: "有什麼想說的，留個言吧~",
+	[Key.guestbookOpenFullPage]: "打開完整頁面",
 	[Key.commentSection]: "評論區",
 	[Key.commentSubtitle]: "歡迎在評論區留言交流",
 	[Key.commentNotConfigured]: "評論功能未配置，請在後台設置評論系統。",
@@ -169,6 +171,12 @@ export const zh_TW: Translation = {
 	[Key.siteStatsTagCount]: "標籤",
 	[Key.siteStatsVisitors]: "訪客",
 	[Key.siteStatsSource]: "來源",
+	[Key.siteStatsLoading]: "--",
+	[Key.siteStatsVisitorPrefix]: "恭喜你是第",
+	[Key.siteStatsVisitorSuffix]: "個訪問本網站的人",
+	[Key.siteStatsPageViewPrefix]: "小破站訪問量為",
+	[Key.siteStatsPageViewSuffix]: "",
+	[Key.siteStatsTotalWords]: "總字數",
 	[Key.footerRunningDays]: "已運行 {days} 天",
 	[Key.footerRunningTime]:
 		"本站已運行 {days} 天 {hours} 小時 {minutes} 分 {seconds} 秒",
@@ -260,6 +268,7 @@ export const zh_TW: Translation = {
 	[Key.navPosts]: "文章",
 	[Key.navMy]: "其他",
 	[Key.navLinks]: "導航",
+	[Key.writing]: "寫作",
 	// ===== 通用操作 =====
 	[Key.close]: "關閉",
 	[Key.expand]: "展開",
