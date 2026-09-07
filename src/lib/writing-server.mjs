@@ -1,11 +1,13 @@
 /**
- * 写作空间服务端共享模块 —— 同时被两端引用：
- * - astro.config.mjs 的 writing-dev-api 插件（本地 `astro dev` middleware）
- * - api/writing/[[...path]].js（Vercel Serverless Function，线上站点）
+ * 写作空间的本地服务端模块 —— 仅供 astro.config.mjs 的 writing-dev-api 插件
+ * （`astro dev` middleware）使用：密码校验、HMAC 会话 token、buildMarkdown、
+ * 仓库解析（读本地 git remote）。
  *
- * 用 plain ESM（.mjs）而非 TS，是因为 tsconfig 关闭了 allowJs，TS 侧不需要引它，
- * 而 Vercel 的 @vercel/node 与 Astro 的配置加载器都能直接处理 .mjs。
+ * 线上 Vercel Function（api/writing/[[...path]].js）持有一份内联副本——Vercel
+ * 打包 api/ 函数时不会可靠带上 api/ 之外的文件，跨目录 import 会导致线上
+ * FUNCTION_INVOCATION_FAILED，因此两端各自持有，修改时需保持同步。
  *
+ * 用 plain ESM（.mjs）而非 TS，是因为 tsconfig 关闭了 allowJs，TS 侧不需要引它。
  * 所有密钥一律从环境变量读取（系统变量 / Vercel Environment Variables，
  * .env 文件仅作本地备选），绝不进前端或打包产物。
  */
@@ -13,16 +15,11 @@ import { execSync } from "node:child_process";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import matter from "gray-matter";
 
-// 内置默认密码（firefly）的 SHA-256，仅兜底用；与 src/config 侧历史值保持一致
-export const DEFAULT_PASSWORD_HASH =
+// 内置默认密码（firefly）的 SHA-256，仅兜底用
+const DEFAULT_PASSWORD_HASH =
 	"afac327e73694e68c02f5c62f3bc0bcf0f239744ff12921e781487a0f9b3d5d0";
 
-export const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
-// 文件名/slug 段校验（与 scripts/new-post.js 一致）：允许中英文、数字、._-，不允许路径符号
-export const VALID_SEGMENT = /^[\p{L}\p{N}][\p{L}\p{N}._-]*$/u;
-export const GITHUB_API = "https://api.github.com";
-export const GITHUB_TIMEOUT_MS = 30 * 1000;
-export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const sha256Hex = (text) => createHash("sha256").update(text).digest("hex");
 
@@ -151,23 +148,4 @@ export function buildMarkdown(fm, content) {
 	let md = matter.stringify(String(content || ""), data);
 	md = md.replace(/^(published|updated): '(\d{4}-\d{2}-\d{2})'$/gm, "$1: $2");
 	return md;
-}
-
-// --- GitHub Contents API ---
-export function githubHeaders(token, extra = {}) {
-	return {
-		Accept: "application/vnd.github+json",
-		Authorization: `Bearer ${token}`,
-		"X-GitHub-Api-Version": "2022-11-28",
-		"User-Agent": "firefly-writing-api",
-		...extra,
-	};
-}
-
-export async function githubFetch(pathWithQuery, token, init = {}) {
-	return fetch(`${GITHUB_API}${pathWithQuery}`, {
-		...init,
-		headers: githubHeaders(token, init.headers),
-		signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
-	});
 }

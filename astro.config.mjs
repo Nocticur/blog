@@ -39,10 +39,8 @@ import { rehypeMermaid } from "./src/plugins/rehype-mermaid.mjs";
 import { rehypePlantuml } from "./src/plugins/rehype-plantuml.mjs";
 import { parseDirectiveNode } from "./src/plugins/remark-directive-rehype.js";
 import {
-	REPO_PATTERN,
 	buildMarkdown,
 	formatDate,
-	githubFetch,
 	resolveRepo,
 	signSession,
 	verifyPassword,
@@ -120,21 +118,16 @@ function getPostLastmod(postId) {
 }
 
 /**
- * 写作页（/writing/）的本地发布 API —— 仅在 `astro dev` 时存在。
+ * 写作页（/writing/）的本地写作 API —— 仅在 `astro dev` 时存在。
  *
- * 静态博客无法在线上写入文件，因此「写作页」的发布逻辑走 dev server middleware：
  * 前端提交文章元信息 + Markdown，这里做校验后用 gray-matter 生成 frontmatter
  * 并写入 src/content/posts/（文件名与路径校验规则与 scripts/new-post.js 一致），
  * Astro 检测到新文件后热更新，文章立即出现在站上。
  *
- * POST /api/writing/publish/：把指定文章 .md 通过 GitHub Contents API 提交到
- * owner/repo 仓库的 src/content/posts/ 下（已存在则带 sha 更新），触发 Vercel
- * 自动部署。token 从环境变量 GITHUB_TOKEN（回退 GH_TOKEN）读取，绝不进前端；
- * 可选 WRITING_GITHUB_BRANCH 指定目标分支，缺省用仓库默认分支。
- *
  * POST /api/writing/auth/：登录接口，服务端校验密码后签发 HMAC 会话 token，
  * 与线上 api/writing/[[...path]].js（Vercel Function）保持同一契约，前端据此
- * 自适应本地/线上模式。鉴权/会话/GitHub 辅助逻辑在 src/lib/writing-server.mjs。
+ * 自适应本地/线上模式（线上保存即经 GitHub Contents API 提交并触发重新构建）。
+ * 鉴权/会话辅助逻辑在 src/lib/writing-server.mjs（与线上函数内的内联副本同步）。
  *
  * 安全：除登录外，每个接口都要求 x-writing-auth 头携带有效会话 token，
  * 防止绕过页面直接调用接口写文件。
@@ -218,102 +211,6 @@ function writingDevApi() {
 			req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
 			req.on("error", reject);
 		});
-	}
-
-	// --- GitHub 上传（POST /publish）：githubFetch 由共享模块提供 ---
-
-	async function publishToGitHub(res, body) {
-		const repo = String(body.repo || "").trim();
-		if (!REPO_PATTERN.test(repo)) {
-			return error(res, 400, "仓库格式应为 owner/repo");
-		}
-		const fullPath = resolvePostPath(body.file);
-		if (!fullPath) {
-			return error(res, 400, "Invalid file name");
-		}
-		if (!fs.existsSync(fullPath)) {
-			return error(res, 404, "Post not found");
-		}
-		const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
-		if (!token) {
-			return error(res, 500, "未配置 GITHUB_TOKEN 环境变量");
-		}
-		const file = body.file.trim().replace(/\\/g, "/");
-		const md = fs.readFileSync(fullPath, "utf8");
-		let title = "";
-		try {
-			title = String(matter(md).data.title || "").trim();
-		} catch {
-			// frontmatter 解析失败时用文件名代替
-		}
-		// 1. 远端文件是否已存在（决定 commit message 与是否需要 sha；404 视为新建）
-		let sha = null;
-		try {
-			const apiPath = `/repos/${repo}/contents/src/content/posts/${file}${process.env.WRITING_GITHUB_BRANCH ? `?ref=${encodeURIComponent(process.env.WRITING_GITHUB_BRANCH)}` : ""}`;
-			const getRes = await githubFetch(apiPath, token);
-			if (getRes.status === 200) {
-				const data = await getRes.json();
-				sha = data.sha;
-			} else if (getRes.status === 404) {
-				// 可能是文件不存在（新建），也可能是仓库/分支不存在，先查仓库区分
-				const repoRes = await githubFetch(`/repos/${repo}`, token);
-				if (repoRes.status === 404) {
-					return error(res, 502, "仓库不存在或无权访问");
-				}
-				if (repoRes.status === 401 || repoRes.status === 403) {
-					return error(res, 502, "GitHub Token 认证失败或无 Contents 写权限");
-				}
-				if (!repoRes.ok) {
-					return error(res, 502, `GitHub 查询仓库失败（HTTP ${repoRes.status}）`);
-				}
-				// 仓库正常 → 确属新建文件，无需 sha
-			} else if (getRes.status === 401 || getRes.status === 403) {
-				return error(res, 502, "GitHub Token 认证失败或无 Contents 写权限");
-			} else {
-				return error(res, 502, `GitHub 查询文件失败（HTTP ${getRes.status}）`);
-			}
-		} catch (err) {
-			if (err && (err.name === "TimeoutError" || err.name === "AbortError")) {
-				return error(res, 504, "连接 GitHub 超时（30 秒），请检查网络后重试");
-			}
-			return error(res, 502, `连接 GitHub 失败：${err && err.message ? err.message : "未知错误"}`);
-		}
-
-		// 2. 提交文件（base64 content + commit message）
-		const message = `${sha ? "更新文章" : "发布文章"}：${title || file}`;
-		const putBody = {
-			message,
-			content: Buffer.from(md, "utf8").toString("base64"),
-			...(sha ? { sha } : {}),
-			...(process.env.WRITING_GITHUB_BRANCH ? { branch: process.env.WRITING_GITHUB_BRANCH } : {}),
-		};
-		try {
-			const putRes = await githubFetch(
-				`/repos/${repo}/contents/src/content/posts/${file}`,
-				token,
-				{
-					method: "PUT",
-					body: JSON.stringify(putBody),
-					headers: { "Content-Type": "application/json" },
-				},
-			);
-			if (putRes.status === 401 || putRes.status === 403) {
-				return error(res, 502, "GitHub Token 认证失败或无 Contents 写权限");
-			}
-			if (putRes.status === 404) {
-				return error(res, 502, "仓库不存在或无权访问");
-			}
-			if (!putRes.ok) {
-				return error(res, 502, `GitHub 提交失败（HTTP ${putRes.status}）`);
-			}
-			const data = await putRes.json();
-			return json(res, 200, { ok: true, url: data.commit?.html_url ?? "" });
-		} catch (err) {
-			if (err && (err.name === "TimeoutError" || err.name === "AbortError")) {
-				return error(res, 504, "连接 GitHub 超时（30 秒），请检查网络后重试");
-			}
-			return error(res, 502, `连接 GitHub 失败：${err && err.message ? err.message : "未知错误"}`);
-		}
 	}
 
 	return {
@@ -435,19 +332,6 @@ function writingDevApi() {
 							server.watcher.emit("unlink", fullPath);
 						});
 						return json(res, 200, { ok: true });
-					}
-
-					if (req.method === "POST" && route === "/publish") {
-						let body;
-						try {
-							body = JSON.parse(await readBody(req));
-						} catch {
-							return error(res, 400, "Invalid JSON body");
-						}
-						if (!body || typeof body !== "object") {
-							return error(res, 400, "Invalid JSON body");
-						}
-						return publishToGitHub(res, body);
 					}
 
 					return error(res, 404, "Not found");

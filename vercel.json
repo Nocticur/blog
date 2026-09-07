@@ -3,6 +3,12 @@
   "outputDirectory": "dist",
   "installCommand": "pnpm install",
   "framework": "astro",
+  "rewrites": [
+    {
+      "source": "/api/writing/:path*/",
+      "destination": "/api/writing/:path*"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

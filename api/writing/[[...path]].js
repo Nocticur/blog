@@ -12,22 +12,142 @@
  * - POST/PUT /api/writing/posts     保存 = 提交到仓库（草稿以 draft:true 一并入库）
  * - DELETE /api/writing/posts?file= 删除仓库中的文章文件
  *
+ * 注意：本文件刻意做成「自包含」——鉴权/会话/buildMarkdown/仓库解析等逻辑直接
+ * 内联，不 import 项目其他目录的模块。Vercel 对 api/ 目录做函数打包时不会可靠
+ * 地带上 api/ 之外的文件，跨目录 import 会导致线上 FUNCTION_INVOCATION_FAILED。
+ * 这些逻辑与 src/lib/writing-server.mjs（本地 dev middleware 使用）保持同步。
+ *
  * 安全：密钥只存在于服务端环境变量（GITHUB_TOKEN、WRITING_PASSWORD[_HASH]、
  * WRITING_SESSION_SECRET），除 /auth 外的所有请求都要求有效的会话 token；
- * 密码哈希不再随页面下发到浏览器。
+ * 密码哈希不随页面下发到浏览器。
  */
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import matter from "gray-matter";
-import {
-	buildMarkdown,
-	formatDate,
-	githubFetch,
-	REPO_PATTERN,
-	resolveRepo,
-	signSession,
-	VALID_SEGMENT,
-	verifyPassword,
-	verifySession,
-} from "../../src/lib/writing-server.mjs";
+
+// ── 与 src/lib/writing-server.mjs 同步的内联实现 ──────────────────────────
+
+const DEFAULT_PASSWORD_HASH =
+	"afac327e73694e68c02f5c62f3bc0bcf0f239744ff12921e781487a0f9b3d5d0";
+const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
+const VALID_SEGMENT = /^[\p{L}\p{N}][\p{L}\p{N}._-]*$/u;
+const GITHUB_API = "https://api.github.com";
+const GITHUB_TIMEOUT_MS = 30 * 1000;
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const sha256Hex = (text) => createHash("sha256").update(text).digest("hex");
+
+function resolvePasswordHash(env = process.env) {
+	if (env.WRITING_PASSWORD) return sha256Hex(env.WRITING_PASSWORD);
+	if (env.WRITING_PASSWORD_HASH) return env.WRITING_PASSWORD_HASH;
+	return DEFAULT_PASSWORD_HASH;
+}
+
+function verifyPassword(password, env = process.env) {
+	const plain = String(password ?? "");
+	if (!plain) return false;
+	return sha256Hex(plain) === resolvePasswordHash(env);
+}
+
+function resolveSessionSecret(env = process.env) {
+	return (
+		env.WRITING_SESSION_SECRET ||
+		`firefly-writing-session:${resolvePasswordHash(env)}`
+	);
+}
+
+function signSession(env = process.env, ttlMs = SESSION_TTL_MS) {
+	const payload = Buffer.from(
+		JSON.stringify({ exp: Date.now() + ttlMs }),
+	).toString("base64url");
+	const sig = createHmac("sha256", resolveSessionSecret(env))
+		.update(payload)
+		.digest("base64url");
+	return `${payload}.${sig}`;
+}
+
+function verifySession(token, env = process.env) {
+	if (typeof token !== "string") return false;
+	const [payload, sig] = token.split(".");
+	if (!payload || !sig) return false;
+	const expected = createHmac("sha256", resolveSessionSecret(env))
+		.update(payload)
+		.digest();
+	let given;
+	try {
+		given = Buffer.from(sig, "base64url");
+	} catch {
+		return false;
+	}
+	if (given.length !== expected.length || !timingSafeEqual(given, expected))
+		return false;
+	try {
+		const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+		return Number.isFinite(data.exp) && data.exp > Date.now();
+	} catch {
+		return false;
+	}
+}
+
+// 线上目标仓库：WRITING_GITHUB_REPO → Vercel 所连仓库（平台自动注入）→ 空
+// （与本地不同：函数运行时没有 git 仓库，不尝试读 git remote）
+function resolveRepo(env = process.env) {
+	const explicit = String(env.WRITING_GITHUB_REPO || "").trim();
+	if (explicit) return explicit;
+	if (env.VERCEL_GIT_REPO_OWNER && env.VERCEL_GIT_REPO_SLUG) {
+		return `${env.VERCEL_GIT_REPO_OWNER}/${env.VERCEL_GIT_REPO_SLUG}`;
+	}
+	return "";
+}
+
+function formatDate(value) {
+	if (!value) return "";
+	if (value instanceof Date) {
+		try {
+			return value.toISOString().slice(0, 10);
+		} catch {
+			return "";
+		}
+	}
+	return String(value).slice(0, 10);
+}
+
+// 表单 + 正文 → Markdown。js-yaml 会给形如日期的字符串加引号，而引号字符串
+// 经 z.date() 校验会失败，这里还原为日期字面量
+function buildMarkdown(fm, content) {
+	const data = {
+		title: String(fm.title || "").trim(),
+		published: formatDate(fm.published) || formatDate(new Date()),
+		description: String(fm.description || ""),
+		image: String(fm.image || ""),
+		tags: Array.isArray(fm.tags)
+			? fm.tags.map((t) => String(t)).filter(Boolean)
+			: [],
+		category: String(fm.category || ""),
+		draft: fm.draft === true,
+		lang: String(fm.lang || ""),
+	};
+	const updated = formatDate(fm.updated);
+	if (updated) data.updated = updated;
+	let md = matter.stringify(String(content || ""), data);
+	md = md.replace(/^(published|updated): '(\d{4}-\d{2}-\d{2})'$/gm, "$1: $2");
+	return md;
+}
+
+async function githubFetch(pathWithQuery, token, init = {}) {
+	return fetch(`${GITHUB_API}${pathWithQuery}`, {
+		...init,
+		headers: {
+			Accept: "application/vnd.github+json",
+			Authorization: `Bearer ${token}`,
+			"X-GitHub-Api-Version": "2022-11-28",
+			"User-Agent": "firefly-writing-api",
+			...init.headers,
+		},
+		signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
+	});
+}
+
+// ── 函数内部实现 ──────────────────────────────────────────────────────────
 
 const POSTS_DIR = "src/content/posts";
 const LIST_SKIP_DIRS = new Set(["assets", "image", "node_modules"]);
@@ -179,7 +299,7 @@ async function handleAuth(request) {
 	});
 }
 
-function pickRepo(request, url) {
+function pickRepo(url) {
 	const repo =
 		String(url.searchParams.get("repo") || "").trim() || resolveRepo();
 	if (!REPO_PATTERN.test(repo)) {
@@ -191,8 +311,8 @@ function pickRepo(request, url) {
 	return repo;
 }
 
-async function handleList(request, url) {
-	const repo = pickRepo(request, url);
+async function handleList(url) {
+	const repo = pickRepo(url);
 	const token = requireToken();
 	const branch = await resolveBranch(repo, token);
 	const files = await listPostFiles(repo, branch, token);
@@ -206,12 +326,12 @@ async function handleList(request, url) {
 	return json({ posts, mode: "deployed", repo, branch });
 }
 
-async function handleRead(request, url) {
+async function handleRead(url) {
 	const file = url.searchParams.get("file") || "";
 	if (!file || !isPostPath(`${POSTS_DIR}/${file.replace(/\\/g, "/")}`)) {
 		return fail("Invalid file name");
 	}
-	const repo = pickRepo(request, url);
+	const repo = pickRepo(url);
 	const token = requireToken();
 	const branch = await resolveBranch(repo, token);
 	const data = await ghData(
@@ -311,11 +431,11 @@ async function handleSave(request, isCreate) {
 	return json({ ok: true, file, url: data.commit?.html_url || "" });
 }
 
-async function handleDelete(request, url) {
+async function handleDelete(url) {
 	const file = (url.searchParams.get("file") || "").trim().replace(/\\/g, "/");
 	if (!file || !isPostPath(`${POSTS_DIR}/${file}`))
 		return fail("Invalid file name");
-	const repo = pickRepo(request, url);
+	const repo = pickRepo(url);
 	const token = requireToken();
 	const branch = await resolveBranch(repo, token);
 
@@ -365,8 +485,8 @@ export default async function handler(request) {
 		}
 		if (request.method === "GET" && route === "/posts") {
 			// 与 dev middleware 一致：带 file 参数读单篇，否则返回列表
-			if (url.searchParams.get("file")) return handleRead(request, url);
-			return await handleList(request, url);
+			if (url.searchParams.get("file")) return handleRead(url);
+			return await handleList(url);
 		}
 		if (
 			(request.method === "POST" || request.method === "PUT") &&
@@ -375,7 +495,7 @@ export default async function handler(request) {
 			return await handleSave(request, request.method === "POST");
 		}
 		if (request.method === "DELETE" && route === "/posts")
-			return await handleDelete(request, url);
+			return await handleDelete(url);
 		return fail("Not found", 404);
 	} catch (error) {
 		if (error.name === "TimeoutError" || error.name === "AbortError") {

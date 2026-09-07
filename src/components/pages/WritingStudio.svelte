@@ -2,7 +2,6 @@
 import {
 	Bold,
 	CloudOff,
-	CloudUpload,
 	Code,
 	Eye,
 	Heading2,
@@ -92,12 +91,9 @@ let tagInput = $state("");
 let content = $state("");
 let saving = $state(false);
 let saveError = $state("");
-// --- GitHub 上传状态 ---
+// --- 仓库输入（仅 deployed 模式可见，用于指定 save/delete 的目标仓库）---
 const REPO_KEY = "firefly-writing-repo";
 let repoInput = $state("");
-let publishing = $state(false);
-let publishError = $state("");
-let publishUrl = $state("");
 let mobilePane = $state<"edit" | "preview">("edit");
 let editorEl: HTMLTextAreaElement | undefined = $state();
 
@@ -115,13 +111,6 @@ const canSave = $derived(
 	!!form.title.trim() && !!form.published && !!form.slug && !slugConflict,
 );
 const repoValid = $derived(/^[\w.-]+\/[\w.-]+$/.test(repoInput.trim()));
-const publishButtonTitle = $derived(
-	!githubTokenReady
-		? "未配置 GITHUB_TOKEN 环境变量，无法上传"
-		: !repoValid
-			? "请输入格式为 owner/repo 的仓库名"
-			: "上传当前文章到 GitHub 仓库（Vercel 将自动部署）",
-);
 
 function todayStr(): string {
 	const d = new Date();
@@ -306,10 +295,7 @@ function openCreate() {
 	view = "editor";
 }
 
-async function savePost(options?: {
-	stayInEditor?: boolean;
-}): Promise<string | null> {
-	const stayInEditor = options?.stayInEditor === true;
+async function savePost(): Promise<string | null> {
 	if (!canSave || saving) return null;
 	saving = true;
 	saveError = "";
@@ -340,12 +326,8 @@ async function savePost(options?: {
 		justSavedFile = (data as { file?: string }).file ?? "";
 		// 线上模式保存即提交，响应里带 commit 链接
 		justSavedUrl = (data as { url?: string }).url ?? "";
-		if (stayInEditor) {
-			// 上传前静默保存：留在编辑器展示上传结果，并把后续保存切为更新模式
-			if (justSavedFile) editingFile = justSavedFile;
-		} else {
-			await loadList();
-		}
+		if (repoValid) localStorage.setItem(REPO_KEY, repoInput.trim());
+		await loadList();
 		return justSavedFile || null;
 	} catch {
 		saveError =
@@ -355,47 +337,6 @@ async function savePost(options?: {
 		return null;
 	} finally {
 		saving = false;
-	}
-}
-
-// 上传到 GitHub 仓库触发 Vercel 自动部署（仅本地 dev 模式；线上保存即提交）
-async function publishPost() {
-	if (mode === "deployed") return;
-	const repo = repoInput.trim();
-	if (!repoValid || publishing) return;
-	publishing = true;
-	publishError = "";
-	publishUrl = "";
-	try {
-		const file = await savePost({ stayInEditor: true });
-		if (!file) {
-			if (!saveError) publishError = "请先完善标题、发布日期和文件名后再上传";
-			return;
-		}
-		const res = await fetch("/api/writing/publish/", {
-			method: "POST",
-			headers: authHeaders(),
-			body: JSON.stringify({ file, repo }),
-		});
-		if (res.status === 401) {
-			handleSessionExpired();
-			return;
-		}
-		const data = await res
-			.json()
-			.catch(() => ({}) as { error?: string; url?: string });
-		if (!res.ok) {
-			publishError =
-				(data as { error?: string }).error || `上传失败（HTTP ${res.status}）`;
-			return;
-		}
-		publishUrl = (data as { url?: string }).url ?? "";
-		localStorage.setItem(REPO_KEY, repo);
-	} catch {
-		publishError =
-			"上传失败：无法连接本地写作服务（请确认 npm run dev 正在运行）";
-	} finally {
-		publishing = false;
 	}
 }
 
@@ -611,6 +552,14 @@ onMount(() => {
 			{/if}
 			{#if listError}
 				<p class="ws-field-error mb-4">{listError}</p>
+			{/if}
+			{#if mode === "deployed" && !githubTokenReady}
+				<p
+					class="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-800 dark:text-amber-200"
+				>
+					服务端未配置 GITHUB_TOKEN，无法提交到 GitHub。请在 Vercel 项目 Settings →
+					Environment Variables 中添加后重新部署。
+				</p>
 			{/if}
 
 			{#if listLoading}
@@ -858,26 +807,15 @@ onMount(() => {
 
 			<div class="mt-5">
 				<div class="flex flex-wrap items-center gap-3">
-					<input
-						type="text"
-						class="ws-input w-56 shrink-0 font-mono text-xs"
-						bind:value={repoInput}
-						placeholder="anywhere-labs/dsh-desktop"
-						aria-label="目标仓库（用户名/仓库名）"
-						title={mode === "deployed"
-							? "保存/删除将提交到该仓库，留空用站点仓库"
-							: "「上传 GitHub」的目标仓库（用户名/仓库名）"}
-					/>
-					{#if mode !== "deployed"}
-						<button
-							class="btn-regular flex h-10 items-center gap-2 rounded-lg px-5 font-bold disabled:cursor-not-allowed disabled:opacity-50"
-							onclick={publishPost}
-							disabled={!canSave || saving || publishing || !repoValid}
-							title={publishButtonTitle}
-						>
-							<CloudUpload size={16} />
-							{publishing ? "上传中…" : "上传 GitHub"}
-						</button>
+					{#if mode === "deployed"}
+						<input
+							type="text"
+							class="ws-input w-56 shrink-0 font-mono text-xs"
+							bind:value={repoInput}
+							placeholder="默认站点仓库"
+							aria-label="目标仓库（用户名/仓库名）"
+							title="保存/删除将提交到该仓库，留空用站点仓库"
+						/>
 					{/if}
 					<button
 						class="btn-regular flex h-10 items-center gap-2 rounded-lg px-6 font-bold disabled:cursor-not-allowed disabled:opacity-50"
@@ -900,20 +838,6 @@ onMount(() => {
 
 				{#if saveError}
 					<p class="ws-field-error mt-3">{saveError}</p>
-				{:else if publishError}
-					<p class="ws-field-error mt-3">{publishError}</p>
-				{:else if publishUrl}
-					<p class="ws-field-hint mt-3">
-						已上传到 <span class="font-mono">{repoInput.trim()}</span> ·
-						<a
-							href={publishUrl}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="text-(--primary) underline underline-offset-2"
-						>
-							查看提交
-						</a>（Vercel 将自动部署）
-					</p>
 				{:else if justSavedUrl}
 					<p class="ws-field-hint mt-3">
 						已提交到
