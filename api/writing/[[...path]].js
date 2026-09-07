@@ -162,11 +162,71 @@ class HttpError extends Error {
 }
 
 function json(data, status = 200) {
-	return Response.json(data, { status });
+	return new Response(JSON.stringify(data), {
+		status,
+		headers: { "Content-Type": "application/json; charset=utf-8" },
+	});
 }
 
 function fail(message, status = 400) {
 	return json({ error: message }, status);
+}
+
+function createHeaders(headers) {
+	if (headers instanceof Headers) return headers;
+	const normalized = new Headers();
+	if (headers && typeof headers === "object") {
+		for (const [name, value] of Object.entries(headers)) {
+			if (value != null) {
+				normalized.set(
+					name,
+					Array.isArray(value) ? value.join(", ") : String(value),
+				);
+			}
+		}
+	}
+	return normalized;
+}
+
+function absoluteRequestUrl(request) {
+	const rawUrl = typeof request.url === "string" && request.url ? request.url : "/";
+	if (/^[a-z][a-z\d+\-.]*:\/\//i.test(rawUrl)) return rawUrl;
+	const headers = createHeaders(request.headers);
+	const host = headers.get("host") || "localhost";
+	const protocol = headers.get("x-forwarded-proto") || "https";
+	return new URL(rawUrl, `${protocol}://${host}`).href;
+}
+
+async function readRequestBody(request) {
+	if (request.body !== undefined && request.body !== null) {
+		if (typeof request.body === "object" && !Buffer.isBuffer(request.body))
+			return request.body;
+		const text = Buffer.isBuffer(request.body)
+			? request.body.toString("utf8")
+			: String(request.body);
+		try {
+			return JSON.parse(text);
+		} catch {
+			return null;
+		}
+	}
+	if (typeof request.on !== "function") return null;
+	const chunks = [];
+	for await (const chunk of request) chunks.push(Buffer.from(chunk));
+	try {
+		return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+	} catch {
+		return null;
+	}
+}
+
+function adaptNodeRequest(request) {
+	return {
+		url: absoluteRequestUrl(request),
+		method: String(request.method || "GET").toUpperCase(),
+		headers: createHeaders(request.headers),
+		json: () => readRequestBody(request),
+	};
 }
 
 async function readJson(request) {
@@ -176,6 +236,19 @@ async function readJson(request) {
 	} catch {
 		return null;
 	}
+}
+
+async function sendResponse(response, res) {
+	if (!res) return response;
+	res.statusCode = response.status;
+	response.headers.forEach((value, name) => res.setHeader?.(name, value));
+	const body = await response.text();
+	if (typeof res.end === "function") {
+		res.end(body);
+		return undefined;
+	}
+	if (typeof res.send === "function") return res.send(body);
+	return undefined;
 }
 
 function requireToken() {
@@ -323,7 +396,13 @@ async function handleList(url) {
 		.filter(Boolean)
 		.map(({ sha, ...meta }) => meta)
 		.sort((a, b) => String(b.published).localeCompare(String(a.published)));
-	return json({ posts, mode: "deployed", repo, branch });
+	return json({
+		posts,
+		mode: "deployed",
+		repo,
+		branch,
+		tokenReady: Boolean(process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN),
+	});
 }
 
 async function handleRead(url) {
@@ -472,36 +551,49 @@ async function handleDelete(url) {
 	return json({ ok: true });
 }
 
-export default async function handler(request) {
-	const url = new URL(request.url);
-	const route =
-		url.pathname.slice("/api/writing".length).replace(/\/+$/, "") || "/";
+export default async function handler(request, response) {
 	try {
-		if (request.method === "POST" && route === "/auth")
-			return await handleAuth(request);
-		// 会话 token 校验：登录以外的所有接口都要带有效 token
-		if (!verifySession(request.headers.get("x-writing-auth"))) {
-			return fail("登录已过期，请重新登录", 401);
-		}
-		if (request.method === "GET" && route === "/posts") {
+		const isFetchRequest = response === undefined;
+		const normalizedRequest = isFetchRequest
+			? request
+			: adaptNodeRequest(request);
+		const url = new URL(normalizedRequest.url);
+		const route =
+			url.pathname.slice("/api/writing".length).replace(/\/+$/, "") || "/";
+		let result;
+		if (normalizedRequest.method === "POST" && route === "/auth") {
+			result = await handleAuth(normalizedRequest);
+		} else if (
+			!verifySession(normalizedRequest.headers.get("x-writing-auth"))
+		) {
+			// 会话 token 校验：登录以外的所有接口都要带有效 token
+			result = fail("登录已过期，请重新登录", 401);
+		} else if (normalizedRequest.method === "GET" && route === "/posts") {
 			// 与 dev middleware 一致：带 file 参数读单篇，否则返回列表
-			if (url.searchParams.get("file")) return handleRead(url);
-			return await handleList(url);
-		}
-		if (
-			(request.method === "POST" || request.method === "PUT") &&
+			result = url.searchParams.get("file")
+				? await handleRead(url)
+				: await handleList(url);
+		} else if (
+			(normalizedRequest.method === "POST" ||
+				normalizedRequest.method === "PUT") &&
 			route === "/posts"
 		) {
-			return await handleSave(request, request.method === "POST");
+			result = await handleSave(
+				normalizedRequest,
+				normalizedRequest.method === "POST",
+			);
+		} else if (normalizedRequest.method === "DELETE" && route === "/posts") {
+			result = await handleDelete(url);
+		} else {
+			result = fail("Not found", 404);
 		}
-		if (request.method === "DELETE" && route === "/posts")
-			return await handleDelete(url);
-		return fail("Not found", 404);
+		return sendResponse(result, response);
 	} catch (error) {
-		if (error.name === "TimeoutError" || error.name === "AbortError") {
-			return fail("请求 GitHub 超时，请稍后重试", 504);
-		}
-		return fail(error.message || "Internal error", error.status || 500);
+		const result =
+			error?.name === "TimeoutError" || error?.name === "AbortError"
+				? fail("请求 GitHub 超时，请稍后重试", 504)
+				: fail(error?.message || "Internal error", error?.status || 500);
+		return sendResponse(result, response);
 	}
 }
 

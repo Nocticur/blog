@@ -171,6 +171,7 @@ async function handleLogin(event: SubmitEvent) {
 			token?: string;
 			mode?: string;
 			repo?: string;
+			tokenReady?: boolean;
 		};
 		if (!auth.token) {
 			loginError = "登录响应异常，请重试";
@@ -178,6 +179,8 @@ async function handleLogin(event: SubmitEvent) {
 		}
 		sessionStorage.setItem(AUTH_KEY, auth.token);
 		mode = auth.mode === "deployed" ? "deployed" : "dev";
+		if (typeof auth.tokenReady === "boolean")
+			githubTokenReady = auth.tokenReady;
 		// 服务端给的默认仓库仅在用户没有手动输入过时预填
 		if (!repoInput.trim() && auth.repo) repoInput = auth.repo;
 		password = "";
@@ -218,8 +221,15 @@ async function loadList() {
 			handleSessionExpired();
 			return;
 		}
-		if (!res.ok) throw new Error(`HTTP ${res.status}`);
-		const data = await res.json();
+		const data = await res
+			.json()
+			.catch(() => ({}) as { error?: string });
+		if (!res.ok) {
+			listError =
+				data.error || `加载文章失败（HTTP ${res.status}）`;
+			view = "list";
+			return;
+		}
 		posts = data.posts ?? [];
 		// 会话恢复（不经过登录）时，从列表接口拿运行模式与服务端信息
 		mode = data.mode === "deployed" ? "deployed" : "dev";
