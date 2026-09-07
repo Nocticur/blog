@@ -38,11 +38,20 @@ import { rehypeDiagramPanZoom } from "./src/plugins/rehype-diagram-panzoom.mjs";
 import { rehypeMermaid } from "./src/plugins/rehype-mermaid.mjs";
 import { rehypePlantuml } from "./src/plugins/rehype-plantuml.mjs";
 import { parseDirectiveNode } from "./src/plugins/remark-directive-rehype.js";
-import { writingConfig } from "./src/config/writingConfig";
+import {
+	REPO_PATTERN,
+	buildMarkdown,
+	formatDate,
+	githubFetch,
+	resolveRepo,
+	signSession,
+	verifyPassword,
+	verifySession,
+} from "./src/lib/writing-server.mjs";
 
 // astro.config.mjs 的模块上下文不会自动加载 .env 文件（pnpm 下也无法直接 import vite
-// 的 loadEnv），这里按 Vite 的优先级手动并入 process.env，供 writingConfig 解析
-// WRITING_PASSWORD / WRITING_PASSWORD_HASH；系统环境变量优先，不会被文件值覆盖
+// 的 loadEnv），这里按 Vite 的优先级手动并入 process.env，供 writing-server.mjs
+// 解析 WRITING_PASSWORD / WRITING_PASSWORD_HASH / GITHUB_TOKEN 等；系统环境变量优先
 {
 	const mode = process.env.NODE_ENV ?? "development";
 	const envFiles = [".env", ".env.local", `.env.${mode}`, `.env.${mode}.local`];
@@ -123,7 +132,11 @@ function getPostLastmod(postId) {
  * 自动部署。token 从环境变量 GITHUB_TOKEN（回退 GH_TOKEN）读取，绝不进前端；
  * 可选 WRITING_GITHUB_BRANCH 指定目标分支，缺省用仓库默认分支。
  *
- * 安全：每个接口都要求 x-writing-auth 头等于 writingConfig.passwordHash，
+ * POST /api/writing/auth/：登录接口，服务端校验密码后签发 HMAC 会话 token，
+ * 与线上 api/writing/[[...path]].js（Vercel Function）保持同一契约，前端据此
+ * 自适应本地/线上模式。鉴权/会话/GitHub 辅助逻辑在 src/lib/writing-server.mjs。
+ *
+ * 安全：除登录外，每个接口都要求 x-writing-auth 头携带有效会话 token，
  * 防止绕过页面直接调用接口写文件。
  */
 function writingDevApi() {
@@ -154,18 +167,6 @@ function writingDevApi() {
 		const fullPath = path.resolve(postsDir, name);
 		if (!fullPath.startsWith(postsDirPrefix)) return null;
 		return fullPath;
-	}
-
-	function formatDate(value) {
-		if (!value) return "";
-		if (value instanceof Date) {
-			try {
-				return value.toISOString().slice(0, 10);
-			} catch {
-				return "";
-			}
-		}
-		return String(value).slice(0, 10);
 	}
 
 	function listPosts() {
@@ -201,26 +202,6 @@ function writingDevApi() {
 		return out.sort((a, b) => String(b.published).localeCompare(String(a.published)));
 	}
 
-	function buildMarkdown(fm, content) {
-		const data = {
-			title: String(fm.title || "").trim(),
-			published: formatDate(fm.published) || formatDate(new Date()),
-			description: String(fm.description || ""),
-			image: String(fm.image || ""),
-			tags: Array.isArray(fm.tags) ? fm.tags.map((t) => String(t)).filter(Boolean) : [],
-			category: String(fm.category || ""),
-			draft: fm.draft === true,
-			lang: String(fm.lang || ""),
-		};
-		const updated = formatDate(fm.updated);
-		if (updated) data.updated = updated;
-		let md = matter.stringify(String(content || ""), data);
-		// js-yaml 会给形如日期的字符串加引号（published: '2026-06-14'），
-		// 引号字符串经 z.date() 校验会失败，还原为与现有文章一致的日期字面量
-		md = md.replace(/^(published|updated): '(\d{4}-\d{2}-\d{2})'$/gm, "$1: $2");
-		return md;
-	}
-
 	function readBody(req) {
 		return new Promise((resolve, reject) => {
 			const chunks = [];
@@ -239,32 +220,11 @@ function writingDevApi() {
 		});
 	}
 
-	// --- GitHub 上传（POST /publish） ---
-	const GITHUB_API = "https://api.github.com";
-	const GITHUB_TIMEOUT_MS = 30 * 1000;
-
-	function githubHeaders(token, extra = {}) {
-		return {
-			Accept: "application/vnd.github+json",
-			Authorization: `Bearer ${token}`,
-			"X-GitHub-Api-Version": "2022-11-28",
-			"User-Agent": "firefly-writing-dev-api",
-			...extra,
-		};
-	}
-
-	async function githubFetch(pathWithQuery, token, init = {}) {
-		const res = await fetch(`${GITHUB_API}${pathWithQuery}`, {
-			...init,
-			headers: githubHeaders(token, init.headers),
-			signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
-		});
-		return res;
-	}
+	// --- GitHub 上传（POST /publish）：githubFetch 由共享模块提供 ---
 
 	async function publishToGitHub(res, body) {
 		const repo = String(body.repo || "").trim();
-		if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+		if (!REPO_PATTERN.test(repo)) {
 			return error(res, 400, "仓库格式应为 owner/repo");
 		}
 		const fullPath = resolvePostPath(body.file);
@@ -360,16 +320,36 @@ function writingDevApi() {
 		name: "firefly-writing-dev-api",
 		configureServer(server) {
 			server.middlewares.use("/api/writing", (req, res, next) => {
-				if (req.headers["x-writing-auth"] !== writingConfig.passwordHash) {
-					error(res, 401, "Unauthorized");
-					return;
-				}
 				// connect 挂载后 req.url 形如 "/posts?file=xxx"
 				const requestUrl = new URL(req.url, "http://localhost");
 				const route = requestUrl.pathname.replace(/\/+$/, "") || "/";
 				const fileParam = requestUrl.searchParams.get("file") || "";
 
 				const handle = async () => {
+					// 登录：服务端校验密码并签发会话 token（与线上 Vercel Function 同契约）
+					if (req.method === "POST" && route === "/auth") {
+						let body;
+						try {
+							body = JSON.parse(await readBody(req));
+						} catch {
+							return error(res, 400, "Invalid JSON body");
+						}
+						if (!body || !verifyPassword(body.password)) {
+							return error(res, 401, "密码不正确");
+						}
+						return json(res, 200, {
+							token: signSession(),
+							mode: "dev",
+							repo: resolveRepo(),
+							branch: (process.env.WRITING_GITHUB_BRANCH || "").trim(),
+							tokenReady: Boolean(process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN),
+						});
+					}
+					// 其余接口要求有效会话 token（HMAC 签名 + 有效期）
+					if (!verifySession(req.headers["x-writing-auth"])) {
+						error(res, 401, "登录已过期，请重新登录");
+						return;
+					}
 					if (route === "/posts" && req.method === "GET") {
 						if (fileParam) {
 							const fullPath = resolvePostPath(fileParam);
@@ -393,7 +373,13 @@ function writingDevApi() {
 								content,
 							});
 						}
-						return json(res, 200, { posts: listPosts() });
+						return json(res, 200, {
+							posts: listPosts(),
+							mode: "dev",
+							repo: resolveRepo(),
+							branch: (process.env.WRITING_GITHUB_BRANCH || "").trim(),
+							tokenReady: Boolean(process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN),
+						});
 					}
 
 					if ((req.method === "POST" || req.method === "PUT") && route === "/posts") {
