@@ -91,9 +91,10 @@ let tagInput = $state("");
 let content = $state("");
 let saving = $state(false);
 let saveError = $state("");
-// --- 仓库输入（仅 deployed 模式可见，用于指定 save/delete 的目标仓库）---
-const REPO_KEY = "firefly-writing-repo";
+// --- 目标仓库（仅 deployed 模式只读展示，由服务端自动解析）---
 let repoInput = $state("");
+// --- 列表视图：published 我的文章 / drafts 草稿箱 ---
+let listTab = $state<"published" | "drafts">("published");
 let mobilePane = $state<"edit" | "preview">("edit");
 let editorEl: HTMLTextAreaElement | undefined = $state();
 
@@ -110,7 +111,11 @@ const slugConflict = $derived(
 const canSave = $derived(
 	!!form.title.trim() && !!form.published && !!form.slug && !slugConflict,
 );
-const repoValid = $derived(/^[\w.-]+\/[\w.-]+$/.test(repoInput.trim()));
+const publishedPosts = $derived(posts.filter((p) => !p.draft));
+const draftPosts = $derived(posts.filter((p) => p.draft));
+const visiblePosts = $derived(
+	listTab === "drafts" ? draftPosts : publishedPosts,
+);
 
 function todayStr(): string {
 	const d = new Date();
@@ -181,8 +186,8 @@ async function handleLogin(event: SubmitEvent) {
 		mode = auth.mode === "deployed" ? "deployed" : "dev";
 		if (typeof auth.tokenReady === "boolean")
 			githubTokenReady = auth.tokenReady;
-		// 服务端给的默认仓库仅在用户没有手动输入过时预填
-		if (!repoInput.trim() && auth.repo) repoInput = auth.repo;
+		// 仓库只由服务端解析并下发，前端只读展示
+		repoInput = auth.repo ?? "";
 		password = "";
 		await loadList();
 	} catch {
@@ -200,23 +205,15 @@ function authHeaders(): Record<string, string> {
 	};
 }
 
-// 用户改过仓库输入框时，把目标仓库带给服务端（线上按仓库读写；本地忽略）
-function repoQuery(): string {
-	return repoValid ? `&repo=${encodeURIComponent(repoInput.trim())}` : "";
-}
-
 async function loadList() {
 	listLoading = true;
 	listError = "";
 	try {
 		// 注意：站点 trailingSlash 为 always，Astro 会在无尾斜杠 URL 上
 		// 先于 dev middleware 返回 404，因此 API 路径统一带尾斜杠
-		const res = await fetch(
-			`/api/writing/posts/?_=${Date.now()}${repoQuery()}`,
-			{
-				headers: authHeaders(),
-			},
-		);
+		const res = await fetch(`/api/writing/posts/?_=${Date.now()}`, {
+			headers: authHeaders(),
+		});
 		if (res.status === 401) {
 			handleSessionExpired();
 			return;
@@ -235,7 +232,7 @@ async function loadList() {
 		mode = data.mode === "deployed" ? "deployed" : "dev";
 		if (typeof data.tokenReady === "boolean")
 			githubTokenReady = data.tokenReady;
-		if (!repoInput.trim() && data.repo) repoInput = data.repo;
+		repoInput = data.repo ?? "";
 		view = "list";
 	} catch {
 		// 站点上没有 /api/writing 接口（未部署 Functions 或 Cloudflare 纯静态）时进入离线提示
@@ -249,8 +246,10 @@ async function openEdit(item: PostItem) {
 	listError = "";
 	try {
 		const res = await fetch(
-			`/api/writing/posts/?file=${encodeURIComponent(item.file)}${repoQuery()}`,
-			{ headers: authHeaders() },
+			`/api/writing/posts/?file=${encodeURIComponent(item.file)}`,
+			{
+				headers: authHeaders(),
+			},
 		);
 		if (res.status === 401) {
 			handleSessionExpired();
@@ -318,7 +317,6 @@ async function savePost(): Promise<string | null> {
 				tags,
 				content,
 				...(editingFile ? { file: editingFile } : {}),
-				...(repoValid ? { repo: repoInput.trim() } : {}),
 			}),
 		});
 		if (res.status === 401) {
@@ -336,7 +334,8 @@ async function savePost(): Promise<string | null> {
 		justSavedFile = (data as { file?: string }).file ?? "";
 		// 线上模式保存即提交，响应里带 commit 链接
 		justSavedUrl = (data as { url?: string }).url ?? "";
-		if (repoValid) localStorage.setItem(REPO_KEY, repoInput.trim());
+		// 发布的文章回到「我的文章」，草稿留在草稿箱
+		if (!form.draft) listTab = "published";
 		await loadList();
 		return justSavedFile || null;
 	} catch {
@@ -355,8 +354,11 @@ async function deletePost(item: PostItem) {
 	listError = "";
 	try {
 		const res = await fetch(
-			`/api/writing/posts/?file=${encodeURIComponent(item.file)}${repoQuery()}`,
-			{ method: "DELETE", headers: authHeaders() },
+			`/api/writing/posts/?file=${encodeURIComponent(item.file)}`,
+			{
+				method: "DELETE",
+				headers: authHeaders(),
+			},
 		);
 		if (res.status === 401) {
 			handleSessionExpired();
@@ -446,8 +448,8 @@ function insertCodeBlock() {
 }
 
 onMount(() => {
-	// 恢复上次使用的仓库；没有记录时用页面传入的默认仓库
-	repoInput = localStorage.getItem(REPO_KEY) || defaultRepo;
+	// 仓库由服务端解析并只读展示，这里先用页面传入的默认仓库占位
+	repoInput = defaultRepo;
 	// 会话恢复：token 是否有效由服务端在首次列表请求时校验，失效走 401 → 登录页
 	if (sessionStorage.getItem(AUTH_KEY)) {
 		loadList();
@@ -520,11 +522,40 @@ onMount(() => {
 		<div class="card-base px-5 py-6 md:px-8">
 			<div class="mb-5 flex flex-wrap items-center gap-3">
 				<div class="flex-1">
-					<h1 class="text-2xl font-bold">我的文章</h1>
+					<h1 class="text-2xl font-bold">
+						{listTab === "drafts" ? "草稿箱" : "我的文章"}
+					</h1>
 					<p class="mt-1 text-sm text-black/50 dark:text-white/50">
-						共 {posts.length} 篇 · 发布后立即出现在站上
+						{#if listTab === "drafts"}
+							共 {draftPosts.length} 篇 · 保存草稿后统一在这里管理
+						{:else}
+							共 {publishedPosts.length} 篇 · 发布后立即出现在站上
+						{/if}
 					</p>
 				</div>
+				{#if listTab === "drafts"}
+					<button
+						class="flex h-10 items-center rounded-lg px-4 text-sm text-black/55 transition hover:text-(--primary) dark:text-white/55"
+						onclick={() => (listTab = "published")}
+					>
+						返回我的文章
+					</button>
+				{:else}
+					<button
+						class="flex h-10 items-center gap-2 rounded-lg px-4 text-sm text-black/55 transition hover:text-(--primary) dark:text-white/55"
+						onclick={() => (listTab = "drafts")}
+						title="查看和管理草稿"
+					>
+						草稿箱
+						{#if draftPosts.length > 0}
+							<span
+								class="inline-flex min-w-5 items-center justify-center rounded-full bg-black/8 px-1.5 text-xs font-bold dark:bg-white/15"
+							>
+								{draftPosts.length}
+							</span>
+						{/if}
+					</button>
+				{/if}
 				<button
 					class="btn-regular h-10 rounded-lg px-5 font-bold"
 					onclick={openCreate}
@@ -574,13 +605,17 @@ onMount(() => {
 
 			{#if listLoading}
 				<p class="py-10 text-center text-sm text-black/45 dark:text-white/45">加载中…</p>
-			{:else if posts.length === 0}
+			{:else if visiblePosts.length === 0}
 				<p class="py-10 text-center text-sm text-black/45 dark:text-white/45">
-					还没有文章，点右上角「新建文章」开始写作吧。
+					{#if listTab === "drafts"}
+						暂无草稿，新建文章时勾选「存为草稿」即可保存到这里。
+					{:else}
+						还没有文章，点右上角「新建文章」开始写作吧。
+					{/if}
 				</p>
 			{:else}
 				<ul>
-					{#each posts as item (item.file)}
+					{#each visiblePosts as item (item.file)}
 						<li class="ws-row">
 							<div class="min-w-0 flex-1">
 								<div class="flex items-center gap-2">
@@ -818,14 +853,12 @@ onMount(() => {
 			<div class="mt-5">
 				<div class="flex flex-wrap items-center gap-3">
 					{#if mode === "deployed"}
-						<input
-							type="text"
-							class="ws-input w-56 shrink-0 font-mono text-xs"
-							bind:value={repoInput}
-							placeholder="默认站点仓库"
-							aria-label="目标仓库（用户名/仓库名）"
-							title="保存/删除将提交到该仓库，留空用站点仓库"
-						/>
+						<span
+							class="shrink-0 border-0 font-mono text-xs text-black/55 dark:text-white/55"
+							title="目标仓库由服务端自动解析，不可手动更改"
+						>
+							{repoInput.trim() || "站点仓库"}
+						</span>
 					{/if}
 					<button
 						class="btn-regular flex h-10 items-center gap-2 rounded-lg px-6 font-bold disabled:cursor-not-allowed disabled:opacity-50"

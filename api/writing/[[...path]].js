@@ -372,20 +372,21 @@ async function handleAuth(request) {
 	});
 }
 
-function pickRepo(url) {
-	const repo =
-		String(url.searchParams.get("repo") || "").trim() || resolveRepo();
+// 仓库只由服务端解析（WRITING_GITHUB_REPO → Vercel 注入仓库），
+// 不接受客户端传入，防止带 token 的会话提交到任意仓库
+function pickRepo() {
+	const repo = resolveRepo();
 	if (!REPO_PATTERN.test(repo)) {
 		throw new HttpError(
 			400,
-			"仓库格式应为 owner/repo（可在页面输入框指定或配置 WRITING_GITHUB_REPO）",
+			"目标仓库未配置（需设置 WRITING_GITHUB_REPO 或将站点部署在 Vercel）",
 		);
 	}
 	return repo;
 }
 
-async function handleList(url) {
-	const repo = pickRepo(url);
+async function handleList() {
+	const repo = pickRepo();
 	const token = requireToken();
 	const branch = await resolveBranch(repo, token);
 	const files = await listPostFiles(repo, branch, token);
@@ -410,7 +411,7 @@ async function handleRead(url) {
 	if (!file || !isPostPath(`${POSTS_DIR}/${file.replace(/\\/g, "/")}`)) {
 		return fail("Invalid file name");
 	}
-	const repo = pickRepo(url);
+	const repo = pickRepo();
 	const token = requireToken();
 	const branch = await resolveBranch(repo, token);
 	const data = await ghData(
@@ -454,8 +455,7 @@ async function handleSave(request, isCreate) {
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(formatDate(body.published) || "")) {
 		return fail("Published date is required (YYYY-MM-DD)");
 	}
-	const repo = String(body.repo || "").trim() || resolveRepo();
-	if (!REPO_PATTERN.test(repo)) return fail("仓库格式应为 owner/repo");
+	const repo = pickRepo();
 	// 本地可判定的校验全部前置，通过后才发起 GitHub 请求
 	let file;
 	if (isCreate) {
@@ -514,7 +514,7 @@ async function handleDelete(url) {
 	const file = (url.searchParams.get("file") || "").trim().replace(/\\/g, "/");
 	if (!file || !isPostPath(`${POSTS_DIR}/${file}`))
 		return fail("Invalid file name");
-	const repo = pickRepo(url);
+	const repo = pickRepo();
 	const token = requireToken();
 	const branch = await resolveBranch(repo, token);
 
@@ -572,7 +572,7 @@ export default async function handler(request, response) {
 			// 与 dev middleware 一致：带 file 参数读单篇，否则返回列表
 			result = url.searchParams.get("file")
 				? await handleRead(url)
-				: await handleList(url);
+				: await handleList();
 		} else if (
 			(normalizedRequest.method === "POST" ||
 				normalizedRequest.method === "PUT") &&
