@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm build",
+  "buildCommand": "rm -f node_modules/.astro/data-store.json && pnpm build",
   "outputDirectory": "dist",
   "installCommand": "pnpm install",
   "framework": "astro",
