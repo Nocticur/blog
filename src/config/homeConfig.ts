@@ -6,7 +6,7 @@ export const homeConfig: HomeConfig = {
 	// 1. public 目录（以 "/" 开头，不优化）："/assets/images/avatar.webp"
 	// 2. src 目录（不以 "/" 开头，自动优化但会增加构建时间，推荐）："assets/images/avatar.webp"
 	// 3. 远程 URL："https://example.com/avatar.jpg"
-	avatar: "assets/images/avatar.webp",
+	avatar: "assets/images/logo-nocticur.png",
 
 	// 名字
 	name: "Nocticur",
@@ -52,8 +52,8 @@ export const homeConfig: HomeConfig = {
 			handle: "属于夜幕之人",
 		},
 		sticker: {
-			image: "/assets/images/home/character.avif",
-			alt: "黑猫角色贴纸",
+			image: "/assets/images/logo-nocticur.png",
+			alt: "站长头像贴纸",
 			eye: {
 				xPercent: 41.1,
 				yPercent: 48.2,
