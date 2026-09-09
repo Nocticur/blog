@@ -24,7 +24,7 @@ export const friendsPageConfig: FriendsPageConfig = {
 		name: "Nocticur的博客",
 		desc: "哈基米，南北绿豆",
 		url: "https://blog.mourn.top",
-		avatar: "https://i.stardots.io/784774835/StarDots-2026052116374135506.jpg",
+		avatar: "https://mourn.eu.cc/file/1788886353387_Codex_图像_2026年9月9日_00_52_08.png",
 		email: "nocticur@mourn.top",
 	},
 
