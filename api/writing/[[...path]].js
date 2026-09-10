@@ -10,6 +10,7 @@
  * - GET  /api/writing/posts         文章列表（含草稿）
  * - GET  /api/writing/posts?file=   读取单篇（frontmatter + 正文）
  * - POST/PUT /api/writing/posts     保存 = 提交到仓库（草稿以 draft:true 一并入库）
+ * - POST /api/writing/images        上传本地图片 = 提交到仓库现有文章图片目录
  * - DELETE /api/writing/posts?file= 删除仓库中的文章文件
  *
  * 注意：本文件刻意做成「自包含」——鉴权/会话/buildMarkdown/仓库解析等逻辑直接
@@ -30,6 +31,16 @@ const DEFAULT_PASSWORD_HASH =
 	"afac327e73694e68c02f5c62f3bc0bcf0f239744ff12921e781487a0f9b3d5d0";
 const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
 const VALID_SEGMENT = /^[\p{L}\p{N}][\p{L}\p{N}._-]*$/u;
+const IMAGE_MIME_TYPES = {
+	"image/jpeg": ".jpg",
+	"image/png": ".png",
+	"image/webp": ".webp",
+	"image/avif": ".avif",
+	"image/gif": ".gif",
+};
+const IMAGE_DATA_URL_PATTERN =
+	/^data:(image\/(?:jpeg|png|webp|avif|gif));base64,([A-Za-z0-9+/]+={0,2})$/;
+const MAX_UPLOAD_SIZE = 4.5 * 1024 * 1024;
 const GITHUB_API = "https://api.github.com";
 const GITHUB_TIMEOUT_MS = 30 * 1000;
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -109,6 +120,33 @@ function formatDate(value) {
 		}
 	}
 	return String(value).slice(0, 10);
+}
+
+function imageTimestamp() {
+	const now = new Date();
+	const pad = (value) => String(value).padStart(2, "0");
+	return [
+		now.getFullYear(),
+		pad(now.getMonth() + 1),
+		pad(now.getDate()),
+		pad(now.getHours()),
+		pad(now.getMinutes()),
+		pad(now.getSeconds()),
+	].join("");
+}
+
+function resolveImageUpload(body) {
+	const slug = String(body?.slug || "").trim();
+	if (!slug || !VALID_SEGMENT.test(slug)) return null;
+	const match = IMAGE_DATA_URL_PATTERN.exec(String(body?.dataUrl || ""));
+	if (!match) return null;
+	const image = Buffer.from(match[2], "base64");
+	if (image.length === 0 || image.length > MAX_UPLOAD_SIZE) return null;
+	return {
+		slug,
+		image,
+		extension: IMAGE_MIME_TYPES[match[1]],
+	};
 }
 
 // 表单 + 正文 → Markdown。js-yaml 会给形如日期的字符串加引号，而引号字符串
@@ -448,6 +486,32 @@ async function handleRead(url) {
 	});
 }
 
+async function handleUploadImage(request) {
+	const body = await readJson(request);
+	const upload = resolveImageUpload(body);
+	if (!upload) return fail("Invalid image or file size");
+
+	const repo = pickRepo();
+	const token = requireToken();
+	const branch = await resolveBranch(repo, token);
+	const fileName = `${upload.slug}-${imageTimestamp()}${upload.extension}`;
+	const remotePath = `src/content/posts/image/${upload.slug}.assets/${fileName}`;
+	const put = await githubFetch(
+		`/repos/${repo}/contents/${remotePath.split("/").map(encodeURIComponent).join("/")}`,
+		token,
+		{
+			method: "PUT",
+			body: JSON.stringify({
+				message: `上传文章图片：${upload.slug}`,
+				content: upload.image.toString("base64"),
+				branch,
+			}),
+		},
+	);
+	await ghData(put, "图片上传失败");
+	return json({ image: `./image/${upload.slug}.assets/${fileName}` });
+}
+
 async function handleSave(request, isCreate) {
 	const body = await readJson(request);
 	if (!body) return fail("Invalid JSON body");
@@ -573,6 +637,8 @@ export default async function handler(request, response) {
 			result = url.searchParams.get("file")
 				? await handleRead(url)
 				: await handleList();
+		} else if (normalizedRequest.method === "POST" && route === "/images") {
+			result = await handleUploadImage(normalizedRequest);
 		} else if (
 			(normalizedRequest.method === "POST" ||
 				normalizedRequest.method === "PUT") &&

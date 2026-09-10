@@ -97,6 +97,9 @@ let repoInput = $state("");
 let listTab = $state<"published" | "drafts">("published");
 let mobilePane = $state<"edit" | "preview">("edit");
 let editorEl: HTMLTextAreaElement | undefined = $state();
+let coverFileInput: HTMLInputElement | undefined = $state();
+let uploadingCover = $state(false);
+let coverUploadError = $state("");
 
 const previewHtml = $derived(marked.parse(content) as string);
 const allCategories = $derived([
@@ -218,12 +221,9 @@ async function loadList() {
 			handleSessionExpired();
 			return;
 		}
-		const data = await res
-			.json()
-			.catch(() => ({}) as { error?: string });
+		const data = await res.json().catch(() => ({}) as { error?: string });
 		if (!res.ok) {
-			listError =
-				data.error || `加载文章失败（HTTP ${res.status}）`;
+			listError = data.error || `加载文章失败（HTTP ${res.status}）`;
 			view = "list";
 			return;
 		}
@@ -274,6 +274,7 @@ async function openEdit(item: PostItem) {
 		tagInput = "";
 		content = data.content;
 		saveError = "";
+		coverUploadError = "";
 		mobilePane = "edit";
 		view = "editor";
 	} catch {
@@ -298,16 +299,57 @@ function openCreate() {
 	tagInput = "";
 	content = "";
 	saveError = "";
+	coverUploadError = "";
 	justSavedFile = "";
 	justSavedUrl = "";
 	mobilePane = "edit";
 	view = "editor";
 }
 
+async function uploadCover(event: Event) {
+	const input = event.currentTarget as HTMLInputElement;
+	const file = input.files?.[0];
+	if (!file || uploadingCover) return;
+
+	coverUploadError = "";
+	uploadingCover = true;
+	try {
+		const dataUrl = await new Promise<string>((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(reader.result as string);
+			reader.onerror = () => reject(new Error("read failed"));
+			reader.readAsDataURL(file);
+		});
+		const res = await fetch("/api/writing/images/", {
+			method: "POST",
+			headers: authHeaders(),
+			body: JSON.stringify({ slug: form.slug, dataUrl }),
+		});
+		if (res.status === 401) {
+			handleSessionExpired();
+			return;
+		}
+		const data = await res
+			.json()
+			.catch(() => ({}) as { error?: string; image?: string });
+		if (!res.ok) {
+			coverUploadError = data.error || `封面上传失败（HTTP ${res.status}）`;
+			return;
+		}
+		form.image = data.image ?? "";
+	} catch {
+		coverUploadError = "封面上传失败，请重试";
+	} finally {
+		uploadingCover = false;
+		input.value = "";
+	}
+}
+
 async function savePost(): Promise<string | null> {
 	if (!canSave || saving) return null;
 	saving = true;
 	saveError = "";
+	coverUploadError = "";
 	try {
 		const res = await fetch("/api/writing/posts/", {
 			method: editingFile ? "PUT" : "POST",
@@ -741,8 +783,27 @@ onMount(() => {
 					<input
 						class="ws-input"
 						bind:value={form.image}
-						placeholder="./assets/{form.slug || "your-slug"}.webp（留空用随机封面）"
+						placeholder="在线图片链接"
 					/>
+					<input
+						bind:this={coverFileInput}
+						type="file"
+						accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
+						class="sr-only"
+						aria-label="本地上传封面图"
+						onchange={uploadCover}
+					/>
+					<button
+						type="button"
+						class="ws-upload-link mt-2"
+						disabled={uploadingCover || !form.slug}
+						onclick={() => coverFileInput?.click()}
+					>
+						{uploadingCover ? "上传中…" : "本地上传"}
+					</button>
+					{#if coverUploadError}
+						<span class="ws-field-error block">{coverUploadError}</span>
+					{/if}
 				</label>
 
 				<label class="block md:col-span-2">

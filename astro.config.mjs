@@ -126,7 +126,7 @@ function getPostLastmod(postId) {
  *
  * POST /api/writing/auth/：登录接口，服务端校验密码后签发 HMAC 会话 token，
  * 与线上 api/writing/[[...path]].js（Vercel Function）保持同一契约，前端据此
- * 自适应本地/线上模式（线上保存即经 GitHub Contents API 提交并触发重新构建）。
+ * 自适应本地/线上模式（线上保存/上传即经 GitHub Contents API 提交并触发重新构建）。
  * 鉴权/会话辅助逻辑在 src/lib/writing-server.mjs（与线上函数内的内联副本同步）。
  *
  * 安全：除登录外，每个接口都要求 x-writing-auth 头携带有效会话 token，
@@ -136,7 +136,17 @@ function writingDevApi() {
 	const postsDir = path.resolve("./src/content/posts");
 	const postsDirPrefix = `${postsDir}${path.sep}`;
 	const validSegment = /^[\p{L}\p{N}][\p{L}\p{N}._-]*$/u;
-	const MAX_BODY_SIZE = 5 * 1024 * 1024;
+	const MAX_BODY_SIZE = 8 * 1024 * 1024;
+	const MAX_UPLOAD_SIZE = 4.5 * 1024 * 1024;
+	const IMAGE_MIME_TYPES = {
+		"image/jpeg": ".jpg",
+		"image/png": ".png",
+		"image/webp": ".webp",
+		"image/avif": ".avif",
+		"image/gif": ".gif",
+	};
+	const IMAGE_DATA_URL_PATTERN =
+		/^data:(image\/(?:jpeg|png|webp|avif|gif));base64,([A-Za-z0-9+/]+={0,2})$/;
 
 	function json(res, status, data) {
 		res.statusCode = status;
@@ -160,6 +170,33 @@ function writingDevApi() {
 		const fullPath = path.resolve(postsDir, name);
 		if (!fullPath.startsWith(postsDirPrefix)) return null;
 		return fullPath;
+	}
+
+	function imageTimestamp() {
+		const now = new Date();
+		const pad = (value) => String(value).padStart(2, "0");
+		return [
+			now.getFullYear(),
+			pad(now.getMonth() + 1),
+			pad(now.getDate()),
+			pad(now.getHours()),
+			pad(now.getMinutes()),
+			pad(now.getSeconds()),
+		].join("");
+	}
+
+	function resolveImageUpload(body) {
+		const slug = String(body?.slug || "").trim();
+		if (!slug || !validSegment.test(slug)) return null;
+		const match = IMAGE_DATA_URL_PATTERN.exec(String(body?.dataUrl || ""));
+		if (!match) return null;
+		const image = Buffer.from(match[2], "base64");
+		if (image.length === 0 || image.length > MAX_UPLOAD_SIZE) return null;
+		return {
+			slug,
+			image,
+			extension: IMAGE_MIME_TYPES[match[1]],
+		};
 	}
 
 	function listPosts() {
@@ -276,6 +313,34 @@ function writingDevApi() {
 							repo: resolveRepo(),
 							branch: (process.env.WRITING_GITHUB_BRANCH || "").trim(),
 							tokenReady: Boolean(process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN),
+						});
+					}
+
+					if (req.method === "POST" && route === "/images") {
+						let body;
+						try {
+							body = JSON.parse(await readBody(req));
+						} catch {
+							return error(res, 400, "Invalid JSON body");
+						}
+						const upload = resolveImageUpload(body);
+						if (!upload) {
+							return error(res, 400, "Invalid image or file size");
+						}
+						const relativeDir = `image/${upload.slug}.assets`;
+						const targetDir = path.resolve(postsDir, relativeDir);
+						if (!targetDir.startsWith(postsDirPrefix)) {
+							return error(res, 400, "Invalid slug (file name)");
+						}
+						const fileName = `${upload.slug}-${imageTimestamp()}${upload.extension}`;
+						const fullPath = path.join(targetDir, fileName);
+						fs.mkdirSync(targetDir, { recursive: true });
+						fs.writeFileSync(fullPath, upload.image);
+						setImmediate(() => {
+							server.watcher.emit("add", fullPath);
+						});
+						return json(res, 200, {
+							image: `./image/${upload.slug}.assets/${fileName}`,
 						});
 					}
 
