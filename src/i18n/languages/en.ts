@@ -267,6 +267,7 @@ export const en: Translation = {
 	[Key.calendarNoPosts]: "No posts were published this day",
 	[Key.feibichi]: "Feibichi",
 	[Key.contactMe]: "Contact",
+	[Key.email]: "Email",
 	[Key.qqGroup]: "QQ Group",
 	[Key.navPosts]: "Posts",
 	[Key.navMy]: "Others",

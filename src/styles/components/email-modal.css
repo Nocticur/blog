@@ -1,0 +1,168 @@
+.email-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: oklch(0 0 0 / 0.3);
+  animation: email-modal-fade-in 0.2s ease;
+}
+
+.email-modal-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(1180px, 96vw);
+  height: min(86vh, 860px);
+  overflow: hidden;
+  border-radius: 1rem;
+  background: var(--page-bg);
+  border: 1px solid color-mix(in oklab, var(--deep-text) 14%, transparent);
+  box-shadow:
+    0 24px 60px -12px rgb(0 0 0 / 0.35),
+    0 8px 20px -8px rgb(0 0 0 / 0.25);
+  animation: email-modal-slide-up 0.25s ease;
+}
+
+.email-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--deep-text) 10%, transparent);
+}
+
+.email-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.email-modal-title-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--primary);
+}
+
+.email-modal-title-text {
+  overflow: hidden;
+  color: var(--deep-text);
+  font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.email-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 0.5rem;
+  color: color-mix(in oklab, var(--deep-text) 65%, transparent);
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    transform 0.15s;
+}
+
+.email-modal-close:hover {
+  color: var(--primary);
+  background: color-mix(in oklab, var(--deep-text) 8%, transparent);
+}
+
+.email-modal-close:active {
+  transform: scale(0.92);
+}
+
+.email-modal-frame {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--page-bg);
+}
+
+.email-modal-iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  color-scheme: light dark;
+}
+
+.email-modal-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.email-modal-loading-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--primary);
+  animation: email-modal-loading-pulse 0.9s ease-in-out infinite;
+}
+
+.email-modal-loading-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.email-modal-loading-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes email-modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes email-modal-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(1rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes email-modal-loading-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-0.25rem);
+  }
+}
+
+@media (max-width: 640px) {
+  .email-modal-overlay {
+    padding: 0;
+  }
+
+  .email-modal-panel {
+    width: 100vw;
+    height: 100dvh;
+    border-width: 0;
+    border-radius: 0;
+  }
+}

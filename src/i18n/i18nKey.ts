@@ -59,6 +59,7 @@ enum I18nKey {
 	author = "author",
 	publishedAt = "publishedAt",
 	license = "license",
+	email = "email",
 	friends = "friends",
 	friendsDescription = "friendsDescription",
 	guestbook = "guestbook",

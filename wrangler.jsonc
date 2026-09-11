@@ -1,9 +1,10 @@
 {
 	// 编辑器智能提示与校验（自动补全、错误红线），不影响部署行为
 	"$schema": "./node_modules/wrangler/config-schema.json",
-	// 纯静态资产部署：dist/ 由 Workers 静态资产服务直接分发，无 Worker 脚本
+	// 静态资产优先；指定 Cloud Mail 相关路径进入 Worker，其余内容仍由静态资产服务分发
 	// Worker 名称，必须与 Cloudflare 后台已连接 Git 构建的那个 Worker 一致
 	"name": "my-blog",
+	"main": "./worker/index.js",
 	// Workers 运行时兼容性日期，纯静态资产服务下无实质影响
 	"compatibility_date": "2026-05-07",
 	"assets": {
@@ -13,6 +14,44 @@
 		// 与站点 trailingSlash: "always" 一致，统一 URL 避免 SEO 权重分散
 		"html_handling": "force-trailing-slash",
 		// 未命中路由时返回 dist/404.html（附 404 状态码）
-		"not_found_handling": "404-page"
+		"not_found_handling": "404-page",
+		// Worker 通过该绑定回退读取博客静态资产
+		"binding": "ASSETS",
+		"run_worker_first": [
+			"/all-mail",
+			"/all-mail/",
+			"/all-users",
+			"/all-users/",
+			"/analysis",
+			"/analysis/",
+			"/drafts",
+			"/drafts/",
+			"/inbox",
+			"/inbox/",
+			"/invite-code",
+			"/invite-code/",
+			"/login",
+			"/login/",
+			"/mail",
+			"/mail/",
+			"/role",
+			"/role/",
+			"/sent",
+			"/sent/",
+			"/settings",
+			"/settings/",
+			"/starred",
+			"/starred/",
+			"/system-settings",
+			"/system-settings/",
+			"/test",
+			"/test/",
+			"/assets/*",
+			"/api/*",
+			"/manifest.webmanifest",
+			"/mail-pwa.png",
+			"/registerSW.js",
+			"/sw.js"
+		]
 	}
 }

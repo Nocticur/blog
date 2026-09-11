@@ -268,6 +268,7 @@ export const ja: Translation = {
 	[Key.calendarNoPosts]: "この日に公開された記事はありません",
 	[Key.feibichi]: "个人主站",
 	[Key.contactMe]: "連絡",
+	[Key.email]: "メール",
 	[Key.qqGroup]: "QQグループ",
 	[Key.navPosts]: "記事",
 	[Key.navMy]: "その他",

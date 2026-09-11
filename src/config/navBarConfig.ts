@@ -1,4 +1,7 @@
+import { EMAIL_MODAL_TOGGLE_EVENT } from "@/utils/email-modal-controller";
 import { LinkPresets } from "../constants/link-presets";
+import I18nKey from "../i18n/i18nKey";
+import { i18n } from "../i18n/translation";
 import {
 	LinkPreset,
 	type NavBarConfig,
@@ -43,6 +46,12 @@ const buildNavBarConfig = (): NavBarConfig => {
 	// 2. 构建联系我下拉菜单
 	// 留言板不再走导航入口：全站由 dock 按钮唤起弹窗（FloatingDock / MobileDock）
 	const contactChildren: (NavBarLink | LinkPreset)[] = [];
+	contactChildren.push({
+		name: i18n(I18nKey.email),
+		url: "/role",
+		action: EMAIL_MODAL_TOGGLE_EVENT,
+		icon: "material-symbols:mail",
+	});
 	if (siteConfig.pages.friends) {
 		contactChildren.push(LinkPreset.Friends);
 	}

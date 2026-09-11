@@ -40,6 +40,8 @@ declare global {
 		__searchModalMounted?: boolean;
 		__guestbookLoadersReady?: boolean;
 		__guestbookModalMounted?: boolean;
+		__emailLoadersReady?: boolean;
+		__emailModalMounted?: boolean;
 		__friendImagePreviewReady?: boolean;
 		// biome-ignore lint/suspicious/noExplicitAny: External library
 		spinePlayerInstance?: any;

@@ -269,6 +269,7 @@ export const ru: Translation = {
 	[Key.calendarNoPosts]: "В этот день публикаций не было",
 	[Key.feibichi]: "Фэйби Цзюби",
 	[Key.contactMe]: "Связаться",
+	[Key.email]: "Почта",
 	[Key.qqGroup]: "QQ Группа",
 	[Key.navPosts]: "Статьи",
 	[Key.navMy]: "Другое",

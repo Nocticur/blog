@@ -262,6 +262,7 @@ export const zh_CN: Translation = {
 	[Key.calendarNoPosts]: "这一天还没有发布文章",
 	[Key.feibichi]: "个人主站",
 	[Key.contactMe]: "联系",
+	[Key.email]: "邮箱",
 	[Key.qqGroup]: "QQ群",
 	[Key.navPosts]: "文章",
 	[Key.navMy]: "其他",
