@@ -2,8 +2,7 @@
 title: cloudflare优选
 published: 2026-09-10
 description: ''
-image: >-
-  https://nocticur.eu.cc/file/1788966075414_17725449966280dd9e9c1a6642198825787320a011a942b8.webp
+image: 'https://image.nocticur.eu.cc/file/1788966069948_IMG_20260322_102441.webp'
 tags:
   - 部署
 category: cloudflare
