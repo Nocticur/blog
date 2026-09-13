@@ -260,7 +260,6 @@ const siteLang = lang.replace("_", "-");
     <MobileDock />
     <div id="search-modal-root"></div>
     {siteConfig.pages.guestbook && <div id="guestbook-modal-root"></div>}
-    <div id="email-modal-root"></div>
     <PrivacyModal />
     <UserAgreementModal />
     <FancyboxManager />
@@ -374,54 +373,7 @@ const siteLang = lang.replace("_", "-");
       }
     });
   }
-</script>
-
-<script>
-  // 邮箱弹窗：惰性挂载到 Swup 容器外，首次触发时才加载 Cloud Mail iframe。
-  import {
-    requestEmailModalToggle,
-    EMAIL_MODAL_TOGGLE_EVENT,
-  } from "@/utils/email-modal-controller";
-
-  if (!window.__emailLoadersReady) {
-    window.__emailLoadersReady = true;
-    let emailMountPromise: Promise<void> | null = null;
-
-    const mountEmailModal = () => {
-      if (window.__emailModalMounted) return Promise.resolve();
-      if (!emailMountPromise) {
-        emailMountPromise = Promise.all([
-          import("svelte"),
-          import("@/components/features/EmailModal.svelte"),
-        ]).then(async ([{ mount, tick }, { default: EmailModal }]) => {
-          const target = document.getElementById("email-modal-root");
-          if (!target) throw new Error("Email modal root is missing");
-          mount(EmailModal, { target });
-          await tick();
-          window.__emailModalMounted = true;
-        }).catch((error) => {
-          emailMountPromise = null;
-          console.error("Failed to load email modal:", error);
-        });
-      }
-      return emailMountPromise;
-    };
-
-    window.addEventListener(EMAIL_MODAL_TOGGLE_EVENT, () => {
-      void mountEmailModal();
-    });
-
-    document.addEventListener("keydown", (event) => {
-      if (window.__emailModalMounted) return;
-      if (event.altKey && !event.ctrlKey && !event.metaKey && event.code === "KeyE") {
-        event.preventDefault();
-        requestEmailModalToggle();
-      }
-    });
-  }
-</script>
-
-<script>
+</script>`r`n<script>
 	import { initLayout } from "@/utils/layout-init";
 
 	initLayout();

@@ -1,0 +1,10 @@
+---
+import I18nKey from "@/i18n/i18nKey";
+import { i18n } from "@/i18n/translation";
+import "@/styles/components/email-embed.css";
+const mailUrl = "https://mail.mourn.top/";
+---
+<section class="email-embed" aria-labelledby="email-embed-title">
+  <header class="email-embed__header"><div><h1 id="email-embed-title">{i18n(I18nKey.email)}</h1><p>Cloud Mail</p></div><a class="email-embed__external" href={mailUrl} target="_blank" rel="noopener noreferrer">在新标签页打开</a></header>
+  <div class="email-embed__frame"><div class="email-embed__loading">正在加载邮箱…</div><iframe src={mailUrl} title={i18n(I18nKey.email)} loading="eager" referrerpolicy="strict-origin-when-cross-origin" onload="this.previousElementSibling?.remove()"></iframe></div>
+</section>

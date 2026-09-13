@@ -1,4 +1,3 @@
-import { EMAIL_MODAL_TOGGLE_EVENT } from "@/utils/email-modal-controller";
 import { LinkPresets } from "../constants/link-presets";
 import I18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
@@ -48,8 +47,7 @@ const buildNavBarConfig = (): NavBarConfig => {
 	const contactChildren: (NavBarLink | LinkPreset)[] = [];
 	contactChildren.push({
 		name: i18n(I18nKey.email),
-		url: "/role",
-		action: EMAIL_MODAL_TOGGLE_EVENT,
+		url: "/role/",
 		icon: "material-symbols:mail",
 	});
 	if (siteConfig.pages.friends) {
