@@ -27,6 +27,14 @@
 	],
 	"headers": [
 		{
+			"source": "/api/mail-admin/(.*)",
+			"headers": [
+				{ "key": "Cache-Control", "value": "private, no-store" },
+				{ "key": "CDN-Cache-Control", "value": "no-store" },
+				{ "key": "Vercel-CDN-Cache-Control", "value": "no-store" }
+			]
+		},
+		{
 			"source": "/api/:endpoint(new_address|parsed_mails|parsed_mail|mails|clear_inbox|delete_address)/:path*",
 			"headers": [
 				{ "key": "Cache-Control", "value": "private, no-store" },

@@ -6,6 +6,23 @@
   margin-block: 1rem 2rem;
 }
 
+.mail-admin-entry {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.65rem;
+  font-size: 0.78rem;
+}
+
+.mail-admin-entry a {
+  color: var(--content-meta);
+  text-decoration: none;
+}
+
+.mail-admin-entry a:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
 .mail-app {
   --mail-line: color-mix(in oklab, var(--deep-text) 14%, transparent);
   --mail-soft: color-mix(in oklab, var(--deep-text) 5%, transparent);

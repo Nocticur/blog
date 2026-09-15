@@ -18,6 +18,7 @@ const description = "博客内置临时邮箱，无需跳转外部站点即可�
 >
 	<h1 class="sr-only">{title}</h1>
 	<div class="mail-page">
+		<div class="mail-admin-entry"><a href="/mail/admin/">管理员入口</a></div>
 		<MailApp client:only="svelte">
 			<MailAppFallback slot="fallback" />
 		</MailApp>

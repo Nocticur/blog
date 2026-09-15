@@ -1,0 +1,20 @@
+---
+import MailAdmin from "@components/features/MailAdmin.svelte";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import "@/styles/pages/mail-admin.css";
+
+const title = "邮件管理后台";
+const description = "邮件系统管理员控制台。";
+---
+
+<MainGridLayout
+	title={title}
+	description={description}
+	robots="noindex,nofollow"
+	hasOwnH1={true}
+	sidebarPosition="none"
+>
+	<div class="mail-admin-page">
+		<MailAdmin client:only="svelte" />
+	</div>
+</MainGridLayout>
