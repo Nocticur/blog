@@ -17,7 +17,9 @@
 		"icons": "node scripts/generate-icons.js",
 		"lqips": "tsx scripts/generate-lqips.ts",
 		"indexnow": "tsx scripts/indexnow.ts",
-		"test:writing-api": "node scripts/test-writing-api.mjs"
+		"test:writing-api": "node scripts/test-writing-api.mjs",
+		"test:mail": "tsx --test scripts/test-mail-api.mjs scripts/test-mail-worker.mjs",
+		"test:mail:browser": "node scripts/test-mail-browser.mjs"
 	},
 	"dependencies": {
 		"@astrojs/check": "^0.9.10",

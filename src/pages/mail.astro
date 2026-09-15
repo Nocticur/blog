@@ -1,0 +1,25 @@
+---
+import MailApp from "@components/features/MailApp.svelte";
+import MailAppFallback from "@components/features/MailAppFallback.astro";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import I18nKey from "@/i18n/i18nKey";
+import { i18n } from "@/i18n/translation";
+import "@/styles/pages/mail.css";
+
+const title = i18n(I18nKey.email);
+const description = "博客内置临时邮箱，无需跳转外部站点即可收件和查看邮件。";
+---
+
+<MainGridLayout
+	title={title}
+	description={description}
+	hasOwnH1={true}
+	sidebarPosition="none"
+>
+	<h1 class="sr-only">{title}</h1>
+	<div class="mail-page">
+		<MailApp client:only="svelte">
+			<MailAppFallback slot="fallback" />
+		</MailApp>
+	</div>
+</MainGridLayout>

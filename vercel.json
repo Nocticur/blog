@@ -1,94 +1,119 @@
 {
-  "buildCommand": "rm -f node_modules/.astro/data-store.json && pnpm build",
-  "outputDirectory": "dist",
-  "installCommand": "pnpm install",
-  "framework": "astro",
-  "rewrites": [
-    {
-      "source": "/api/writing/:path*/",
-      "destination": "/api/writing/:path*"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        }
-      ]
-    },
-    {
-      "source": "/_astro/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=86400, stale-while-revalidate=604800"
-        }
-      ]
-    },
-    {
-      "source": "/fonts/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=604800, stale-while-revalidate=2592000"
-        }
-      ]
-    },
-    {
-      "source": "/llms.txt",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, stale-while-revalidate=86400"
-        }
-      ]
-    },
-    {
-      "source": "/wiki/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, stale-while-revalidate=86400"
-        }
-      ]
-    },
-    {
-      "source": "/api/allPostMeta.json",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "application/json; charset=utf-8"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, stale-while-revalidate=86400"
-        }
-      ]
-    }
-  ],
-  "cleanUrls": true
+	"buildCommand": "rm -f node_modules/.astro/data-store.json && pnpm build",
+	"outputDirectory": "dist",
+	"installCommand": "pnpm install",
+	"framework": "astro",
+	"rewrites": [
+		{
+			"source": "/api/:endpoint(new_address|parsed_mails|clear_inbox|delete_address)",
+			"destination": "https://mail.mourn.top/api/:endpoint"
+		},
+		{
+			"source": "/api/parsed_mail/:id",
+			"destination": "https://mail.mourn.top/api/parsed_mail/:id"
+		},
+		{
+			"source": "/api/mails/:id/read",
+			"destination": "https://mail.mourn.top/api/mails/:id/read"
+		},
+		{
+			"source": "/api/mails/:id",
+			"destination": "https://mail.mourn.top/api/mails/:id"
+		},
+		{
+			"source": "/api/writing/:path*/",
+			"destination": "/api/writing/:path*"
+		}
+	],
+	"headers": [
+		{
+			"source": "/api/:endpoint(new_address|parsed_mails|parsed_mail|mails|clear_inbox|delete_address)/:path*",
+			"headers": [
+				{ "key": "Cache-Control", "value": "private, no-store" },
+				{ "key": "CDN-Cache-Control", "value": "no-store" },
+				{ "key": "Vercel-CDN-Cache-Control", "value": "no-store" },
+				{ "key": "x-vercel-enable-rewrite-caching", "value": "0" }
+			]
+		},
+		{
+			"source": "/(.*)",
+			"headers": [
+				{
+					"key": "X-Content-Type-Options",
+					"value": "nosniff"
+				},
+				{
+					"key": "X-Frame-Options",
+					"value": "DENY"
+				},
+				{
+					"key": "X-XSS-Protection",
+					"value": "1; mode=block"
+				},
+				{
+					"key": "Referrer-Policy",
+					"value": "strict-origin-when-cross-origin"
+				}
+			]
+		},
+		{
+			"source": "/_astro/(.*)",
+			"headers": [
+				{
+					"key": "Cache-Control",
+					"value": "public, max-age=31536000, immutable"
+				}
+			]
+		},
+		{
+			"source": "/assets/(.*)",
+			"headers": [
+				{
+					"key": "Cache-Control",
+					"value": "public, max-age=86400, stale-while-revalidate=604800"
+				}
+			]
+		},
+		{
+			"source": "/fonts/(.*)",
+			"headers": [
+				{
+					"key": "Cache-Control",
+					"value": "public, max-age=604800, stale-while-revalidate=2592000"
+				}
+			]
+		},
+		{
+			"source": "/llms.txt",
+			"headers": [
+				{
+					"key": "Cache-Control",
+					"value": "public, max-age=3600, stale-while-revalidate=86400"
+				}
+			]
+		},
+		{
+			"source": "/wiki/(.*)",
+			"headers": [
+				{
+					"key": "Cache-Control",
+					"value": "public, max-age=3600, stale-while-revalidate=86400"
+				}
+			]
+		},
+		{
+			"source": "/api/allPostMeta.json",
+			"headers": [
+				{
+					"key": "Content-Type",
+					"value": "application/json; charset=utf-8"
+				},
+				{
+					"key": "Cache-Control",
+					"value": "public, max-age=3600, stale-while-revalidate=86400"
+				}
+			]
+		}
+	],
+	"cleanUrls": true
 }

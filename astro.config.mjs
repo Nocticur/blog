@@ -94,6 +94,10 @@ import rehypeFigure from "./src/plugins/rehype-figure.mjs";
 import { remarkImageGrid } from "./src/plugins/remark-image-grid.js";
 import { unified } from "@astrojs/markdown-remark";
 
+const MAIL_API_ORIGIN = "https://mail.mourn.top";
+const MAIL_API_PATH =
+	/^\/api\/(?:new_address|parsed_mails|parsed_mail\/[^/]+|mails\/[^/]+(?:\/read)?|clear_inbox|delete_address)(?:\?.*)?$/;
+
 if (process.env.NODE_ENV === "development") {
 	setMaxListeners(20);
 }
@@ -164,7 +168,11 @@ function writingDevApi() {
 		const name = file.trim().replace(/\\/g, "/");
 		if (!name || !/\.(md|mdx)$/i.test(name)) return null;
 		const segments = name.split("/");
-		if (segments.some((s) => !s || s === "." || s === ".." || !validSegment.test(s))) {
+		if (
+			segments.some(
+				(s) => !s || s === "." || s === ".." || !validSegment.test(s),
+			)
+		) {
 			return null;
 		}
 		const fullPath = path.resolve(postsDir, name);
@@ -229,7 +237,9 @@ function writingDevApi() {
 			}
 		};
 		if (fs.existsSync(postsDir)) walk(postsDir, "");
-		return out.sort((a, b) => String(b.published).localeCompare(String(a.published)));
+		return out.sort((a, b) =>
+			String(b.published).localeCompare(String(a.published)),
+		);
 	}
 
 	function readBody(req) {
@@ -276,7 +286,9 @@ function writingDevApi() {
 							mode: "dev",
 							repo: resolveRepo(),
 							branch: (process.env.WRITING_GITHUB_BRANCH || "").trim(),
-							tokenReady: Boolean(process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN),
+							tokenReady: Boolean(
+								process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN,
+							),
 						});
 					}
 					// 其余接口要求有效会话 token（HMAC 签名 + 有效期）
@@ -288,7 +300,8 @@ function writingDevApi() {
 						if (fileParam) {
 							const fullPath = resolvePostPath(fileParam);
 							if (!fullPath) return error(res, 400, "Invalid file name");
-							if (!fs.existsSync(fullPath)) return error(res, 404, "Post not found");
+							if (!fs.existsSync(fullPath))
+								return error(res, 404, "Post not found");
 							const raw = fs.readFileSync(fullPath, "utf8");
 							const { data, content } = matter(raw);
 							return json(res, 200, {
@@ -312,7 +325,9 @@ function writingDevApi() {
 							mode: "dev",
 							repo: resolveRepo(),
 							branch: (process.env.WRITING_GITHUB_BRANCH || "").trim(),
-							tokenReady: Boolean(process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN),
+							tokenReady: Boolean(
+								process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN,
+							),
 						});
 					}
 
@@ -344,7 +359,10 @@ function writingDevApi() {
 						});
 					}
 
-					if ((req.method === "POST" || req.method === "PUT") && route === "/posts") {
+					if (
+						(req.method === "POST" || req.method === "PUT") &&
+						route === "/posts"
+					) {
 						let body;
 						try {
 							body = JSON.parse(await readBody(req));
@@ -375,7 +393,8 @@ function writingDevApi() {
 							targetFile = fileParam || String(body.file || "");
 							const fullPath = resolvePostPath(targetFile);
 							if (!fullPath) return error(res, 400, "Invalid file name");
-							if (!fs.existsSync(fullPath)) return error(res, 404, "Post not found");
+							if (!fs.existsSync(fullPath))
+								return error(res, 404, "Post not found");
 						}
 						const fullPath = path.resolve(postsDir, targetFile);
 						const md = buildMarkdown(body, body.content);
@@ -391,7 +410,8 @@ function writingDevApi() {
 					if (req.method === "DELETE" && route === "/posts") {
 						const fullPath = resolvePostPath(fileParam);
 						if (!fullPath) return error(res, 400, "Invalid file name");
-						if (!fs.existsSync(fullPath)) return error(res, 404, "Post not found");
+						if (!fs.existsSync(fullPath))
+							return error(res, 404, "Post not found");
 						fs.unlinkSync(fullPath);
 						setImmediate(() => {
 							server.watcher.emit("unlink", fullPath);
@@ -410,13 +430,85 @@ function writingDevApi() {
 	};
 }
 
+function mailDevProxy() {
+	return {
+		name: "firefly-mail-dev-proxy",
+		configureServer(server) {
+			const middleware = async (req, res, next) => {
+				const requestUrl = new URL(req.url || "/", "http://localhost");
+				if (!MAIL_API_PATH.test(`${requestUrl.pathname}${requestUrl.search}`)) {
+					next();
+					return;
+				}
+
+				try {
+					const headers = new Headers();
+					for (const name of [
+						"accept",
+						"accept-language",
+						"authorization",
+						"content-type",
+						"x-custom-auth",
+						"x-lang",
+					]) {
+						const value = req.headers[name];
+						if (typeof value === "string") headers.set(name, value);
+					}
+					headers.set("origin", MAIL_API_ORIGIN);
+					headers.set("referer", `${MAIL_API_ORIGIN}/`);
+
+					let body;
+					if (req.method !== "GET" && req.method !== "HEAD") {
+						body = await new Promise((resolve, reject) => {
+							const chunks = [];
+							req.on("data", (chunk) => chunks.push(chunk));
+							req.on("end", () => resolve(Buffer.concat(chunks)));
+							req.on("error", reject);
+						});
+					}
+
+					const upstream = await fetch(
+						`${MAIL_API_ORIGIN}${requestUrl.pathname}${requestUrl.search}`,
+						{
+							method: req.method,
+							headers,
+							body,
+							redirect: "follow",
+						},
+					);
+					res.statusCode = upstream.status;
+					for (const [name, value] of upstream.headers) {
+						if (
+							!["content-encoding", "content-length", "set-cookie"].includes(
+								name,
+							)
+						) {
+							res.setHeader(name, value);
+						}
+					}
+					res.setHeader("cache-control", "no-store");
+					res.end(Buffer.from(await upstream.arrayBuffer()));
+				} catch (error) {
+					res.statusCode = 502;
+					res.end(error instanceof Error ? error.message : "Mail proxy failed");
+				}
+			};
+			return () => {
+				server.middlewares.stack.unshift({ route: "", handle: middleware });
+			};
+		},
+	};
+}
+
 // https://astro.build/config
 export default defineConfig({
 	site: siteConfig.site_url,
-	
+
 	base: "/",
 	trailingSlash: "always",
-
+	redirects: {
+		"/role": "/mail/",
+	},
 	// 图像优化配置
 	image: {
 		// 全局响应式布局
@@ -568,7 +660,7 @@ export default defineConfig({
 					return false;
 				}
 
-			return true;
+				return true;
 			},
 			serialize: (item) => {
 				const pathname = new URL(item.url).pathname;
@@ -579,18 +671,14 @@ export default defineConfig({
 					item.changefreq = "weekly";
 				} else if (pathname.startsWith("/posts/")) {
 					// 文章页：高优先级，基于 frontmatter 的 updated/published 设置 lastmod
-					const postId = pathname
-						.replace(/^\/posts\//, "")
-						.replace(/\/$/, "");
+					const postId = pathname.replace(/^\/posts\//, "").replace(/\/$/, "");
 					const lastmod = getPostLastmod(postId);
 					if (lastmod) {
 						item.lastmod = new Date(lastmod).toISOString();
 					}
 					item.priority = 0.8;
 					item.changefreq = "monthly";
-				} else if (
-					["/archive/", "/categories/", "/tags/"].includes(pathname)
-				) {
+				} else if (["/archive/", "/categories/", "/tags/"].includes(pathname)) {
 					// 归档/分类/标签列表页：中优先级，有新文章时会更新
 					item.priority = 0.6;
 					item.changefreq = "weekly";
@@ -665,7 +753,7 @@ export default defineConfig({
 		}),
 	},
 	vite: {
-		plugins: [tailwindcss(), writingDevApi()],
+		plugins: [tailwindcss(), writingDevApi(), mailDevProxy()],
 		server: {
 			watch: {
 				ignored: ["**/package/**", "**/Firefly-docs/**"],
@@ -694,7 +782,8 @@ export default defineConfig({
 						if (id.includes("node_modules")) {
 							if (id.includes("katex")) return "vendor-katex";
 							if (id.includes("mermaid")) return "vendor-mermaid";
-							if (id.includes("pixi") || id.includes("live2d")) return "vendor-live2d";
+							if (id.includes("pixi") || id.includes("live2d"))
+								return "vendor-live2d";
 							if (id.includes("gsap")) return "vendor-gsap";
 						}
 						if (id.includes("Guestbook")) return "vendor-guestbook";

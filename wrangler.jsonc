@@ -17,41 +17,6 @@
 		"not_found_handling": "404-page",
 		// Worker 通过该绑定回退读取博客静态资产
 		"binding": "ASSETS",
-		"run_worker_first": [
-			"/all-mail",
-			"/all-mail/",
-			"/all-users",
-			"/all-users/",
-			"/analysis",
-			"/analysis/",
-			"/drafts",
-			"/drafts/",
-			"/inbox",
-			"/inbox/",
-			"/invite-code",
-			"/invite-code/",
-			"/login",
-			"/login/",
-			"/mail",
-			"/mail/",
-			"/role",
-			"/role/",
-			"/sent",
-			"/sent/",
-			"/settings",
-			"/settings/",
-			"/starred",
-			"/starred/",
-			"/system-settings",
-			"/system-settings/",
-			"/test",
-			"/test/",
-			"/assets/*",
-			"/api/*",
-			"/manifest.webmanifest",
-			"/mail-pwa.png",
-			"/registerSW.js",
-			"/sw.js"
-		]
+		"run_worker_first": ["/api/*", "/registerSW.js", "/sw.js"]
 	}
 }

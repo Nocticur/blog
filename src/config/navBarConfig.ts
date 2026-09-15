@@ -47,7 +47,7 @@ const buildNavBarConfig = (): NavBarConfig => {
 	const contactChildren: (NavBarLink | LinkPreset)[] = [];
 	contactChildren.push({
 		name: i18n(I18nKey.email),
-		url: "/role/",
+		url: "/mail/",
 		icon: "material-symbols:mail",
 	});
 	if (siteConfig.pages.friends) {
