@@ -11,10 +11,12 @@ test("forwards only mailbox APIs and preserves bearer, method, query and body", 
 	mock.method(globalThis, "fetch", async (url, init) => {
 		assert.equal(
 			String(url),
-			"https://mail.mourn.top/api/new_address?fixture=1",
+			"https://apimail.noctis.eu.cc/api/new_address?fixture=1",
 		);
 		assert.equal(init.method, "POST");
 		assert.equal(init.headers.get("authorization"), "Bearer fixture-token");
+		assert.equal(init.headers.get("origin"), "https://apimail.noctis.eu.cc");
+		assert.equal(init.headers.get("referer"), "https://apimail.noctis.eu.cc/");
 		assert.equal(init.headers.get("cookie"), null);
 		assert.equal(
 			await new Response(init.body).text(),

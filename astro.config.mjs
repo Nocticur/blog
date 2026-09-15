@@ -94,7 +94,7 @@ import rehypeFigure from "./src/plugins/rehype-figure.mjs";
 import { remarkImageGrid } from "./src/plugins/remark-image-grid.js";
 import { unified } from "@astrojs/markdown-remark";
 
-const MAIL_API_ORIGIN = "https://mail.mourn.top";
+const MAIL_API_ORIGIN = "https://apimail.noctis.eu.cc";
 const MAIL_API_PATH =
 	/^\/api\/(?:new_address|parsed_mails|parsed_mail\/[^/]+|mails\/[^/]+(?:\/read)?|clear_inbox|delete_address)(?:\?.*)?$/;
 

@@ -6,19 +6,19 @@
 	"rewrites": [
 		{
 			"source": "/api/:endpoint(new_address|parsed_mails|clear_inbox|delete_address)",
-			"destination": "https://mail.mourn.top/api/:endpoint"
+			"destination": "https://apimail.noctis.eu.cc/api/:endpoint"
 		},
 		{
 			"source": "/api/parsed_mail/:id",
-			"destination": "https://mail.mourn.top/api/parsed_mail/:id"
+			"destination": "https://apimail.noctis.eu.cc/api/parsed_mail/:id"
 		},
 		{
 			"source": "/api/mails/:id/read",
-			"destination": "https://mail.mourn.top/api/mails/:id/read"
+			"destination": "https://apimail.noctis.eu.cc/api/mails/:id/read"
 		},
 		{
 			"source": "/api/mails/:id",
-			"destination": "https://mail.mourn.top/api/mails/:id"
+			"destination": "https://apimail.noctis.eu.cc/api/mails/:id"
 		},
 		{
 			"source": "/api/writing/:path*/",

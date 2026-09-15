@@ -1,4 +1,4 @@
-const MAIL_API_ORIGIN = "https://mail.mourn.top";
+const MAIL_API_ORIGIN = "https://apimail.noctis.eu.cc";
 const MAIL_API_PATH =
 	/^\/api\/(?:new_address|parsed_mails|parsed_mail\/[^/]+|mails\/[^/]+(?:\/read)?|clear_inbox|delete_address)$/;
 
