@@ -1,9 +1,18 @@
 import worker from "../../worker/index.js";
 
+// vercel.json 将 /api/mail-admin/<多段路径> 重写到本函数，查询参数 __suffix
+// 携带原始后缀（嵌套可选 catch-all 的编译路由只匹配单段子路径）；构建器自带的
+// 单段路由则直接给出原始 pathname。这里统一还原原始请求路径。
 function requestUrl(req) {
 	const protocol = req.headers["x-forwarded-proto"] || "https";
 	const host = req.headers.host || "localhost";
-	return `${protocol}://${host}${req.url || "/api/mail-admin/session"}`;
+	const url = new URL(req.url || "/api/mail-admin", `${protocol}://${host}`);
+	const suffix = url.searchParams.get("__suffix");
+	if (typeof suffix === "string" && suffix) {
+		url.searchParams.delete("__suffix");
+		url.pathname = `/api/mail-admin/${suffix.replace(/^\/+/, "")}`;
+	}
+	return url.toString();
 }
 
 function requestHeaders(req) {

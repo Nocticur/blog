@@ -321,6 +321,93 @@
 	background: #35a66f;
 }
 
+.mail-admin-status-dot.loading {
+	background: var(--admin-muted);
+	animation: mail-admin-pulse 1.2s ease-in-out infinite;
+}
+
+.mail-admin-status-dot.warn {
+	background: #d9a13c;
+}
+
+.mail-admin-status-dot.error {
+	background: #d24f55;
+}
+
+@keyframes mail-admin-pulse {
+	50% { opacity: 0.35; }
+}
+
+.mail-admin-heading-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex: 0 0 auto;
+}
+
+.mail-admin-status-chip {
+	flex: 0 0 auto;
+	padding: 0.18rem 0.55rem;
+	border: 1px solid var(--admin-line);
+	border-radius: 999px;
+	color: var(--admin-muted);
+	font-size: 0.66rem;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.mail-admin-status-chip.ok {
+	border-color: color-mix(in oklab, #35a66f 45%, transparent);
+	background: color-mix(in oklab, #35a66f 10%, transparent);
+	color: color-mix(in oklab, #35a66f 80%, var(--deep-text));
+}
+
+.mail-admin-status-chip.loading {
+	border-color: color-mix(in oklab, var(--admin-muted) 40%, transparent);
+}
+
+.mail-admin-status-chip.warn {
+	border-color: color-mix(in oklab, #d9a13c 45%, transparent);
+	background: color-mix(in oklab, #d9a13c 10%, transparent);
+	color: color-mix(in oklab, #d9a13c 70%, var(--deep-text));
+}
+
+.mail-admin-status-chip.error {
+	border-color: color-mix(in oklab, #d24f55 45%, transparent);
+	background: color-mix(in oklab, #d24f55 10%, transparent);
+	color: #d24f55;
+}
+
+.mail-admin-module-alert {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.7rem;
+	margin-top: 0.75rem;
+	padding: 0.6rem 0.8rem;
+	border: 1px solid color-mix(in oklab, #d24f55 38%, var(--admin-line));
+	border-radius: 0.55rem;
+	background: color-mix(in oklab, #d24f55 8%, transparent);
+	color: #d24f55;
+	font-size: 0.76rem;
+	line-height: 1.5;
+}
+
+.mail-admin-module-alert > span {
+	display: -webkit-box;
+	min-width: 0;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow-wrap: anywhere;
+}
+
+.mail-admin-module-alert .mail-admin-secondary {
+	flex: 0 0 auto;
+	border-color: color-mix(in oklab, #d24f55 45%, var(--admin-line));
+	color: #d24f55;
+}
+
 .mail-admin-main {
 	min-width: 0;
 	background: color-mix(in oklab, var(--page-bg) 98%, var(--deep-text));
@@ -528,6 +615,10 @@
 
 .mail-admin-capability-list span.enabled b {
 	color: #35a66f;
+}
+
+.mail-admin-capability-list span.unknown b {
+	color: var(--admin-muted);
 }
 
 .mail-admin-definition {

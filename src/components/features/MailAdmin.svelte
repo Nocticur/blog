@@ -35,6 +35,7 @@ import {
 	logoutAdmin,
 	MailAdminError,
 	type MailAdminProfile,
+	parseJsonObject,
 } from "@/utils/mail-admin-api";
 import { sanitizeMailHtml } from "@/utils/mail-html";
 
@@ -49,6 +50,13 @@ type ViewId =
 	| "maintenance";
 type Phase = "loading" | "login" | "bootstrap" | "ready";
 type RecordValue = Record<string, unknown>;
+type ModuleState = "loading" | "ready" | "error";
+type ModuleLoad = {
+	state: ModuleState;
+	data: RecordValue | null;
+	stale: boolean;
+	error: string;
+};
 type AdvancedSettingId =
 	| "account"
 	| "users"
@@ -125,8 +133,24 @@ let total = $state(0);
 let search = $state("");
 let searchInput = $state("");
 let selected = $state<RecordValue | null>(null);
-let statistics = $state<RecordValue>({});
-let workerConfig = $state<RecordValue>({});
+const dashboardModules = {
+	statistics: { label: "系统统计", endpoint: "/admin/statistics" },
+	configs: { label: "后端配置", endpoint: "/admin/worker/configs" },
+} as const;
+type DashboardModuleId = keyof typeof dashboardModules;
+
+const emptyModuleLoad = (): ModuleLoad => ({
+	state: "loading",
+	data: null,
+	stale: false,
+	error: "",
+});
+let statisticsLoad = $state<ModuleLoad>(emptyModuleLoad());
+let workerConfigLoad = $state<ModuleLoad>(emptyModuleLoad());
+const moduleRequestIds: Record<DashboardModuleId, number> = {
+	statistics: 0,
+	configs: 0,
+};
 let dbStatus = $state<RecordValue>({});
 let userSettings = $state<RecordValue>({});
 let accountSettings = $state<RecordValue>({});
@@ -215,9 +239,58 @@ function displayTime(row: RecordValue): string {
 		: date.toLocaleString("zh-CN");
 }
 
-function statisticValue(key: string, legacyKey: string): number {
-	return numberValue(statistics[key] ?? statistics[legacyKey]);
+function moduleData(load: ModuleLoad): RecordValue | null {
+	return load.state === "error" && !load.data ? null : load.data;
 }
+
+function statisticText(key: string, legacyKey: string): string {
+	const data = moduleData(statisticsLoad);
+	if (!data) return "—";
+	const raw = data[key] ?? data[legacyKey];
+	if (raw === undefined || raw === null) return "暂不支持";
+	const number = Number(raw);
+	return Number.isFinite(number) ? String(number) : "暂不支持";
+}
+
+function configState(key: string): "on" | "off" | "unknown" {
+	const data = moduleData(workerConfigLoad);
+	const raw = data ? data[key] : undefined;
+	if (raw === true || raw === "true") return "on";
+	if (raw === false || raw === "false") return "off";
+	return "unknown";
+}
+
+function configText(key: string): string {
+	const state = configState(key);
+	return state === "on" ? "已开启" : state === "off" ? "已关闭" : "未知";
+}
+
+function anonymousConfigText(): string {
+	const state = configState("DISABLE_ANONYMOUS_USER_CREATE_EMAIL");
+	return state === "unknown" ? "未知" : state === "on" ? "已关闭" : "已开启";
+}
+
+function moduleChip(load: ModuleLoad): { tone: string; text: string } {
+	if (load.state === "loading") return { tone: "loading", text: "读取中" };
+	if (load.state === "ready") return { tone: "ok", text: "数据正常" };
+	return { tone: "error", text: load.stale ? "刷新失败" : "加载失败" };
+}
+
+const backendStatus = $derived.by(() => {
+	if (
+		statisticsLoad.state === "loading" ||
+		workerConfigLoad.state === "loading"
+	) {
+		return { tone: "loading", text: "后端数据读取中" };
+	}
+	if (statisticsLoad.state === "ready" && workerConfigLoad.state === "ready") {
+		return { tone: "ok", text: "数据读取正常" };
+	}
+	if (statisticsLoad.state === "ready" || workerConfigLoad.state === "ready") {
+		return { tone: "warn", text: "部分请求失败" };
+	}
+	return { tone: "error", text: "管理数据加载失败" };
+});
 
 async function sha256Hex(value: string): Promise<string> {
 	const digest = await crypto.subtle.digest(
@@ -234,13 +307,72 @@ function setError(value: unknown, fallback?: string) {
 	notice = "";
 }
 
-async function loadDashboard() {
-	const [statsResponse, configResponse] = await Promise.all([
-		adminRequest("/admin/statistics"),
-		adminRequest("/admin/worker/configs"),
+async function reconcileSession() {
+	try {
+		await getAdminSession();
+	} catch {
+		profile = null;
+		phase = "login";
+		authError = "登录已过期，请重新登录。";
+	}
+}
+
+function getModuleLoad(id: DashboardModuleId): ModuleLoad {
+	return id === "statistics" ? statisticsLoad : workerConfigLoad;
+}
+
+function setModuleLoad(id: DashboardModuleId, value: ModuleLoad) {
+	if (id === "statistics") statisticsLoad = value;
+	else workerConfigLoad = value;
+}
+
+async function fetchDashboardModule(
+	id: DashboardModuleId,
+	requestId: number,
+): Promise<void> {
+	const meta = dashboardModules[id];
+	try {
+		const response = await adminRequest(meta.endpoint, { module: meta.label });
+		if (requestId !== moduleRequestIds[id]) return;
+		const payload = parseJsonObject(response, meta.label);
+		setModuleLoad(id, {
+			state: "ready",
+			data: bodyValue(payload),
+			stale: false,
+			error: "",
+		});
+	} catch (value) {
+		if (requestId !== moduleRequestIds[id]) return;
+		const message = readableError(value, `${meta.label}加载失败。`);
+		if (value instanceof MailAdminError && value.status === 401) {
+			void reconcileSession();
+		}
+		const previous = getModuleLoad(id);
+		setModuleLoad(id, {
+			state: "error",
+			data: previous.data,
+			stale: !!previous.data,
+			error: message,
+		});
+	}
+}
+
+async function loadDashboard(): Promise<boolean> {
+	const statisticsRequest = ++moduleRequestIds.statistics;
+	const configsRequest = ++moduleRequestIds.configs;
+	statisticsLoad = { ...statisticsLoad, state: "loading", error: "" };
+	workerConfigLoad = { ...workerConfigLoad, state: "loading", error: "" };
+	await Promise.all([
+		fetchDashboardModule("statistics", statisticsRequest),
+		fetchDashboardModule("configs", configsRequest),
 	]);
-	statistics = bodyValue(statsResponse);
-	workerConfig = bodyValue(configResponse);
+	return statisticsLoad.state === "ready" && workerConfigLoad.state === "ready";
+}
+
+async function reloadDashboardModule(id: DashboardModuleId): Promise<void> {
+	const requestId = ++moduleRequestIds[id];
+	setModuleLoad(id, { ...getModuleLoad(id), state: "loading", error: "" });
+	await fetchDashboardModule(id, requestId);
 }
 
 async function loadList(path: string) {
@@ -270,7 +402,12 @@ async function loadSettings() {
 	userSettings = bodyValue(userResponse);
 	accountSettings = bodyValue(accountResponse);
 	autoCleanup = bodyValue(cleanupResponse);
-	workerConfig = bodyValue(configResponse);
+	workerConfigLoad = {
+		state: "ready",
+		data: bodyValue(configResponse),
+		stale: false,
+		error: "",
+	};
 	businessSettings = bodyValue(businessResponse);
 	registrationEnabled = Boolean(
 		businessSettings.allowRegistration ?? userSettings.enable,
@@ -325,11 +462,12 @@ async function saveAdvancedSetting() {
 	}
 }
 
-async function loadView(view: ViewId) {
+async function loadView(view: ViewId): Promise<boolean> {
 	busy = true;
 	error = "";
+	let success = true;
 	try {
-		if (view === "dashboard") await loadDashboard();
+		if (view === "dashboard") success = await loadDashboard();
 		if (view === "addresses") await loadList("/admin/address");
 		if (view === "users") {
 			const [usersResponse, rolesResponse] = await Promise.all([
@@ -357,14 +495,24 @@ async function loadView(view: ViewId) {
 				adminRequest("/admin/auto_cleanup"),
 				adminRequest("/admin/db_version"),
 			]);
-			workerConfig = bodyValue(configResponse);
+			workerConfigLoad = {
+				state: "ready",
+				data: bodyValue(configResponse),
+				stale: false,
+				error: "",
+			};
 			autoCleanup = bodyValue(cleanupResponse);
 			dbStatus = bodyValue(dbResponse);
 		}
 		activeView = view;
 		sidebarOpen = false;
+		return success;
 	} catch (value) {
+		if (value instanceof MailAdminError && value.status === 401) {
+			void reconcileSession();
+		}
 		setError(value);
+		return false;
 	} finally {
 		busy = false;
 	}
@@ -440,8 +588,8 @@ async function signOut() {
 }
 
 async function refreshCurrent() {
-	await loadView(activeView);
-	notice = "已刷新当前数据。";
+	const success = await loadView(activeView);
+	notice = success ? "已刷新当前数据。" : "";
 }
 
 async function searchCurrent() {
@@ -843,7 +991,7 @@ onMount(() => {
 		</div>
 	</section>
 {:else}
-	<div class="mail-admin">
+	<div class="mail-admin mail-admin-shell">
 		{#if sidebarOpen}<button class="mail-admin-backdrop" type="button" aria-label="关闭菜单" onclick={() => (sidebarOpen = false)}></button>{/if}
 		<aside class:mail-admin-sidebar-open={sidebarOpen} class="mail-admin-sidebar">
 			<div class="mail-admin-sidebar-brand"><span class="mail-admin-logo"><Mail size={19} aria-hidden="true" /></span><span><strong>Mail Admin</strong><small>管理控制台</small></span></div>
@@ -860,7 +1008,7 @@ onMount(() => {
 					</div>
 				{/each}
 			</nav>
-			<div class="mail-admin-sidebar-foot"><span class="mail-admin-status-dot"></span>后端已接入 <code>apimail.noctis.eu.cc</code></div>
+			<div class="mail-admin-sidebar-foot"><span class="mail-admin-status-dot {backendStatus.tone}"></span>{backendStatus.text}<code>apimail.noctis.eu.cc</code></div>
 		</aside>
 
 		<main class="mail-admin-main">
@@ -878,18 +1026,24 @@ onMount(() => {
 			{#if notice}<div class="mail-admin-notice" role="status">{notice}<button type="button" aria-label="关闭提示" onclick={() => (notice = "")}><X size={15} /></button></div>{/if}
 			{#if error}<div class="mail-admin-error" role="alert">{error}<button type="button" aria-label="关闭错误" onclick={() => (error = "")}><X size={15} /></button></div>{/if}
 
-			<section class="mail-admin-content">
-				{#if activeView === "dashboard"}
-					<div class="mail-admin-page-heading"><div><p class="mail-admin-eyebrow">OVERVIEW</p><h1>系统概览</h1><p>查看邮件系统状态、资源规模和当前后端能力。</p></div><button class="mail-admin-secondary" type="button" onclick={() => void refreshCurrent()}><RefreshCw size={15} />刷新数据</button></div>
-					<div class="mail-admin-metrics">
-						{#each [{ label: "邮箱地址", key: "addressCount", legacyKey: "address_count", icon: "address" }, { label: "用户账号", key: "userCount", legacyKey: "user_count", icon: "users" }, { label: "邮件总量", key: "mailCount", legacyKey: "mail_count", icon: "mail" }, { label: "未知邮件", key: "unknownMailCount", legacyKey: "unknown_mail_count", icon: "unknown" }] as metric}
-							<div class="mail-admin-metric"><span class="mail-admin-metric-icon">{#if metric.icon === "address"}<Archive size={18} />{:else if metric.icon === "users"}<Users size={18} />{:else if metric.icon === "mail"}<Mail size={18} />{:else}<CircleHelp size={18} />{/if}</span><div><span>{metric.label}</span><strong>{statisticValue(metric.key, metric.legacyKey)}</strong></div></div>
-						{/each}
-					</div>
-					<div class="mail-admin-grid-two"><article class="mail-admin-card"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">CAPABILITIES</p><h2>功能开关状态</h2></div><Activity size={18} /></div><div class="mail-admin-capability-list"><span class:enabled={Boolean(workerConfig.ENABLE_USER_CREATE_EMAIL)}>用户创建邮箱 <b>{Boolean(workerConfig.ENABLE_USER_CREATE_EMAIL) ? "已开启" : "已关闭"}</b></span><span class:enabled={!Boolean(workerConfig.DISABLE_ANONYMOUS_USER_CREATE_EMAIL)}>匿名创建邮箱 <b>{!Boolean(workerConfig.DISABLE_ANONYMOUS_USER_CREATE_EMAIL) ? "已开启" : "已关闭"}</b></span><span class:enabled={Boolean(workerConfig.ENABLE_USER_DELETE_EMAIL)}>用户删除邮件 <b>{Boolean(workerConfig.ENABLE_USER_DELETE_EMAIL) ? "已开启" : "已关闭"}</b></span></div></article><article class="mail-admin-card"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">SECURITY</p><h2>当前会话</h2></div><ShieldCheck size={18} /></div><dl class="mail-admin-definition"><div><dt>账号</dt><dd>{profile?.email}</dd></div><div><dt>角色</dt><dd><span class="mail-admin-badge">{profile?.role ?? "master"}</span></dd></div><div><dt>令牌</dt><dd>服务端 HttpOnly 会话</dd></div></dl></article></div>
+				<section class="mail-admin-content">
+					{#if activeView === "dashboard"}
+						<div class="mail-admin-page-heading"><div><p class="mail-admin-eyebrow">OVERVIEW</p><h1>系统概览</h1><p>查看邮件系统状态、资源规模和当前后端能力。</p></div><div class="mail-admin-heading-actions"><span class="mail-admin-status-chip {moduleChip(statisticsLoad).tone}">{moduleChip(statisticsLoad).text}</span><button class="mail-admin-secondary" type="button" onclick={() => void refreshCurrent()}><RefreshCw size={15} />刷新数据</button></div></div>
+						<div class="mail-admin-metrics">
+							{#each [{ label: "邮箱地址", key: "addressCount", legacyKey: "address_count", icon: "address" }, { label: "用户账号", key: "userCount", legacyKey: "user_count", icon: "users" }, { label: "邮件总量", key: "mailCount", legacyKey: "mail_count", icon: "mail" }, { label: "未知邮件", key: "unknownMailCount", legacyKey: "unknown_mail_count", icon: "unknown" }] as metric}
+								<div class="mail-admin-metric"><span class="mail-admin-metric-icon">{#if metric.icon === "address"}<Archive size={18} />{:else if metric.icon === "users"}<Users size={18} />{:else if metric.icon === "mail"}<Mail size={18} />{:else}<CircleHelp size={18} />{/if}</span><div><span>{metric.label}</span><strong>{statisticText(metric.key, metric.legacyKey)}</strong></div></div>
+							{/each}
+						</div>
+						{#if statisticsLoad.state === "error"}
+							<div class="mail-admin-module-alert" role="alert">
+								<span>{statisticsLoad.stale ? "刷新失败，显示上次结果。" : ""}{statisticsLoad.error}</span>
+								<button class="mail-admin-secondary" type="button" onclick={() => void reloadDashboardModule("statistics")}>重试统计</button>
+							</div>
+						{/if}
+						<div class="mail-admin-grid-two"><article class="mail-admin-card"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">CAPABILITIES</p><h2>功能开关状态</h2></div><span class="mail-admin-status-chip {moduleChip(workerConfigLoad).tone}">{moduleChip(workerConfigLoad).text}</span></div><div class="mail-admin-capability-list"><span class:enabled={configState("ENABLE_USER_CREATE_EMAIL") === "on"} class:unknown={configState("ENABLE_USER_CREATE_EMAIL") === "unknown"}>用户创建邮箱 <b>{configText("ENABLE_USER_CREATE_EMAIL")}</b></span><span class:enabled={configState("DISABLE_ANONYMOUS_USER_CREATE_EMAIL") === "off"} class:unknown={configState("DISABLE_ANONYMOUS_USER_CREATE_EMAIL") === "unknown"}>匿名创建邮箱 <b>{anonymousConfigText()}</b></span><span class:enabled={configState("ENABLE_USER_DELETE_EMAIL") === "on"} class:unknown={configState("ENABLE_USER_DELETE_EMAIL") === "unknown"}>用户删除邮件 <b>{configText("ENABLE_USER_DELETE_EMAIL")}</b></span></div>{#if workerConfigLoad.state === "error"}<div class="mail-admin-module-alert" role="alert"><span>{workerConfigLoad.stale ? "刷新失败，显示上次结果。" : ""}{workerConfigLoad.error}</span><button class="mail-admin-secondary" type="button" onclick={() => void reloadDashboardModule("configs")}>重试配置</button></div>{/if}</article><article class="mail-admin-card"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">SECURITY</p><h2>当前会话</h2></div><ShieldCheck size={18} /></div><dl class="mail-admin-definition"><div><dt>账号</dt><dd>{profile?.email}</dd></div><div><dt>角色</dt><dd><span class="mail-admin-badge">{profile?.role ?? "master"}</span></dd></div><div><dt>令牌</dt><dd>服务端 HttpOnly 会话</dd></div></dl></article></div>
 				{:else if activeView === "settings"}
 					<div class="mail-admin-page-heading"><div><p class="mail-admin-eyebrow">CONFIGURATION</p><h1>系统设置</h1><p>设置账号注册、邮件策略及后端能力。环境变量仅在没有覆盖值时生效。</p></div></div>
-					<div class="mail-admin-grid-two"><article class="mail-admin-card"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">ACCOUNT</p><h2>账号与邮箱开关</h2></div><Settings size={18} /></div><div class="mail-admin-toggle-list"><label><span><strong>允许用户注册</strong><small>关闭后不会阻断已有用户登录。</small></span><input type="checkbox" bind:checked={registrationEnabled} /></label><label><span><strong>允许用户创建邮箱</strong><small>用户端新地址接口立即读取此值。</small></span><input type="checkbox" bind:checked={userMailboxEnabled} /></label><label><span><strong>允许匿名创建邮箱</strong><small>匿名用户无需账号即可申请地址。</small></span><input type="checkbox" bind:checked={anonymousMailboxEnabled} /></label><label><span><strong>允许用户删除邮件</strong><small>用户端删除、清理邮件接口立即读取此值。</small></span><input type="checkbox" bind:checked={userDeleteEnabled} /></label></div><p class="mail-admin-config-note">覆盖值存入后端 D1 settings，并在实际邮件接口中生效。</p><div class="mail-admin-button-row"><button class="mail-admin-primary" type="button" onclick={() => void saveBusinessSettings()} disabled={busy}>保存四项业务开关</button><button class="mail-admin-secondary" type="button" onclick={() => void resetBusinessSettings()} disabled={busy}>恢复环境变量默认</button></div></article><article class="mail-admin-card"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">BACKEND SNAPSHOT</p><h2>后端配置状态</h2></div><Activity size={18} /></div><pre class="mail-admin-json">{JSON.stringify({ businessSettings, workerConfig }, null, 2)}</pre></article></div>
+					<div class="mail-admin-grid-two"><article class="mail-admin-card"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">ACCOUNT</p><h2>账号与邮箱开关</h2></div><Settings size={18} /></div><div class="mail-admin-toggle-list"><label><span><strong>允许用户注册</strong><small>关闭后不会阻断已有用户登录。</small></span><input type="checkbox" bind:checked={registrationEnabled} /></label><label><span><strong>允许用户创建邮箱</strong><small>用户端新地址接口立即读取此值。</small></span><input type="checkbox" bind:checked={userMailboxEnabled} /></label><label><span><strong>允许匿名创建邮箱</strong><small>匿名用户无需账号即可申请地址。</small></span><input type="checkbox" bind:checked={anonymousMailboxEnabled} /></label><label><span><strong>允许用户删除邮件</strong><small>用户端删除、清理邮件接口立即读取此值。</small></span><input type="checkbox" bind:checked={userDeleteEnabled} /></label></div><p class="mail-admin-config-note">覆盖值存入后端 D1 settings，并在实际邮件接口中生效。</p><div class="mail-admin-button-row"><button class="mail-admin-primary" type="button" onclick={() => void saveBusinessSettings()} disabled={busy}>保存四项业务开关</button><button class="mail-admin-secondary" type="button" onclick={() => void resetBusinessSettings()} disabled={busy}>恢复环境变量默认</button></div></article><article class="mail-admin-card"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">BACKEND SNAPSHOT</p><h2>后端配置状态</h2></div><Activity size={18} /></div><pre class="mail-admin-json">{JSON.stringify({ businessSettings, workerConfig: workerConfigLoad.data ?? {} }, null, 2)}</pre></article></div>
 					<article class="mail-admin-card mail-admin-card-wide"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">ADVANCED SETTINGS</p><h2>完整系统配置</h2></div><Settings size={18} /></div><p class="mail-admin-card-copy">沿用后端已有设置接口，包含地址规则、额度、发信限制、黑名单、OAuth 与 Webhook。依赖未配置时会显示后端返回的具体状态。</p><div class="mail-admin-form-grid"><label class="mail-admin-field"><span>配置模块</span><select bind:value={advancedKey} onchange={() => void loadAdvancedSetting()}>{#each advancedSettingOptions as option}<option value={option.id}>{option.label}</option>{/each}</select></label><div class="mail-admin-button-row"><button class="mail-admin-secondary" type="button" onclick={() => void loadAdvancedSetting()} disabled={advancedBusy || busy}>读取配置</button><button class="mail-admin-primary" type="button" onclick={() => void saveAdvancedSetting()} disabled={advancedBusy || busy}>保存配置</button></div></div><textarea class="mail-admin-json-editor" aria-label="高级配置 JSON" bind:value={advancedText} spellcheck="false" rows="14"></textarea></article>
 				{:else if activeView === "maintenance"}
 					<div class="mail-admin-page-heading"><div><p class="mail-admin-eyebrow">MAINTENANCE</p><h1>数据库维护</h1><p>初始化和迁移会保留已有数据；破坏性清理始终需要明确确认。</p></div></div>

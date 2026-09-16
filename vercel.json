@@ -5,6 +5,10 @@
 	"framework": "astro",
 	"rewrites": [
 		{
+			"source": "/api/mail-admin/(.+)",
+			"destination": "/api/mail-admin/[[...path]]?...path=$1&__suffix=$1"
+		},
+		{
 			"source": "/api/:endpoint(new_address|parsed_mails|clear_inbox|delete_address)",
 			"destination": "https://apimail.noctis.eu.cc/api/:endpoint"
 		},

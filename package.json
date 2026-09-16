@@ -18,7 +18,7 @@
 		"lqips": "tsx scripts/generate-lqips.ts",
 		"indexnow": "tsx scripts/indexnow.ts",
 		"test:writing-api": "node scripts/test-writing-api.mjs",
-		"test:mail": "tsx --test scripts/test-mail-api.mjs scripts/test-mail-worker.mjs scripts/test-mail-admin.mjs",
+		"test:mail": "tsx --test scripts/test-mail-api.mjs scripts/test-mail-worker.mjs scripts/test-mail-admin.mjs scripts/test-mail-admin-api.mjs scripts/test-mail-admin-vercel.mjs",
 		"test:mail:browser": "node scripts/test-mail-browser.mjs",
 		"test:mail:admin:browser": "node scripts/test-mail-admin-browser.mjs"
 	},
