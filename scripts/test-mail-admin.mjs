@@ -40,6 +40,8 @@ test("admin login returns profile without exposing upstream tokens", async () =>
 			return Response.json({ jwt: "user-token" });
 		}
 		assert.equal(String(url), "https://apimail.noctis.eu.cc/user_api/settings");
+		assert.equal(init.method, "GET");
+		assert.equal(init.body, undefined);
 		return Response.json({ is_admin: false });
 	});
 	const response = await worker.fetch(
@@ -73,6 +75,8 @@ test("first setup uses the upstream atomic bootstrap endpoint", async () => {
 		if (target.endsWith("/user_api/login"))
 			return Response.json({ jwt: "new-user-token" });
 		assert.equal(target, "https://apimail.noctis.eu.cc/user_api/settings");
+		assert.equal(init.method, "GET");
+		assert.equal(init.body, undefined);
 		return Response.json({
 			is_admin: true,
 			access_token: "new-access-token",
@@ -141,6 +145,8 @@ test("admin proxy revalidates the current role before forwarding", async () => {
 	const upstream = mock.method(globalThis, "fetch", async (url, init) => {
 		if (String(url).endsWith("/user_api/settings")) {
 			assert.equal(init.headers.get("x-user-token"), "user-token");
+			assert.equal(init.method, "GET");
+			assert.equal(init.body, undefined);
 			return Response.json({
 				is_admin: true,
 				access_token: "fresh-access-token",
@@ -159,4 +165,67 @@ test("admin proxy revalidates the current role before forwarding", async () => {
 	assert.equal(response.status, 200);
 	assert.deepEqual(await response.json(), { mailCount: 2 });
 	assert.equal(upstream.mock.callCount(), 2);
+});
+
+test("admin writes forward the original body after GET role validation", async () => {
+	const cookie = await createSessionCookie(
+		{
+			userToken: "user-token",
+			accessToken: "access-token",
+			email: "admin@example.com",
+			userId: 1,
+			role: "master",
+			expiresAt: Date.now() + 60_000,
+		},
+		SECRET,
+	);
+	const upstream = mock.method(globalThis, "fetch", async (url, init) => {
+		if (String(url).endsWith("/user_api/settings")) {
+			assert.equal(init.method, "GET");
+			assert.equal(init.body, undefined);
+			return Response.json({ is_admin: true, access_token: "fresh-access-token" });
+		}
+		assert.equal(String(url), "https://apimail.noctis.eu.cc/admin/account_settings");
+		assert.equal(init.method, "POST");
+		const body = new TextDecoder().decode(init.body);
+		assert.deepEqual(JSON.parse(body), { sample: true });
+		assert.equal(init.headers.get("x-user-access-token"), "fresh-access-token");
+		return Response.json({ success: true });
+	});
+	const response = await worker.fetch(
+		new Request("https://blog.example.com/api/mail-admin/admin/account_settings", {
+			method: "POST",
+			headers: { cookie, origin: "https://blog.example.com", "content-type": "application/json" },
+			body: JSON.stringify({ sample: true }),
+		}),
+		{ ...assets, MAIL_ADMIN_SESSION_SECRET: SECRET },
+	);
+	assert.equal(response.status, 200);
+	assert.deepEqual(await response.json(), { success: true });
+	assert.equal(upstream.mock.callCount(), 2);
+});
+
+test("bootstrap reports that the account was created when automatic login fails", async () => {
+	const upstream = mock.method(globalThis, "fetch", async (url, init) => {
+		const target = String(url);
+		if (target.endsWith("/admin/bootstrap")) return Response.json({ success: true });
+		if (target.endsWith("/user_api/login")) return Response.json({ jwt: "new-user-token" });
+		assert.equal(target, "https://apimail.noctis.eu.cc/user_api/settings");
+		return new Response("upstream unavailable", { status: 503 });
+	});
+	const response = await worker.fetch(
+		new Request("https://blog.example.com/api/mail-admin/bootstrap", {
+			method: "POST",
+			headers: { origin: "https://blog.example.com", "content-type": "application/json" },
+			body: JSON.stringify({
+				adminPassword: "existing-admin-secret",
+				email: "new-admin@example.com",
+				password: "setup-password",
+			}),
+		}),
+		{ ...assets, MAIL_ADMIN_SESSION_SECRET: SECRET },
+	);
+	assert.equal(response.status, 502);
+	assert.deepEqual(await response.json(), { error: "账号已创建，请返回登录" });
+	assert.equal(upstream.mock.callCount(), 3);
 });

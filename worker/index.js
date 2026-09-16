@@ -96,7 +96,7 @@ async function upstreamRequest(pathname, request, options = {}) {
 		redirect: "follow",
 	};
 	if (options.body !== undefined) init.body = JSON.stringify(options.body);
-	else if (!["GET", "HEAD"].includes(init.method.toUpperCase()) && request.body) init.body = request.body;
+	else if (!["GET", "HEAD"].includes(init.method.toUpperCase()) && request.body) init.body = await request.arrayBuffer();
 	return fetch(targetUrl, init);
 }
 
@@ -171,6 +171,7 @@ async function finishAdminLogin(email, password, env, request) {
 
 	const userToken = String(login.body.jwt);
 	const settingsResponse = await upstreamRequest("/user_api/settings", request, {
+		method: "GET",
 		headers: { accept: "application/json", "x-user-token": userToken },
 	});
 	const settings = await readUpstreamJson(settingsResponse);
@@ -209,6 +210,7 @@ async function getAdminContext(request, env) {
 	if (!session) return { response: jsonResponse({ error: "管理员会话已过期" }, 401) };
 
 	const settingsResponse = await upstreamRequest("/user_api/settings", request, {
+		method: "GET",
 		headers: { accept: "application/json", "x-user-token": session.userToken },
 	});
 	const settings = await readUpstreamJson(settingsResponse);
@@ -263,7 +265,8 @@ async function handleBootstrap(request, env) {
 			if (created.status === 401 || created.status === 403) recordLoginFailure(request, email);
 			return jsonResponse({ error: upstreamMessage(createdBody.body, "创建管理员账号失败") }, created.status === 401 ? 401 : created.status);
 		}
-		return finishAdminLogin(email, password, env, request);
+		const login = await finishAdminLogin(email, password, env, request);
+		return login.ok ? login : jsonResponse({ error: "账号已创建，请返回登录" }, 502);
 	})();
 	try {
 		return await bootstrapInFlight;
