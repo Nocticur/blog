@@ -3,7 +3,14 @@ import {
 	createSessionCookie,
 	readSessionCookie,
 } from "./mail-admin-session.js";
-import { handleMailAuth, MAIL_ADMIN_DEFAULT_DOMAIN, MAIL_ALL_DOMAINS } from "./mail-auth.js";
+import {
+	handleMailAuth,
+	isChallenge,
+	looksLikeHtml,
+	MAIL_ADMIN_DEFAULT_DOMAIN,
+	MAIL_ALL_DOMAINS,
+	upstreamErrorText,
+} from "./mail-auth.js";
 
 const DEFAULT_MAIL_API_ORIGIN = "https://apimail.noctis.eu.cc";
 const MAIL_ADMIN_PATH = /^\/api\/mail-admin(?:\/|$)/;
@@ -97,14 +104,6 @@ async function readUpstreamJson(response) {
 	return { body, text };
 }
 
-function upstreamMessage(body, fallback) {
-	if (body && typeof body === "object") {
-		if (typeof body.message === "string" && body.message) return body.message;
-		if (typeof body.error === "string" && body.error) return body.error;
-	}
-	return typeof body === "string" && body ? body : fallback;
-}
-
 function loginAttemptKey(request, email) {
 	const forwarded = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
 	return `${forwarded.split(",")[0].trim()}:${email}`;
@@ -148,10 +147,21 @@ async function finishAdminLogin(email, password, env, request) {
 	});
 	const login = await readUpstreamJson(loginResponse);
 	if (!loginResponse.ok || !login.body?.jwt) {
-		recordLoginFailure(request, email);
+		// 安全拦截页（Cloudflare 挑战/封禁）属于上游侧故障，不计失败次数
+		const isBlockPage = looksLikeHtml(login.text) && (login.body === null || typeof login.body === "string");
+		if (isChallenge(loginResponse) || isBlockPage) {
+			return jsonResponse(
+				{ error: "邮箱服务被安全策略拦截，暂时无法登录，请稍后重试。", code: "UPSTREAM_BLOCKED" },
+				502,
+			);
+		}
+		if (loginResponse.status === 401 || loginResponse.status === 400) {
+			recordLoginFailure(request, email);
+			return jsonResponse({ error: upstreamErrorText(login.body, "邮箱或密码错误") }, 401);
+		}
 		return jsonResponse(
-			{ error: upstreamMessage(login.body, "邮箱或密码错误") },
-			loginResponse.status === 401 || loginResponse.status === 400 ? 401 : 502,
+			{ error: upstreamErrorText(login.body, "邮箱服务暂时不可用，请稍后再试"), code: "UPSTREAM_UNAVAILABLE" },
+			502,
 		);
 	}
 
@@ -162,8 +172,15 @@ async function finishAdminLogin(email, password, env, request) {
 	});
 	const settings = await readUpstreamJson(settingsResponse);
 	if (!settingsResponse.ok) {
+		const isBlockPage = looksLikeHtml(settings.text) && (settings.body === null || typeof settings.body === "string");
+		if (isChallenge(settingsResponse) || isBlockPage) {
+			return jsonResponse(
+				{ error: "邮箱服务被安全策略拦截，暂时无法验证管理员身份。", code: "UPSTREAM_BLOCKED" },
+				502,
+			);
+		}
 		return jsonResponse(
-			{ error: upstreamMessage(settings.body, "无法读取管理员身份") },
+			{ error: upstreamErrorText(settings.body, "无法读取管理员身份") },
 			settingsResponse.status,
 		);
 	}
@@ -203,7 +220,11 @@ async function getAdminContext(request, env) {
 	if (!settingsResponse.ok || settings.body?.is_admin !== true) {
 		return {
 			response: jsonResponse(
-				{ error: settingsResponse.ok ? "管理员权限已撤销" : upstreamMessage(settings.body, "管理员会话已失效") },
+				{
+					error: settingsResponse.ok
+						? "管理员权限已撤销"
+						: upstreamErrorText(settings.body, "管理员会话已失效"),
+				},
 				settingsResponse.ok ? 403 : 401,
 				{ "set-cookie": clearSessionCookie() },
 			),
@@ -248,8 +269,18 @@ async function handleBootstrap(request, env) {
 		});
 		const createdBody = await readUpstreamJson(created);
 		if (!created.ok) {
+			const isBlockPage = looksLikeHtml(createdBody.text) && (createdBody.body === null || typeof createdBody.body === "string");
+			if (isChallenge(created) || isBlockPage) {
+				return jsonResponse(
+					{ error: "邮箱服务被安全策略拦截，暂时无法创建管理员账号。", code: "UPSTREAM_BLOCKED" },
+					502,
+				);
+			}
 			if (created.status === 401 || created.status === 403) recordLoginFailure(request, email);
-			return jsonResponse({ error: upstreamMessage(createdBody.body, "创建管理员账号失败") }, created.status === 401 ? 401 : created.status);
+			return jsonResponse(
+				{ error: upstreamErrorText(createdBody.body, "创建管理员账号失败") },
+				created.status === 401 ? 401 : created.status,
+			);
 		}
 		const login = await finishAdminLogin(email, password, env, request);
 		return login.ok ? login : jsonResponse({ error: "账号已创建，请返回登录" }, 502);

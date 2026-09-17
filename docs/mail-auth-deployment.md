@@ -4,6 +4,70 @@
 > 复用现有邮箱 Worker（dreamhunter2333/cloudflare_temp_email，D1 库 `cloudflare_temp_email`）
 > 与现有博客 Worker 代理架构，未整套迁移参考项目（Loven7 Mail，MIT）。
 
+## 〇、2026-09-17 登录注册故障修复（本轮）
+
+### 已确认根因
+
+1. **Cloudflare 拦截登录链路**：`noctis.eu.cc` 区域的"数据库"自定义规则拦截非中国来源请求，
+   例外列表遗漏 `POST /api/address_login`。博客后端（海外）转发的登录请求被 Cloudflare
+   封禁页（403 + HTML）拦截，且旧代码把整页 HTML 包进 JSON 错误透传给前端（已在生产复现：
+   `/api/mail-auth/login` 返回 4790 字节 HTML 错误文本）。
+2. **上游地址密码登录关闭**：`apimail.noctis.eu.cc` 实测返回
+   `403 text/plain "Password login is disabled"`，即邮箱 Worker 的 `ENABLE_ADDRESS_PASSWORD`
+   仍为 false。
+3. **生产注册不可用**：`POST /api/mail-auth/register` 实测返回
+   500 `REGISTER_NOT_CONFIGURED`（缺少 D1 凭据）——Vercel 生产环境未配置
+   `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_D1_DATABASE_ID` / `CLOUDFLARE_D1_API_TOKEN`。
+   路由与部署版本本身正常；`abc@nocticur.eu.cc` 已存在且无密码，保持不动（注册走原子
+   INSERT + 唯一约束，重复地址一律 409，绝不覆盖）。
+
+### 代码修复（本轮变更）
+
+- `worker/mail-auth.js`：登录失败统一分类 `loginFailureResponse`——
+  - Cloudflare 封禁页（HTML，无论是否带 `cf-mitigated` 头）→ 502 `UPSTREAM_BLOCKED`；
+  - 仅上游 401/400/404（明确凭据错误）计入登录失败限流；拦截页、challenge、429、5xx、
+    异常 JSON 一律视为上游故障，不计数；
+  - 403 → 固定提示「邮箱密码登录未启用」+ `UPSTREAM_LOGIN_DISABLED`；
+    5xx → `UPSTREAM_UNAVAILABLE`；2xx 缺 jwt → `INVALID_RESPONSE`；
+  - `proxyMailUpstream`（收件等代理）同样识别封禁页并截断超长上游文本。
+- `worker/index.js`：管理员登录 / bootstrap / 会话校验复用同一套识别
+  （`upstreamErrorText` / `looksLikeHtml` / `isChallenge`，自 mail-auth.js 导入），
+  仅 401/400 计入失败限流。
+- `src/utils/mail-api.ts`：前端对后端错误文本二次过滤——HTML 直接弃用固定提示，
+  普通文本压空白并截断到 200 字符；`MailApp.svelte` 对 `UPSTREAM_BLOCKED` 直接展示
+  后端给定的简短中文提示。
+- 注册错误码补全：`ADDRESS_CONFLICT`(409)、`REGISTER_NOT_CONFIGURED`(500)、
+  `REGISTER_CREDENTIALS_INVALID`(500)、`REGISTER_UNAVAILABLE`(502)，
+  配置故障与网络故障分别报告。
+
+### 上线步骤（需人工在控制台执行，代码合并后按序操作）
+
+1. **快照留档**：`CLOUDFLARE_API_TOKEN=<Zone WAF 只读> CLOUDFLARE_ZONE_NAME=noctis.eu.cc
+   node scripts/cf-waf-snapshot.mjs`，输出存入 `.mail-admin-backups/`（或控制台截图）。
+2. **Cloudflare 规则例外**：noctis.eu.cc → 安全性 → WAF → 自定义规则 →"数据库"规则，
+   在表达式末尾追加（保留其他保护不变）：
+   `and not (http.request.method eq "POST" and http.request.uri.path eq "/api/address_login")`
+3. **上游开关**：邮箱 Worker（apimail.noctis.eu.cc 所在 Worker）Settings → Variables →
+   `ENABLE_ADDRESS_PASSWORD = true` 并生效。
+4. **Vercel 环境变量**：补齐 `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_D1_DATABASE_ID` /
+   `CLOUDFLARE_D1_API_TOKEN`（注册必配，缺一注册即 500）。
+5. **部署本仓库**（推送触发 Vercel 与 my-blog Worker 构建）。
+6. **分别验证接口连通与业务结果**：
+   - 连通：`curl -X POST https://blog.mourn.top/api/mail-auth/login`（假密码）→
+     期待 `401 {"error":"邮箱地址或密码错误"}`（上游可达且开关已开）；
+     `502 UPSTREAM_BLOCKED` = 规则例外未生效；`403 UPSTREAM_LOGIN_DISABLED` = 开关未开；
+     错误里出现 HTML = 代码未部署。
+   - 连通：`curl -X POST https://blog.mourn.top/api/mail-auth/register`（地址用
+     `abc@nocticur.eu.cc`）→ 期待 `409 ADDRESS_CONFLICT`（D1 凭据生效且未覆盖无密码地址）；
+     `500 REGISTER_NOT_CONFIGURED` = Vercel 变量未生效。
+   - 业务：新地址注册 → 自动进入收件箱；重复注册 409 提示；已有密码账号登录；收件刷新；
+     管理员登录；从外部邮箱发信到新地址验证收信。
+7. **回滚**：规则例外删除即可恢复原拦截；代码回退到上一部署；D1 只新增行，无需数据回滚。
+
+注：`abc@nocticur.eu.cc` 的无密码状态本轮保持不变；如需为其设置密码，属于管理员重置操作，
+另行处理。密码规则、存储方式与既有账号密码均未改动。
+
+
 ## 一、架构与数据流
 
 ```

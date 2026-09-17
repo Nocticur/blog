@@ -9,6 +9,22 @@ import type {
 } from "@/types/mail";
 
 const MAIL_API_BASE_URL = "/api/mail-auth";
+const MAX_ERROR_LENGTH = 200;
+
+function looksLikeHtmlText(value: string): boolean {
+	return /<\s*(?:!doctype|html\b|head\b|body\b|script\b|title\b)/i.test(value);
+}
+
+// 过滤后端错误文本：结构化 HTML（拦截/封禁页）直接弃用固定提示，
+// 普通文本压空白并限长度，避免撑破桌面或移动端布局
+function compactErrorText(raw: string, fallback: string): string {
+	if (!raw || looksLikeHtmlText(raw)) return fallback;
+	const compact = raw.replace(/\s+/g, " ").trim();
+	if (!compact) return fallback;
+	return compact.length > MAX_ERROR_LENGTH
+		? `${compact.slice(0, MAX_ERROR_LENGTH)}…`
+		: compact;
+}
 type MailRequestOptions = {
 	path: string;
 	method?: "GET" | "POST" | "PATCH" | "DELETE";
@@ -150,9 +166,9 @@ async function request<T>({
 		if (parsedBody && typeof parsedBody === "object") {
 			const responseBody = parsedBody as Record<string, unknown>;
 			if (typeof responseBody.message === "string" && responseBody.message) {
-				message = responseBody.message;
+				message = compactErrorText(responseBody.message, message);
 			} else if (typeof responseBody.error === "string" && responseBody.error) {
-				message = responseBody.error;
+				message = compactErrorText(responseBody.error, message);
 			}
 			if (
 				typeof responseBody.code === "string" ||
@@ -161,7 +177,7 @@ async function request<T>({
 				code = String(responseBody.code);
 			}
 		} else if (typeof parsedBody === "string" && parsedBody) {
-			message = parsedBody;
+			message = compactErrorText(parsedBody, message);
 		}
 		const retryAfterHeader = response.headers.get("retry-after");
 		const retryAfterSeconds = retryAfterHeader

@@ -48,12 +48,27 @@ function mockD1Insert(overrides = {}) {
 		assert.equal(init.headers.get("authorization"), "Bearer token");
 		const payload = JSON.parse(init.body);
 		assert.match(payload.sql, /INSERT INTO address/);
-		return Response.json({
-			success: overrides.success ?? true,
-			errors: overrides.errors ?? [],
-			results: [],
-		});
+		return Response.json(
+			{
+				success: overrides.success ?? true,
+				errors: overrides.errors ?? [],
+				results: [],
+			},
+			{ status: overrides.status ?? 200 },
+		);
 	});
+}
+
+// 模拟 Cloudflare 封禁页（服务器侧请求被 WAF 拦截时返回的 HTML）
+const CF_BLOCK_PAGE =
+	'<!DOCTYPE html>\n<!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->\n<html><head><title>Attention Required! | Cloudflare</title></head><body><h1>Sorry, you have been blocked</h1><p>You are unable to access apimail.noctis.eu.cc</p><p>Performance & security by Cloudflare</p></body></html>\n';
+
+async function postLogin(body, headers = originHeaders()) {
+	return worker.fetch(new Request("https://blog.example.com/api/mail-auth/login", {
+		method: "POST",
+		headers,
+		body: JSON.stringify(body),
+	}), authEnv());
 }
 
 test("mail auth config separates register allowlist from login domains", async () => {
@@ -182,6 +197,39 @@ test("register maps the D1 unique violation to a conflict", async () => {
 		authEnv(),
 	);
 	assert.equal(response.status, 409);
+	const body = await response.json();
+	assert.equal(body.error, "该邮箱地址已被注册，请换一个前缀或域名");
+	assert.equal(body.code, "ADDRESS_CONFLICT");
+});
+
+test("register reports invalid D1 credentials distinctly", async () => {
+	mockD1Insert({ status: 401 });
+	const response = await worker.fetch(
+		new Request("https://blog.example.com/api/mail-auth/register", {
+			method: "POST",
+			headers: { ...originHeaders(), "x-forwarded-for": "198.51.100.20" },
+			body: JSON.stringify({ name: "reader", domain: "noctis.eu.cc", password: "strong-pass-1" }),
+		}),
+		authEnv(),
+	);
+	assert.equal(response.status, 500);
+	assert.equal((await response.json()).code, "REGISTER_CREDENTIALS_INVALID");
+});
+
+test("register reports D1 network failures separately from configuration issues", async () => {
+	mock.method(globalThis, "fetch", async () => {
+		throw new TypeError("fetch failed");
+	});
+	const response = await worker.fetch(
+		new Request("https://blog.example.com/api/mail-auth/register", {
+			method: "POST",
+			headers: { ...originHeaders(), "x-forwarded-for": "198.51.100.21" },
+			body: JSON.stringify({ name: "reader", domain: "noctis.eu.cc", password: "strong-pass-1" }),
+		}),
+		authEnv(),
+	);
+	assert.equal(response.status, 502);
+	assert.equal((await response.json()).code, "REGISTER_UNAVAILABLE");
 });
 
 test("register uses the D1 binding when available", async () => {
@@ -217,6 +265,7 @@ test("register reports a missing D1 configuration as a server error", async () =
 		{ ...assets },
 	);
 	assert.equal(response.status, 500);
+	assert.equal((await response.json()).code, "REGISTER_NOT_CONFIGURED");
 });
 
 test("register rejects cross-origin writes and invalid payloads", async () => {
@@ -310,34 +359,133 @@ test("login proxies address password login and stores the token only in a cookie
 	assert.ok(!setCookie.includes("issued-jwt"));
 });
 
-test("login normalizes credentials errors and keeps upstream 403 reasons", async () => {
+test("login normalizes credentials errors and reports disabled login with a code", async () => {
 	mock.method(globalThis, "fetch", async () =>
 		new Response(JSON.stringify({ message: "密码错误" }), { status: 401 }),
 	);
-	const bad = await worker.fetch(
-		new Request("https://blog.example.com/api/mail-auth/login", {
-			method: "POST",
-			headers: originHeaders(),
-			body: JSON.stringify({ email: "reader@nocticur.eu.cc", password: "wrong" }),
-		}),
-		authEnv(),
-	);
+	const bad = await postLogin({ email: "reader@nocticur.eu.cc", password: "wrong" });
 	assert.equal(bad.status, 401);
 	assert.equal((await bad.json()).error, "邮箱地址或密码错误");
 
+	// 上游 403（纯文本 "Password login is disabled"）→ 固定中文提示 + 错误码，不透传英文原文
 	mock.method(globalThis, "fetch", async () =>
-		new Response(JSON.stringify({ message: "密码登录功能未启用" }), { status: 403 }),
-	);
-	const disabled = await worker.fetch(
-		new Request("https://blog.example.com/api/mail-auth/login", {
-			method: "POST",
-			headers: originHeaders(),
-			body: JSON.stringify({ email: "reader@nocticur.eu.cc", password: "wrong" }),
+		new Response("Password login is disabled", {
+			status: 403,
+			headers: { "content-type": "text/plain; charset=UTF-8" },
 		}),
-		authEnv(),
 	);
+	const disabled = await postLogin({ email: "reader@nocticur.eu.cc", password: "wrong" });
 	assert.equal(disabled.status, 403);
-	assert.equal((await disabled.json()).error, "密码登录功能未启用");
+	const disabledBody = await disabled.json();
+	assert.equal(disabledBody.error, "邮箱密码登录未启用，请联系站点管理员。");
+	assert.equal(disabledBody.code, "UPSTREAM_LOGIN_DISABLED");
+});
+
+test("upstream block pages become controlled errors and never count as wrong passwords", async () => {
+	const headers = { ...originHeaders(), "x-forwarded-for": "198.51.100.10" };
+	let upstreamCalls = 0;
+	mock.method(globalThis, "fetch", async () => {
+		upstreamCalls += 1;
+		return new Response(CF_BLOCK_PAGE, {
+			status: 403,
+			headers: { "content-type": "text/html; charset=UTF-8" },
+		});
+	});
+	// 连续 6 次仍能触达上游：封禁页不计入登录失败限流（超过 5 次会触发 429）
+	for (let i = 0; i < 6; i += 1) {
+		const response = await postLogin(
+			{ email: "blocked@nocticur.eu.cc", password: "whatever" },
+			headers,
+		);
+		assert.equal(response.status, 502);
+		const body = await response.json();
+		assert.equal(body.code, "UPSTREAM_BLOCKED");
+		assert.equal(body.error, "邮箱服务被安全策略拦截，暂时无法登录，请稍后重试。");
+		assert.ok(!body.error.includes("<"), "error must not contain HTML");
+	}
+	assert.equal(upstreamCalls, 6);
+});
+
+test("login challenge responses stay upstream failures without counting", async () => {
+	const headers = { ...originHeaders(), "x-forwarded-for": "198.51.100.11" };
+	let upstreamCalls = 0;
+	mock.method(globalThis, "fetch", async () => {
+		upstreamCalls += 1;
+		return new Response("<html>Just a moment...</html>", {
+			status: 403,
+			headers: { "content-type": "text/html", "cf-mitigated": "challenge" },
+		});
+	});
+	for (let i = 0; i < 6; i += 1) {
+		const response = await postLogin(
+			{ email: "challenge@nocticur.eu.cc", password: "whatever" },
+			headers,
+		);
+		assert.equal(response.status, 502);
+		assert.equal((await response.json()).code, "UPSTREAM_CHALLENGE");
+	}
+	assert.equal(upstreamCalls, 6);
+});
+
+test("abnormal upstream payloads map to controlled errors without counting", async () => {
+	const headers = { ...originHeaders(), "x-forwarded-for": "198.51.100.12" };
+	// 2xx 却缺少 jwt
+	mock.method(globalThis, "fetch", async () => Response.json({ hello: "world" }));
+	const odd = await postLogin({ email: "odd@nocticur.eu.cc", password: "whatever" }, headers);
+	assert.equal(odd.status, 502);
+	assert.equal((await odd.json()).code, "INVALID_RESPONSE");
+
+	// 5xx JSON：上游故障不计失败次数，6 次全部触达上游
+	let upstreamCalls = 0;
+	mock.method(globalThis, "fetch", async () => {
+		upstreamCalls += 1;
+		return Response.json({ error: "upstream exploded" }, { status: 500 });
+	});
+	for (let i = 0; i < 6; i += 1) {
+		const response = await postLogin(
+			{ email: "flaky@nocticur.eu.cc", password: "whatever" },
+			headers,
+		);
+		assert.equal(response.status, 502);
+		const body = await response.json();
+		assert.equal(body.code, "UPSTREAM_UNAVAILABLE");
+		assert.ok(!body.error.includes("exploded"), "upstream text must not leak");
+	}
+	assert.equal(upstreamCalls, 6);
+});
+
+test("json errors containing html fragments are not treated as block pages", async () => {
+	mock.method(globalThis, "fetch", async () =>
+		Response.json({ message: "<html>quoted content</html>" }, { status: 500 }),
+	);
+	const response = await postLogin(
+		{ email: "jsonish@nocticur.eu.cc", password: "whatever" },
+		{ ...originHeaders(), "x-forwarded-for": "198.51.100.14" },
+	);
+	assert.equal(response.status, 502);
+	const body = await response.json();
+	assert.equal(body.code, "UPSTREAM_UNAVAILABLE");
+	assert.ok(!body.error.includes("<"), "upstream text must not leak");
+});
+
+test("repeated wrong passwords still hit the login failure limit", async () => {
+	const headers = { ...originHeaders(), "x-forwarded-for": "198.51.100.13" };
+	mock.method(globalThis, "fetch", async () =>
+		new Response(JSON.stringify({ message: "Wrong password" }), { status: 401 }),
+	);
+	for (let i = 0; i < 5; i += 1) {
+		const response = await postLogin(
+			{ email: "locked@nocticur.eu.cc", password: "wrong" },
+			headers,
+		);
+		assert.equal(response.status, 401);
+	}
+	const limited = await postLogin(
+		{ email: "locked@nocticur.eu.cc", password: "wrong" },
+		headers,
+	);
+	assert.equal(limited.status, 429);
+	assert.ok(limited.headers.get("retry-after"));
 });
 
 test("session endpoint validates the encrypted cookie and stays cheap", async () => {
@@ -394,6 +542,26 @@ test("mail proxies inject the session token and normalize upstream failures", as
 		authEnv(),
 	);
 	assert.equal(expired.status, 401);
+});
+
+test("mail proxies replace upstream block pages with controlled errors", async () => {
+	const cookie = await sessionCookie("blocked@nocticur.eu.cc", "user-jwt");
+	mock.method(globalThis, "fetch", async () =>
+		new Response(CF_BLOCK_PAGE, {
+			status: 403,
+			headers: { "content-type": "text/html; charset=UTF-8" },
+		}),
+	);
+	const response = await worker.fetch(
+		new Request("https://blog.example.com/api/mail-auth/mails?limit=30&offset=0", {
+			headers: { cookie },
+		}),
+		authEnv(),
+	);
+	assert.equal(response.status, 502);
+	const body = await response.json();
+	assert.equal(body.code, "UPSTREAM_BLOCKED");
+	assert.ok(!body.error.includes("<"), "error must not contain HTML");
 });
 
 test("mail writes require a same-origin request", async () => {

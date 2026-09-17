@@ -17,12 +17,19 @@ try {
 	const page = await context.newPage();
 	const errors = [];
 	page.on("pageerror", (error) => errors.push(error.message));
-	let sessionMode = "anonymous";
-	let inboxMode = "empty";
-	let reads = 0;
-	let deleted = false;
-	let registerRequests = 0;
-	const message = {
+let sessionMode = "anonymous";
+let inboxMode = "empty";
+let reads = 0;
+let deleted = false;
+let registerRequests = 0;
+let autoLoginFails = 0;
+let loginErrorMode = "";
+// 模拟服务器侧请求被 Cloudflare WAF 拦截时后端曾透传的整页 HTML
+const BLOCK_PAGE_HTML =
+	'<!DOCTYPE html>\n<!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->\n<html><head><title>Attention Required! | Cloudflare</title></head><body><h1>Sorry, you have been blocked</h1><p>You are unable to access apimail.noctis.eu.cc</p><p>Performance &amp; security by Cloudflare</p></body></html>\n'.repeat(
+		8,
+	);
+const message = {
 		id: 42,
 		sender: "测试发件人 <sender@example.com>",
 		address: "reader@nocticur.eu.cc",
@@ -70,6 +77,18 @@ try {
 		}
 		if (path === "/api/mail-auth/login") {
 			const body = route.request().postDataJSON();
+			if (loginErrorMode === "html")
+				return json({ error: BLOCK_PAGE_HTML }, 403);
+			if (body.email.startsWith("autologin") && autoLoginFails > 0) {
+				autoLoginFails--;
+				return json(
+					{
+						error: "邮箱服务被安全策略拦截，暂时无法登录，请稍后重试。",
+						code: "UPSTREAM_BLOCKED",
+					},
+					502,
+				);
+			}
 			if (body.password !== "right-pass-1")
 				return json({ error: "邮箱地址或密码错误" }, 401);
 			sessionMode = "authed";
@@ -265,6 +284,67 @@ try {
 		"true",
 	);
 
+	// ── 注册成功但自动登录失败 → 独立提示并切回登录表单，手动登录可达 ──
+	autoLoginFails = 1;
+	await page.getByRole("tab", { name: "注册" }).click();
+	await page.locator("#mail-register-prefix").waitFor();
+	await page.locator("#mail-register-prefix").fill("autologin");
+	await page
+		.locator(".mail-auth-card input[name='new-password']")
+		.fill("right-pass-1");
+	await page
+		.locator(".mail-auth-card input[name='confirm-password']")
+		.fill("right-pass-1");
+	await page.getByRole("button", { name: "注册并进入收件箱" }).click();
+	await page.getByText("注册成功，但自动登录未完成", { exact: false }).waitFor();
+	assert.equal(
+		await page.getByRole("tab", { name: "登录" }).getAttribute("aria-selected"),
+		"true",
+	);
+	assert.equal(
+		await page.locator("#mail-login-prefix").inputValue(),
+		"autologin",
+	);
+	await page
+		.locator(".mail-auth-card input[name='password']")
+		.fill("right-pass-1");
+	await page.getByRole("button", { name: "登录邮箱" }).click();
+	await page.getByText("收件箱还是空的").waitFor();
+	await page.getByRole("button", { name: "退出", exact: true }).click();
+	await page.locator(".mail-auth-card").waitFor();
+
+	// ── 后端 4xx 透传整页 HTML → 前端过滤为受控提示，桌面与移动端均不撑破布局 ──
+	loginErrorMode = "html";
+	await page.locator("#mail-login-prefix").fill("reader");
+	await page
+		.locator(".mail-auth-card input[name='password']")
+		.fill("wrong-pass");
+	await page.getByRole("button", { name: "登录邮箱" }).click();
+	const desktopAlert = await page.getByRole("alert").first().innerText();
+	assert.ok(!desktopAlert.includes("<"), "error text must not contain HTML");
+	await page.getByText("邮箱服务返回错误。", { exact: true }).waitFor();
+	assert.equal(
+		await page.evaluate(
+			() => document.documentElement.scrollWidth <= innerWidth,
+		),
+		true,
+		"desktop layout must not overflow",
+	);
+	await page.locator(".mail-app").screenshot({ path: shot("login-html-error.png") });
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.getByRole("button", { name: "登录邮箱" }).click();
+	await page.getByText("邮箱服务返回错误。", { exact: true }).waitFor();
+	assert.equal(
+		await page.evaluate(
+			() => document.documentElement.scrollWidth <= innerWidth,
+		),
+		true,
+		"mobile layout must not overflow",
+	);
+	await page.locator(".mail-app").screenshot({ path: shot("mobile-html-error.png") });
+	await page.setViewportSize({ width: 1440, height: 1000 });
+	loginErrorMode = "";
+
 	// ── 错误密码 → 提示；正确密码 → 收件箱 ──
 	await page.locator("#mail-login-prefix").fill("reader");
 	await page
@@ -341,6 +421,9 @@ try {
 					"mourn.top paste blocked from register",
 					"duplicate conflict",
 					"register auto login",
+					"register auto-login failure notice",
+					"html error filtered",
+					"no overflow with html error",
 					"no token in browser storage",
 					"refresh",
 					"unread + read marker",

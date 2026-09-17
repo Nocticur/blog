@@ -122,12 +122,32 @@ function clearLoginFailures(request, email) {
 	loginFailures.delete(`${clientKey(request)}:${email}`);
 }
 
-function upstreamMessage(body, fallback) {
+export function looksLikeHtml(text) {
+	return typeof text === "string" && /<\s*(?:!doctype|html\b|head\b|body\b|script\b|title\b)/i.test(text);
+}
+
+const UPSTREAM_TEXT_MAX_LENGTH = 120;
+
+// 提炼可安全展示的上游错误文本：结构化 HTML（Cloudflare 拦截/封禁页）不透传，
+// 普通文本压空白并限长度，避免撑破前端布局
+function safeUpstreamText(text, maxLength = UPSTREAM_TEXT_MAX_LENGTH) {
+	if (typeof text !== "string") return "";
+	const compact = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+	if (!compact) return "";
+	return compact.length > maxLength ? `${compact.slice(0, maxLength)}…` : compact;
+}
+
+// 统一的上游错误文案：JSON 的 message/error 优先，HTML 页面与超长文本回退受控文案
+export function upstreamErrorText(body, fallback, maxLength = UPSTREAM_TEXT_MAX_LENGTH) {
+	let raw = "";
 	if (body && typeof body === "object") {
-		if (typeof body.message === "string" && body.message) return body.message;
-		if (typeof body.error === "string" && body.error) return body.error;
+		if (typeof body.message === "string") raw = body.message;
+		else if (typeof body.error === "string") raw = body.error;
+	} else if (typeof body === "string") {
+		raw = body;
 	}
-	return typeof body === "string" && body ? body : fallback;
+	if (looksLikeHtml(raw)) return fallback;
+	return safeUpstreamText(raw, maxLength) || fallback;
 }
 
 async function readUpstreamJson(response) {
@@ -141,8 +161,46 @@ async function readUpstreamJson(response) {
 	return { body, text };
 }
 
-function isChallenge(response) {
+export function isChallenge(response) {
 	return response.headers.get("cf-mitigated") === "challenge";
+}
+
+// 上游登录失败分类：仅"明确的凭据错误"（401/400/404）计入失败限流；
+// Cloudflare 拦截/验证页、上游限流、故障与异常响应一律视为上游侧问题，
+// 返回简短中文提示与错误码，不把上游页面内容透传给用户。
+function loginFailureResponse(request, email, response, login) {
+	const status = response.status;
+	// 封禁页是 HTML 文本（JSON 解析必然失败）；JSON 错误体由 upstreamErrorText 兜底
+	const isBlockPage = looksLikeHtml(login.text) && (login.body === null || typeof login.body === "string");
+	if (isBlockPage) {
+		return jsonResponse(
+			{ error: "邮箱服务被安全策略拦截，暂时无法登录，请稍后重试。", code: "UPSTREAM_BLOCKED" },
+			502,
+		);
+	}
+	if (response.ok) {
+		// 2xx 却缺少 jwt：上游返回了异常结构
+		return jsonResponse({ error: "邮箱服务返回了无效的数据，暂时无法登录。", code: "INVALID_RESPONSE" }, 502);
+	}
+	if (status === 401 || status === 400 || status === 404) {
+		recordLoginFailure(request, email);
+		return jsonResponse({ error: "邮箱地址或密码错误" }, 401);
+	}
+	if (status === 403) {
+		return jsonResponse(
+			{ error: "邮箱密码登录未启用，请联系站点管理员。", code: "UPSTREAM_LOGIN_DISABLED" },
+			403,
+		);
+	}
+	if (status === 429) {
+		const retryAfter = response.headers.get("retry-after") ?? undefined;
+		return jsonResponse(
+			{ error: "邮箱服务操作过于频繁，请稍后再试。", code: "UPSTREAM_RATE_LIMITED" },
+			429,
+			retryAfter ? { "retry-after": retryAfter } : {},
+		);
+	}
+	return jsonResponse({ error: "邮箱服务暂时不可用，请稍后再试。", code: "UPSTREAM_UNAVAILABLE" }, 502);
 }
 
 function upstreamHeaders(env, extra = {}) {
@@ -227,15 +285,17 @@ async function handleRegister(request, env) {
 	const address = `${name}@${domain}`;
 	const sourceMeta = clientKey(request);
 	const result = await insertAddressRow(env, address, await sha256Hex(password), sourceMeta);
-	if (result.conflict) return jsonResponse({ error: "该邮箱地址已被注册，请换一个前缀或域名" }, 409);
+	if (result.conflict) {
+		return jsonResponse({ error: "该邮箱地址已被注册，请换一个前缀或域名", code: "ADDRESS_CONFLICT" }, 409);
+	}
 	if (result.misconfigured) {
-		return jsonResponse({ error: "注册服务未配置（缺少 D1 凭据），请联系站点管理员" }, 500);
+		return jsonResponse({ error: "注册服务未配置（缺少 D1 凭据），请联系站点管理员", code: "REGISTER_NOT_CONFIGURED" }, 500);
 	}
 	if (result.invalidToken) {
-		return jsonResponse({ error: "注册服务凭据无效，请联系站点管理员" }, 500);
+		return jsonResponse({ error: "注册服务凭据无效，请联系站点管理员", code: "REGISTER_CREDENTIALS_INVALID" }, 500);
 	}
 	if (!result.ok) {
-		return jsonResponse({ error: "暂时无法完成注册，请稍后再试" }, 502);
+		return jsonResponse({ error: "暂时无法完成注册，请稍后再试", code: "REGISTER_UNAVAILABLE" }, 502);
 	}
 	return jsonResponse({ address }, 201);
 }
@@ -258,33 +318,14 @@ async function handleLogin(request, env) {
 			body: JSON.stringify({ email, password: await sha256Hex(password) }),
 		});
 	} catch {
-		return jsonResponse({ error: "无法连接邮箱服务，请稍后重试" }, 502);
+		return jsonResponse({ error: "无法连接邮箱服务，请稍后重试", code: "UPSTREAM_UNREACHABLE" }, 502);
 	}
 	if (isChallenge(response)) {
 		return jsonResponse({ error: "邮箱服务需要安全验证，暂时无法登录。请稍后重试。", code: "UPSTREAM_CHALLENGE" }, 502);
 	}
 	const login = await readUpstreamJson(response);
 	if (!response.ok || !login.body?.jwt) {
-		recordLoginFailure(request, email);
-		const status = response.status;
-		if (status === 401 || status === 400 || status === 404) {
-			return jsonResponse({ error: "邮箱地址或密码错误" }, 401);
-		}
-		if (status === 403) {
-			return jsonResponse(
-				{ error: upstreamMessage(login.body, "邮箱密码登录未启用，请联系站点管理员") },
-				403,
-			);
-		}
-		if (status === 429) {
-			const retryAfter = response.headers.get("retry-after") ?? undefined;
-			return jsonResponse(
-				{ error: upstreamMessage(login.body, "操作过于频繁，请稍后再试") },
-				429,
-				retryAfter ? { "retry-after": retryAfter } : {},
-			);
-		}
-		return jsonResponse({ error: upstreamMessage(login.body, "邮箱服务暂时不可用，请稍后再试") }, 502);
+		return loginFailureResponse(request, email, response, login);
 	}
 
 	clearLoginFailures(request, email);
@@ -362,8 +403,17 @@ async function proxyMailUpstream(request, env, session, upstreamPath, options = 
 	}
 	const { body, text } = await readUpstreamJson(response);
 	if (!response.ok) {
+		// 封禁页是 HTML 文本（JSON 解析必然失败）；JSON 错误体由 upstreamErrorText 兜底
+		const isBlockPage = looksLikeHtml(text) && (body === null || typeof body === "string");
+		if (isBlockPage) {
+			return jsonResponse(
+				{ error: "邮箱服务被安全策略拦截，暂时无法完成操作，请稍后重试。", code: "UPSTREAM_BLOCKED" },
+				502,
+				headers,
+			);
+		}
 		return jsonResponse(
-			{ error: upstreamMessage(body, "邮箱服务暂时不可用，请稍后再试") },
+			{ error: upstreamErrorText(body, "邮箱服务暂时不可用，请稍后再试") },
 			response.status,
 			headers,
 		);

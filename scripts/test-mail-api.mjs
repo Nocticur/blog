@@ -247,3 +247,52 @@ test("mark read sends a PATCH with the unread flag", async () => {
 	});
 	await markMailRead("42");
 });
+
+test("HTML pages inside backend errors are replaced with a safe message", async () => {
+	mock.method(globalThis, "fetch", async () =>
+		Response.json(
+			{
+				error:
+					'<!DOCTYPE html>\n<html><head><title>Attention Required! | Cloudflare</title></head><body><h1>Sorry, you have been blocked</h1></body></html>',
+			},
+			{ status: 403 },
+		),
+	);
+	await assert.rejects(
+		loginMailbox("reader@nocticur.eu.cc", "secret-pass-1"),
+		(error) =>
+			error instanceof MailApiError &&
+			error.status === 403 &&
+			error.message === "邮箱服务返回错误。" &&
+			!error.message.includes("<"),
+	);
+});
+
+test("overlong backend error text is truncated before display", async () => {
+	mock.method(globalThis, "fetch", async () =>
+		Response.json({ error: "很长的错误".repeat(200) }, { status: 502 }),
+	);
+	await assert.rejects(
+		loginMailbox("reader@nocticur.eu.cc", "secret-pass-1"),
+		(error) =>
+			error instanceof MailApiError &&
+			error.message.length === 201 &&
+			error.message.endsWith("…"),
+	);
+});
+
+test("backend error codes survive client parsing", async () => {
+	mock.method(globalThis, "fetch", async () =>
+		Response.json(
+			{ error: "邮箱服务被安全策略拦截，暂时无法登录，请稍后重试。", code: "UPSTREAM_BLOCKED" },
+			{ status: 502 },
+		),
+	);
+	await assert.rejects(
+		loginMailbox("reader@nocticur.eu.cc", "secret-pass-1"),
+		(error) =>
+			error instanceof MailApiError &&
+			error.code === "UPSTREAM_BLOCKED" &&
+			error.message.includes("安全策略"),
+	);
+});

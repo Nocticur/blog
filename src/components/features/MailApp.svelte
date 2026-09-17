@@ -109,6 +109,7 @@ function readableError(error: unknown, fallback: string): string {
 	if (error instanceof MailApiError) {
 		if (
 			error.code === "UPSTREAM_CHALLENGE" ||
+			error.code === "UPSTREAM_BLOCKED" ||
 			error.code === "INVALID_RESPONSE"
 		) {
 			return error.message;
