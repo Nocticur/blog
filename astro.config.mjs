@@ -95,10 +95,6 @@ import { remarkImageGrid } from "./src/plugins/remark-image-grid.js";
 import { unified } from "@astrojs/markdown-remark";
 import mailAdminWorker from "./worker/index.js";
 
-const MAIL_API_ORIGIN = "https://apimail.noctis.eu.cc";
-const MAIL_API_PATH =
-	/^\/api\/(?:new_address|parsed_mails|parsed_mail\/[^/]+|mails\/[^/]+(?:\/read)?|clear_inbox|delete_address)(?:\?.*)?$/;
-
 if (process.env.NODE_ENV === "development") {
 	setMaxListeners(20);
 }
@@ -431,83 +427,14 @@ function writingDevApi() {
 	};
 }
 
-function mailDevProxy() {
+function mailApiDevProxy() {
+	const apiPrefixPattern = /^\/api\/(mail-admin|mail-auth)\//;
 	return {
-		name: "firefly-mail-dev-proxy",
+		name: "firefly-mail-api-dev-proxy",
 		configureServer(server) {
 			const middleware = async (req, res, next) => {
 				const requestUrl = new URL(req.url || "/", "http://localhost");
-				if (!MAIL_API_PATH.test(`${requestUrl.pathname}${requestUrl.search}`)) {
-					next();
-					return;
-				}
-
-				try {
-					const headers = new Headers();
-					for (const name of [
-						"accept",
-						"accept-language",
-						"authorization",
-						"content-type",
-						"x-custom-auth",
-						"x-lang",
-					]) {
-						const value = req.headers[name];
-						if (typeof value === "string") headers.set(name, value);
-					}
-					headers.set("origin", MAIL_API_ORIGIN);
-					headers.set("referer", `${MAIL_API_ORIGIN}/`);
-
-					let body;
-					if (req.method !== "GET" && req.method !== "HEAD") {
-						body = await new Promise((resolve, reject) => {
-							const chunks = [];
-							req.on("data", (chunk) => chunks.push(chunk));
-							req.on("end", () => resolve(Buffer.concat(chunks)));
-							req.on("error", reject);
-						});
-					}
-
-					const upstream = await fetch(
-						`${MAIL_API_ORIGIN}${requestUrl.pathname}${requestUrl.search}`,
-						{
-							method: req.method,
-							headers,
-							body,
-							redirect: "follow",
-						},
-					);
-					res.statusCode = upstream.status;
-					for (const [name, value] of upstream.headers) {
-						if (
-							!["content-encoding", "content-length", "set-cookie"].includes(
-								name,
-							)
-						) {
-							res.setHeader(name, value);
-						}
-					}
-					res.setHeader("cache-control", "no-store");
-					res.end(Buffer.from(await upstream.arrayBuffer()));
-				} catch (error) {
-					res.statusCode = 502;
-					res.end(error instanceof Error ? error.message : "Mail proxy failed");
-				}
-			};
-			return () => {
-				server.middlewares.stack.unshift({ route: "", handle: middleware });
-			};
-		},
-	};
-}
-
-function mailAdminDevProxy() {
-	return {
-		name: "firefly-mail-admin-dev-proxy",
-		configureServer(server) {
-			const middleware = async (req, res, next) => {
-				const requestUrl = new URL(req.url || "/", "http://localhost");
-				if (!requestUrl.pathname.startsWith("/api/mail-admin/")) {
+				if (!apiPrefixPattern.test(requestUrl.pathname)) {
 					next();
 					return;
 				}
@@ -538,6 +465,11 @@ function mailAdminDevProxy() {
 					);
 					const response = await mailAdminWorker.fetch(request, {
 						MAIL_ADMIN_SESSION_SECRET: process.env.MAIL_ADMIN_SESSION_SECRET,
+						MAIL_USER_SESSION_SECRET: process.env.MAIL_USER_SESSION_SECRET,
+						MAIL_UPSTREAM_ORIGIN: process.env.MAIL_UPSTREAM_ORIGIN,
+						CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+						CLOUDFLARE_D1_DATABASE_ID: process.env.CLOUDFLARE_D1_DATABASE_ID,
+						CLOUDFLARE_D1_API_TOKEN: process.env.CLOUDFLARE_D1_API_TOKEN,
 						ASSETS: {
 							fetch: async () => new Response("Not found", { status: 404 }),
 						},
@@ -820,8 +752,7 @@ export default defineConfig({
 		plugins: [
 			tailwindcss(),
 			writingDevApi(),
-			mailDevProxy(),
-			mailAdminDevProxy(),
+			mailApiDevProxy(),
 		],
 		server: {
 			watch: {

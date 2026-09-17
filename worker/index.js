@@ -3,35 +3,20 @@ import {
 	createSessionCookie,
 	readSessionCookie,
 } from "./mail-admin-session.js";
+import { handleMailAuth, MAIL_ADMIN_DEFAULT_DOMAIN, MAIL_ALL_DOMAINS } from "./mail-auth.js";
 
-const MAIL_API_ORIGIN = "https://apimail.noctis.eu.cc";
-const MAIL_API_PATH =
-	/^\/api\/(?:new_address|parsed_mails|parsed_mail\/[^/]+|mails\/[^/]+(?:\/read)?|clear_inbox|delete_address)$/;
+const DEFAULT_MAIL_API_ORIGIN = "https://apimail.noctis.eu.cc";
 const MAIL_ADMIN_PATH = /^\/api\/mail-admin(?:\/|$)/;
+const MAIL_AUTH_PATH = /^\/api\/mail-auth(?:\/|$)/;
 const ADMIN_ROLE = "master";
 let bootstrapInFlight = null;
 const loginFailures = new Map();
 const LOGIN_FAILURE_LIMIT = 5;
 const LOGIN_FAILURE_WINDOW_MS = 15 * 60 * 1000;
 
-const FORWARDED_REQUEST_HEADERS = new Set([
-	"accept",
-	"accept-language",
-	"authorization",
-	"content-type",
-	"x-custom-auth",
-	"x-lang",
-]);
-
-function proxyRequestHeaders(request) {
-	const headers = new Headers();
-	for (const name of FORWARDED_REQUEST_HEADERS) {
-		const value = request.headers.get(name);
-		if (value !== null) headers.set(name, value);
-	}
-	headers.set("origin", MAIL_API_ORIGIN);
-	headers.set("referer", `${MAIL_API_ORIGIN}/`);
-	return headers;
+function mailApiOrigin(env) {
+	const value = typeof env?.MAIL_UPSTREAM_ORIGIN === "string" ? env.MAIL_UPSTREAM_ORIGIN.trim() : "";
+	return value || DEFAULT_MAIL_API_ORIGIN;
 }
 
 function proxyResponseHeaders(response) {
@@ -83,13 +68,14 @@ async function sha256Hex(value) {
 	return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function upstreamRequest(pathname, request, options = {}) {
-	const targetUrl = new URL(MAIL_API_ORIGIN);
+async function upstreamRequest(pathname, request, env, options = {}) {
+	const origin = mailApiOrigin(env);
+	const targetUrl = new URL(origin);
 	targetUrl.pathname = pathname;
 	if (options.search) targetUrl.search = options.search;
 	const headers = new Headers(options.headers || {});
-	headers.set("origin", MAIL_API_ORIGIN);
-	headers.set("referer", MAIL_API_ORIGIN + "/");
+	headers.set("origin", origin);
+	headers.set("referer", origin + "/");
 	const init = {
 		method: options.method || request.method,
 		headers,
@@ -155,7 +141,7 @@ function clearLoginFailures(request, email) {
 async function finishAdminLogin(email, password, env, request) {
 	const limited = loginRateLimitResponse(request, email);
 	if (limited) return limited;
-	const loginResponse = await upstreamRequest("/user_api/login", request, {
+	const loginResponse = await upstreamRequest("/user_api/login", request, env, {
 		method: "POST",
 		body: { email, password: await sha256Hex(password) },
 		headers: { "content-type": "application/json", accept: "application/json" },
@@ -170,7 +156,7 @@ async function finishAdminLogin(email, password, env, request) {
 	}
 
 	const userToken = String(login.body.jwt);
-	const settingsResponse = await upstreamRequest("/user_api/settings", request, {
+	const settingsResponse = await upstreamRequest("/user_api/settings", request, env, {
 		method: "GET",
 		headers: { accept: "application/json", "x-user-token": userToken },
 	});
@@ -209,7 +195,7 @@ async function getAdminContext(request, env) {
 	);
 	if (!session) return { response: jsonResponse({ error: "管理员会话已过期" }, 401) };
 
-	const settingsResponse = await upstreamRequest("/user_api/settings", request, {
+	const settingsResponse = await upstreamRequest("/user_api/settings", request, env, {
 		method: "GET",
 		headers: { accept: "application/json", "x-user-token": session.userToken },
 	});
@@ -255,7 +241,7 @@ async function handleBootstrap(request, env) {
 		const limited = loginRateLimitResponse(request, email);
 		if (limited) return limited;
 
-		const created = await upstreamRequest("/admin/bootstrap", request, {
+		const created = await upstreamRequest("/admin/bootstrap", request, env, {
 			method: "POST",
 			body: { email, password: await sha256Hex(password) },
 			headers: { accept: "application/json", "content-type": "application/json", "x-admin-auth": adminPassword },
@@ -310,35 +296,12 @@ async function handleMailAdmin(request, env) {
 			if (value) headers.set(name, value);
 		}
 		headers.set("x-user-access-token", context.session.accessToken);
-		const upstream = await upstreamRequest(suffix, request, { search: search.slice(1), headers });
+		const upstream = await upstreamRequest(suffix, request, env, { search: search.slice(1), headers });
 		const responseHeaders = proxyResponseHeaders(upstream);
 		responseHeaders.set("set-cookie", context.refreshCookie);
 		return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers: responseHeaders });
 	}
 	return jsonResponse({ error: "管理接口不存在" }, 404);
-}
-
-async function proxyMailApi(request) {
-	const requestUrl = new URL(request.url);
-	const targetUrl = new URL(MAIL_API_ORIGIN);
-	const pathname = requestUrl.pathname;
-	targetUrl.pathname = pathname || "/";
-	targetUrl.search = requestUrl.search;
-
-	const method = request.method.toUpperCase();
-	const init = {
-		method,
-		headers: proxyRequestHeaders(request),
-		redirect: "follow",
-	};
-	if (method !== "GET" && method !== "HEAD") init.body = request.body;
-
-	const response = await fetch(targetUrl, init);
-	return new Response(response.body, {
-		status: response.status,
-		statusText: response.statusText,
-		headers: proxyResponseHeaders(response),
-	});
 }
 
 export default {
@@ -353,8 +316,22 @@ export default {
 			return handleMailAdmin(request, env);
 		}
 
-		if (MAIL_API_PATH.test(pathname)) {
-			return proxyMailApi(request);
+		// 管理员创建配置：须通过服务端管理员会话校验后才返回全部四个后缀
+		if (pathname === "/api/mail-auth/admin/config" && request.method === "GET") {
+			const context = await getAdminContext(request, env);
+			if (context.response) return context.response;
+			const headers = context.refreshCookie
+				? { "set-cookie": context.refreshCookie }
+				: {};
+			return jsonResponse(
+				{ domains: MAIL_ALL_DOMAINS, defaultDomain: MAIL_ADMIN_DEFAULT_DOMAIN },
+				200,
+				headers,
+			);
+		}
+
+		if (MAIL_AUTH_PATH.test(pathname)) {
+			return handleMailAuth(request, env);
 		}
 
 		return env.ASSETS.fetch(request);

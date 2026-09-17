@@ -1,6 +1,18 @@
-export interface MailSession {
+export interface MailAuthConfig {
+	domains: string[];
+	loginDomains: string[];
+	addressMinLength: number;
+	addressMaxLength: number;
+	passwordMinLength: number;
+}
+
+export interface MailAdminDomainConfig {
+	domains: string[];
+	defaultDomain: string;
+}
+
+export interface MailUserProfile {
 	address: string;
-	jwt: string;
 }
 
 export interface MailMessage {

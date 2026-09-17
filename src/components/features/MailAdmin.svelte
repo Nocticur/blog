@@ -37,6 +37,13 @@ import {
 	type MailAdminProfile,
 	parseJsonObject,
 } from "@/utils/mail-admin-api";
+import MailAddressFields from "@components/features/MailAddressFields.svelte";
+import {
+	composeMailboxAddress,
+	FALLBACK_ALL_MAIL_DOMAINS,
+	splitMailboxAddress,
+} from "@/utils/mail-address";
+import { getMailAdminConfig, getMailAuthConfig } from "@/utils/mail-api";
 import { sanitizeMailHtml } from "@/utils/mail-html";
 
 type ViewId =
@@ -122,10 +129,15 @@ let authError = $state("");
 let notice = $state("");
 let error = $state("");
 let busy = $state(false);
-let loginEmail = $state("");
+let loginPrefix = $state("");
+let loginDomain = $state("");
+let loginPasteError = $state("");
 let loginPassword = $state("");
+let loginDomains = $state<string[]>([...FALLBACK_ALL_MAIL_DOMAINS]);
 let bootstrapSecret = $state("");
-let bootstrapEmail = $state("");
+let bootstrapPrefix = $state("");
+let bootstrapDomain = $state("");
+let bootstrapPasteError = $state("");
 let bootstrapPassword = $state("");
 let bootstrapConfirm = $state("");
 let rows = $state<RecordValue[]>([]);
@@ -163,10 +175,13 @@ let anonymousMailboxEnabled = $state(false);
 let userDeleteEnabled = $state(false);
 let cleanupType = $state("raw_mails");
 let cleanupDays = $state("30");
+let adminDomains = $state<string[]>([...FALLBACK_ALL_MAIL_DOMAINS]);
 let newAddressName = $state("");
-let newAddressDomain = $state("");
+let newAddressDomain = $state("mourn.top");
 let randomSubdomain = $state(false);
-let newUserEmail = $state("");
+let newUserPrefix = $state("");
+let newUserDomain = $state("mourn.top");
+let newUserPasteError = $state("");
 let newUserPassword = $state("");
 let selectedUserRole = $state("");
 let bindAddressName = $state("");
@@ -523,6 +538,7 @@ async function establishSession() {
 		const response = await getAdminSession();
 		profile = response.profile;
 		phase = "ready";
+		void loadAdminDomains();
 		await loadView("dashboard");
 	} catch (value) {
 		phase = "login";
@@ -532,11 +548,62 @@ async function establishSession() {
 	}
 }
 
+// 登录 / 首次设置表单的后缀清单（含 mourn.top，全部四个）
+let loginDomainsLoaded = false;
+async function ensureLoginDomains() {
+	if (loginDomainsLoaded) return;
+	loginDomainsLoaded = true;
+	try {
+		const config = await getMailAuthConfig();
+		loginDomains = [...config.loginDomains];
+	} catch {
+		// 拉取失败时保留内置回退清单，登录仍可进行
+	}
+}
+
+// 管理员创建（地址 / 用户账号）的后缀清单，须凭管理员会话获取
+async function loadAdminDomains() {
+	try {
+		const config = await getMailAdminConfig();
+		adminDomains = [...config.domains];
+		if (!newAddressDomain || !adminDomains.includes(newAddressDomain)) {
+			newAddressDomain = config.defaultDomain;
+		}
+		if (!newUserDomain || !adminDomains.includes(newUserDomain)) {
+			newUserDomain = config.defaultDomain;
+		}
+	} catch {
+		// 会话失效或配置异常时保留内置回退清单，组件 effect 会收敛非法值
+		adminDomains = [...FALLBACK_ALL_MAIL_DOMAINS];
+	}
+}
+
 async function submitLogin() {
 	authError = "";
+	if (loginPasteError) {
+		authError = loginPasteError;
+		return;
+	}
+	const raw = loginPrefix.trim().toLowerCase();
+	if (!raw || !loginPassword) {
+		authError = "请输入管理员邮箱和密码。";
+		return;
+	}
+	// 防御性拆分：完整邮箱被直接填入前缀框时也能正确组合
+	const split = splitMailboxAddress(raw);
+	if (split.domain) {
+		if (!loginDomains.includes(split.domain)) {
+			authError = `不支持的后缀 @${split.domain}，请在下拉框中选择后缀。`;
+			return;
+		}
+		loginDomain = split.domain;
+	}
+	const email = split.domain
+		? composeMailboxAddress(split.prefix, split.domain)
+		: composeMailboxAddress(raw, loginDomain);
 	busy = true;
 	try {
-		const response = await loginAdmin(loginEmail, loginPassword);
+		const response = await loginAdmin(email, loginPassword);
 		profile = response.profile;
 		loginPassword = "";
 		phase = "ready";
@@ -554,11 +621,31 @@ async function submitBootstrap() {
 		authError = "两次输入的管理员密码不一致。";
 		return;
 	}
+	if (bootstrapPasteError) {
+		authError = bootstrapPasteError;
+		return;
+	}
+	const raw = bootstrapPrefix.trim().toLowerCase();
+	if (!raw) {
+		authError = "请输入新管理员邮箱。";
+		return;
+	}
+	const split = splitMailboxAddress(raw);
+	if (split.domain) {
+		if (!loginDomains.includes(split.domain)) {
+			authError = `不支持的后缀 @${split.domain}，请在下拉框中选择后缀。`;
+			return;
+		}
+		bootstrapDomain = split.domain;
+	}
+	const email = split.domain
+		? composeMailboxAddress(split.prefix, split.domain)
+		: composeMailboxAddress(raw, bootstrapDomain);
 	busy = true;
 	try {
 		const response = await bootstrapAdmin(
 			bootstrapSecret,
-			bootstrapEmail,
+			email,
 			bootstrapPassword,
 		);
 		profile = response.profile;
@@ -670,18 +757,21 @@ async function createAddress() {
 		error = "请输入地址名称。";
 		return;
 	}
+	if (!adminDomains.includes(newAddressDomain)) {
+		error = "请选择地址后缀。";
+		return;
+	}
 	busy = true;
 	try {
 		await adminRequest("/admin/new_address", {
 			method: "POST",
 			body: {
 				name: newAddressName.trim(),
-				domain: newAddressDomain.trim() || undefined,
+				domain: newAddressDomain,
 				enableRandomSubdomain: randomSubdomain,
 			},
 		});
 		newAddressName = "";
-		newAddressDomain = "";
 		randomSubdomain = false;
 		notice = "邮箱地址已创建。";
 		await loadView("addresses");
@@ -693,20 +783,36 @@ async function createAddress() {
 }
 
 async function createUser() {
-	if (!newUserEmail.trim() || newUserPassword.length < 6) {
-		error = "请输入邮箱，并设置至少 6 位密码。";
+	if (newUserPasteError) {
+		error = newUserPasteError;
 		return;
 	}
+	const raw = newUserPrefix.trim().toLowerCase();
+	if (!raw || newUserPassword.length < 6) {
+		error = "请输入账号邮箱，并设置至少 6 位密码。";
+		return;
+	}
+	const split = splitMailboxAddress(raw);
+	if (split.domain) {
+		if (!adminDomains.includes(split.domain)) {
+			error = `不支持的后缀 @${split.domain}，请在下拉框中选择后缀。`;
+			return;
+		}
+		newUserDomain = split.domain;
+	}
+	const email = split.domain
+		? composeMailboxAddress(split.prefix, split.domain)
+		: composeMailboxAddress(raw, newUserDomain);
 	busy = true;
 	try {
 		await adminRequest("/admin/users", {
 			method: "POST",
 			body: {
-				email: newUserEmail.trim().toLowerCase(),
+				email,
 				password: await sha256Hex(newUserPassword),
 			},
 		});
-		newUserEmail = "";
+		newUserPrefix = "";
 		newUserPassword = "";
 		notice = "用户账号已创建。";
 		await loadView("users");
@@ -946,6 +1052,7 @@ function isMailView(view: ViewId) {
 
 onMount(() => {
 	darkMode = document.documentElement.classList.contains("dark");
+	void ensureLoginDomains();
 	void establishSession();
 });
 </script>
@@ -962,8 +1069,15 @@ onMount(() => {
 			<p class="mail-admin-auth-subtitle">沿用 Loven7 Mail Admin 的管理工作台，凭后端管理员权限访问。</p>
 			{#if phase === "login"}
 				<form class="mail-admin-form" onsubmit={(event) => { event.preventDefault(); void submitLogin(); }}>
-					<label for="mail-admin-email">账号邮箱</label>
-					<input id="mail-admin-email" type="email" autocomplete="username" bind:value={loginEmail} required />
+					<MailAddressFields
+						domains={loginDomains}
+						bind:prefix={loginPrefix}
+						bind:domain={loginDomain}
+						bind:pasteError={loginPasteError}
+						idPrefix="mail-admin"
+						label="账号邮箱"
+						autocomplete="username"
+					/>
 					<label for="mail-admin-password">密码</label>
 					<input id="mail-admin-password" type="password" autocomplete="current-password" bind:value={loginPassword} required />
 					{#if authError}<p class="mail-admin-form-error" role="alert">{authError}</p>{/if}
@@ -977,8 +1091,15 @@ onMount(() => {
 				<form class="mail-admin-form" onsubmit={(event) => { event.preventDefault(); void submitBootstrap(); }}>
 					<label for="mail-admin-bootstrap-secret">现有管理员口令</label>
 					<input id="mail-admin-bootstrap-secret" type="password" autocomplete="off" bind:value={bootstrapSecret} required />
-					<label for="mail-admin-bootstrap-email">新管理员邮箱</label>
-					<input id="mail-admin-bootstrap-email" type="email" autocomplete="username" bind:value={bootstrapEmail} required />
+					<MailAddressFields
+						domains={loginDomains}
+						bind:prefix={bootstrapPrefix}
+						bind:domain={bootstrapDomain}
+						bind:pasteError={bootstrapPasteError}
+						idPrefix="mail-admin-bootstrap"
+						label="新管理员邮箱"
+						autocomplete="username"
+					/>
 					<label for="mail-admin-bootstrap-password">新管理员密码</label>
 					<input id="mail-admin-bootstrap-password" type="password" autocomplete="new-password" minlength="6" bind:value={bootstrapPassword} required />
 					<label for="mail-admin-bootstrap-confirm">确认密码</label>
@@ -1052,8 +1173,8 @@ onMount(() => {
 					<article class="mail-admin-card mail-admin-card-wide"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">RETENTION CONTROLS</p><h2>自动清理范围</h2></div><Archive size={18} /></div><p class="mail-admin-card-copy">只修改自动清理的启用状态和保留天数；后端仍会校验边界，已有高级清理配置保持不变。</p><div class="mail-admin-cleanup-grid"><label class="mail-admin-cleanup-item"><span>收件邮件</span><input type="checkbox" checked={Boolean(autoCleanup.enableMailsAutoCleanup)} onchange={(event) => updateCleanupBoolean("enableMailsAutoCleanup", event)} /><input type="number" min="0" aria-label="收件邮件保留天数" value={numberValue(autoCleanup.cleanMailsDays)} oninput={(event) => updateCleanupDays("cleanMailsDays", event)} /></label><label class="mail-admin-cleanup-item"><span>未知邮件</span><input type="checkbox" checked={Boolean(autoCleanup.enableUnknowMailsAutoCleanup)} onchange={(event) => updateCleanupBoolean("enableUnknowMailsAutoCleanup", event)} /><input type="number" min="0" aria-label="未知邮件保留天数" value={numberValue(autoCleanup.cleanUnknowMailsDays)} oninput={(event) => updateCleanupDays("cleanUnknowMailsDays", event)} /></label><label class="mail-admin-cleanup-item"><span>发件箱</span><input type="checkbox" checked={Boolean(autoCleanup.enableSendBoxAutoCleanup)} onchange={(event) => updateCleanupBoolean("enableSendBoxAutoCleanup", event)} /><input type="number" min="0" aria-label="发件箱保留天数" value={numberValue(autoCleanup.cleanSendBoxDays)} oninput={(event) => updateCleanupDays("cleanSendBoxDays", event)} /></label><label class="mail-admin-cleanup-item"><span>邮箱地址</span><input type="checkbox" checked={Boolean(autoCleanup.enableAddressAutoCleanup)} onchange={(event) => updateCleanupBoolean("enableAddressAutoCleanup", event)} /><input type="number" min="0" aria-label="邮箱地址保留天数" value={numberValue(autoCleanup.cleanAddressDays)} oninput={(event) => updateCleanupDays("cleanAddressDays", event)} /></label><label class="mail-admin-cleanup-item"><span>非活跃地址</span><input type="checkbox" checked={Boolean(autoCleanup.enableInactiveAddressAutoCleanup)} onchange={(event) => updateCleanupBoolean("enableInactiveAddressAutoCleanup", event)} /><input type="number" min="0" aria-label="非活跃地址保留天数" value={numberValue(autoCleanup.cleanInactiveAddressDays)} oninput={(event) => updateCleanupDays("cleanInactiveAddressDays", event)} /></label><label class="mail-admin-cleanup-item"><span>未绑定地址</span><input type="checkbox" checked={Boolean(autoCleanup.enableUnboundAddressAutoCleanup)} onchange={(event) => updateCleanupBoolean("enableUnboundAddressAutoCleanup", event)} /><input type="number" min="0" aria-label="未绑定地址保留天数" value={numberValue(autoCleanup.cleanUnboundAddressDays)} oninput={(event) => updateCleanupDays("cleanUnboundAddressDays", event)} /></label><label class="mail-admin-cleanup-item"><span>空地址</span><input type="checkbox" checked={Boolean(autoCleanup.enableEmptyAddressAutoCleanup)} onchange={(event) => updateCleanupBoolean("enableEmptyAddressAutoCleanup", event)} /><input type="number" min="0" aria-label="空地址保留天数" value={numberValue(autoCleanup.cleanEmptyAddressDays)} oninput={(event) => updateCleanupDays("cleanEmptyAddressDays", event)} /></label></div><button class="mail-admin-primary" type="button" onclick={() => void saveAutoCleanup()} disabled={busy}>保存自动清理配置</button></article>
 				{:else}
 					<div class="mail-admin-page-heading"><div><p class="mail-admin-eyebrow">{isMailView(activeView) ? "MAILBOX" : "DIRECTORY"}</p><h1>{navItems.find((item) => item.id === activeView)?.label}</h1><p>{activeView === "addresses" ? "管理地址、额度和关联邮件。" : activeView === "users" ? "管理用户账号、角色、密码和绑定地址。" : "查看、检索和清理邮件数据。"}</p></div><button class="mail-admin-secondary" type="button" onclick={() => void refreshCurrent()}><RefreshCw size={15} />刷新</button></div>
-					{#if activeView === "addresses"}<article class="mail-admin-card mail-admin-inline-form"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">NEW ADDRESS</p><h2>创建邮箱地址</h2></div><Archive size={18} /></div><div class="mail-admin-form-grid"><label class="mail-admin-field"><span>地址名称</span><input placeholder="例如 inbox" bind:value={newAddressName} /></label><label class="mail-admin-field"><span>域名（可选）</span><input placeholder="使用默认域名" bind:value={newAddressDomain} /></label><label class="mail-admin-check"><input type="checkbox" bind:checked={randomSubdomain} /><span>启用随机子域名</span></label><button class="mail-admin-primary" type="button" onclick={() => void createAddress()} disabled={busy}>创建地址</button></div></article>{/if}
-					{#if activeView === "users"}<article class="mail-admin-card mail-admin-inline-form"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">NEW USER</p><h2>创建用户账号</h2></div><Users size={18} /></div><div class="mail-admin-form-grid"><label class="mail-admin-field"><span>账号邮箱</span><input type="email" autocomplete="off" bind:value={newUserEmail} /></label><label class="mail-admin-field"><span>初始密码</span><input type="password" autocomplete="new-password" minlength="6" bind:value={newUserPassword} /></label><button class="mail-admin-primary" type="button" onclick={() => void createUser()} disabled={busy}>创建用户</button></div></article>{/if}
+					{#if activeView === "addresses"}<article class="mail-admin-card mail-admin-inline-form"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">NEW ADDRESS</p><h2>创建邮箱地址</h2></div><Archive size={18} /></div><div class="mail-admin-form-grid"><MailAddressFields domains={adminDomains} bind:prefix={newAddressName} bind:domain={newAddressDomain} idPrefix="mail-admin-address" label="地址名称" /><label class="mail-admin-check"><input type="checkbox" bind:checked={randomSubdomain} /><span>启用随机子域名</span></label><button class="mail-admin-primary" type="button" onclick={() => void createAddress()} disabled={busy}>创建地址</button></div></article>{/if}
+					{#if activeView === "users"}<article class="mail-admin-card mail-admin-inline-form"><div class="mail-admin-card-heading"><div><p class="mail-admin-eyebrow">NEW USER</p><h2>创建用户账号</h2></div><Users size={18} /></div><div class="mail-admin-form-grid"><MailAddressFields domains={adminDomains} bind:prefix={newUserPrefix} bind:domain={newUserDomain} bind:pasteError={newUserPasteError} idPrefix="mail-admin-user" label="账号邮箱" /><label class="mail-admin-field"><span>初始密码</span><input type="password" autocomplete="new-password" minlength="6" bind:value={newUserPassword} /></label><button class="mail-admin-primary" type="button" onclick={() => void createUser()} disabled={busy}>创建用户</button></div></article>{/if}
 					<div class="mail-admin-toolbar"><div class="mail-admin-search"><Search size={16} aria-hidden="true" /><input aria-label="搜索管理数据" placeholder={activeView === "users" ? "搜索用户邮箱" : "搜索关键字"} bind:value={searchInput} onkeydown={(event) => { if (event.key === "Enter") void searchCurrent(); }} /><button type="button" onclick={() => void searchCurrent()}>搜索</button></div><span class="mail-admin-result-count">共 {total} 条</span></div>
 					<div class="mail-admin-table-wrap"><table class="mail-admin-table"><thead><tr>{#if activeView === "users"}<th>账号</th><th>角色</th><th>地址数</th><th>状态</th><th></th>{:else if activeView === "addresses"}<th>地址</th><th>所属用户</th><th>邮件数</th><th>状态</th><th></th>{:else}<th>发件人</th><th>主题</th><th>收件地址</th><th>时间</th><th></th>{/if}</tr></thead><tbody>{#if busy && rows.length === 0}<tr><td colspan="5" class="mail-admin-empty">正在加载…</td></tr>{:else if rows.length === 0}<tr><td colspan="5" class="mail-admin-empty">暂无数据</td></tr>{:else}{#each rows as row}<tr class:selected={selected && idOf(selected) === idOf(row)}>{#if activeView === "users"}<td><strong>{displayUser(row)}</strong><small>{stringValue(row.id, "")}</small></td><td><span class="mail-admin-badge">{stringValue(row.role_text, "普通用户")}</span></td><td>{numberValue(row.address_count)}</td><td>{row.enable === false ? "已禁用" : "正常"}</td><td class="mail-admin-actions-cell"><button class="mail-admin-text-button" type="button" onclick={() => (selected = row)}>查看</button><button class="mail-admin-text-button danger" type="button" onclick={() => void deleteRow(row, "/admin/users", "删除用户")}>删除</button></td>{:else if activeView === "addresses"}<td><strong>{displayUser(row)}</strong><small>{stringValue(row.domain, "")}</small></td><td>{stringValue(row.user_email ?? row.owner_email, "未绑定")}</td><td>{numberValue(row.mail_count ?? row.message_count)}</td><td>{row.enable === false ? "已停用" : "正常"}</td><td class="mail-admin-actions-cell"><button class="mail-admin-text-button" type="button" onclick={() => void clearAddress(row)}>清收件</button><button class="mail-admin-text-button danger" type="button" onclick={() => void deleteAddress(row)}>删除</button></td>{:else}<td><strong>{stringValue(row.sender ?? row.from, "未知发件人")}</strong></td><td><button class="mail-admin-table-link" type="button" onclick={() => void selectMail(row)}>{displaySubject(row)}</button></td><td>{stringValue(row.address ?? row.to, "—")}</td><td>{displayTime(row)}</td><td class="mail-admin-actions-cell"><button class="mail-admin-text-button danger" type="button" onclick={() => void deleteRow(row, "/admin/mails", "删除邮件")}>删除</button></td>{/if}</tr>{/each}{/if}</tbody></table></div>
 					{#if selected && activeView === "users"}<article class="mail-admin-card mail-admin-user-detail"><div class="mail-admin-detail-head"><div><p class="mail-admin-eyebrow">USER CONTROL</p><h2>{displayUser(selected)}</h2></div><button class="mail-admin-icon-button" type="button" aria-label="关闭用户详情" onclick={() => (selected = null)}><X size={17} /></button></div><div class="mail-admin-form-grid"><label class="mail-admin-field"><span>角色</span><select bind:value={selectedUserRole}><option value="">撤销角色</option>{#each roleOptions as role}<option value={String(role.role ?? role.name ?? "")}>{String(role.role ?? role.name ?? "")}</option>{/each}</select></label><button class="mail-admin-secondary" type="button" onclick={() => void updateUserRole(selected)} disabled={busy}>保存角色</button><label class="mail-admin-field"><span>绑定地址</span><input placeholder="完整邮箱地址" bind:value={bindAddressName} /></label><button class="mail-admin-secondary" type="button" onclick={() => void bindUserAddress(selected)} disabled={busy}>绑定地址</button></div></article>{/if}

@@ -1,45 +1,15 @@
 <section class="mail-app mail-app--fallback" aria-busy="true" aria-label="邮箱">
-	<header class="mail-app__header">
-		<div class="mail-app__identity">
-			<span class="mail-app__label">当前邮箱</span>
-			<span class="mail-app__address-skeleton"></span>
-		</div>
-		<div class="mail-app__actions">
-			<span class="mail-app__action-skeleton"></span>
-			<span class="mail-app__action-skeleton"></span>
-			<span class="mail-app__action-skeleton"></span>
-		</div>
-	</header>
-
-	<div class="mail-app__workspace">
-		<div class="mail-app__list-pane">
-			<div class="mail-app__pane-heading">
-				<span>收件箱</span>
-				<span class="mail-app__count">--</span>
+	<div class="mail-app__auth">
+		<div class="mail-auth-card">
+			<div class="mail-auth-card__tabs" aria-hidden="true">
+				<span class="mail-app__skeleton" style="width:100%;height:2.3rem;"></span>
+				<span class="mail-app__skeleton" style="width:100%;height:2.3rem;"></span>
 			</div>
-			<div class="mail-app__message-list" aria-hidden="true">
-				{Array.from({ length: 7 }).map(() => (
-					<div class="mail-app__message mail-app__message--skeleton">
-						<span class="mail-app__unread-dot"></span>
-						<span class="mail-app__skeleton mail-app__skeleton--sender"></span>
-						<span class="mail-app__skeleton mail-app__skeleton--subject"></span>
-						<span class="mail-app__skeleton mail-app__skeleton--time"></span>
-					</div>
-				))}
-			</div>
-		</div>
-
-		<div class="mail-app__detail-pane">
-			<div class="mail-app__detail">
-				<div class="mail-app__detail-header">
-					<span class="mail-app__skeleton mail-app__skeleton--subject"></span>
-					<span class="mail-app__skeleton mail-app__skeleton--sender"></span>
-				</div>
-				<div class="mail-app__detail-body">
-					{Array.from({ length: 5 }).map(() => (
-						<span class="mail-app__skeleton mail-app__skeleton--paragraph"></span>
-					))}
-				</div>
+			<div class="mail-auth-card__form" aria-hidden="true">
+				<span class="mail-app__skeleton mail-app__skeleton--paragraph"></span>
+				<span class="mail-app__skeleton mail-app__skeleton--paragraph"></span>
+				<span class="mail-app__skeleton mail-app__skeleton--subject" style="width:40%;"></span>
+				<span class="mail-app__skeleton" style="width:100%;height:2.7rem;"></span>
 			</div>
 		</div>
 	</div>

@@ -21,6 +21,12 @@
 	--admin-muted: color-mix(in oklab, var(--deep-text) 60%, transparent);
 	--admin-card: color-mix(in oklab, var(--page-bg) 88%, var(--deep-text));
 	--admin-primary: var(--primary);
+	/* 前缀+后缀共享控件在管理后台中的主题令牌 */
+	--mail-address-line: var(--admin-line);
+	--mail-address-bg: color-mix(in oklab, var(--page-bg) 94%, var(--deep-text));
+	--mail-address-muted: var(--admin-muted);
+	--mail-address-focus: var(--admin-primary);
+	--mail-address-radius: 0.55rem;
 	position: relative;
 	min-height: 44rem;
 	color: var(--deep-text);
@@ -789,6 +795,11 @@
 	min-width: min(100%, 13rem);
 	flex: 1 1 13rem;
 	margin-bottom: 0;
+}
+
+.mail-admin-form-grid .mail-address-fields {
+	flex: 1 1 16rem;
+	min-width: min(100%, 16rem);
 }
 
 .mail-admin-form-grid .mail-admin-primary,

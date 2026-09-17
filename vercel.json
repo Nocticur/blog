@@ -9,20 +9,8 @@
 			"destination": "/api/mail-admin/[[...path]]?...path=$1&__suffix=$1"
 		},
 		{
-			"source": "/api/:endpoint(new_address|parsed_mails|clear_inbox|delete_address)",
-			"destination": "https://apimail.noctis.eu.cc/api/:endpoint"
-		},
-		{
-			"source": "/api/parsed_mail/:id",
-			"destination": "https://apimail.noctis.eu.cc/api/parsed_mail/:id"
-		},
-		{
-			"source": "/api/mails/:id/read",
-			"destination": "https://apimail.noctis.eu.cc/api/mails/:id/read"
-		},
-		{
-			"source": "/api/mails/:id",
-			"destination": "https://apimail.noctis.eu.cc/api/mails/:id"
+			"source": "/api/mail-auth/(.+)",
+			"destination": "/api/mail-auth/[[...path]]?...path=$1&__suffix=$1"
 		},
 		{
 			"source": "/api/writing/:path*/",
@@ -39,7 +27,7 @@
 			]
 		},
 		{
-			"source": "/api/:endpoint(new_address|parsed_mails|parsed_mail|mails|clear_inbox|delete_address)/:path*",
+			"source": "/api/mail-auth/(.*)",
 			"headers": [
 				{ "key": "Cache-Control", "value": "private, no-store" },
 				{ "key": "CDN-Cache-Control", "value": "no-store" },

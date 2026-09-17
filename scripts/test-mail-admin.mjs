@@ -29,7 +29,9 @@ test("encrypted admin cookie round trips and rejects tampering", async () => {
 	assert.match(setCookie, /Path=\//);
 	const cookieValue = setCookie.split(";", 1)[0];
 	assert.deepEqual(await readSessionCookie(cookieValue, SECRET), session);
-	const tampered = `${cookieValue.slice(0, -1)}${cookieValue.endsWith("a") ? "b" : "a"}`;
+	// 首字符编码 IV 的最高有效位，任何改动都会改变解码字节（尾字符可能只携带填充位）
+	const first = cookieValue.charAt(0);
+	const tampered = `${first === "A" ? "B" : "A"}${cookieValue.slice(1)}`;
 	assert.equal(await readSessionCookie(tampered, SECRET), null);
 });
 

@@ -1,29 +1,37 @@
 import type {
 	MailAttachment,
+	MailAdminDomainConfig,
+	MailAuthConfig,
 	MailDetail,
 	MailListResponse,
 	MailMessage,
-	MailSession,
+	MailUserProfile,
 } from "@/types/mail";
 
-const MAIL_API_BASE_URL = "/api";
+const MAIL_API_BASE_URL = "/api/mail-auth";
 type MailRequestOptions = {
 	path: string;
 	method?: "GET" | "POST" | "PATCH" | "DELETE";
 	body?: unknown;
-	token?: string;
 	signal?: AbortSignal;
 };
 
 export class MailApiError extends Error {
 	readonly status?: number;
 	readonly code?: string;
+	readonly retryAfterSeconds?: number;
 
-	constructor(message: string, status?: number, code?: string) {
+	constructor(
+		message: string,
+		status?: number,
+		code?: string,
+		retryAfterSeconds?: number,
+	) {
 		super(message);
 		this.name = "MailApiError";
 		this.status = status;
 		this.code = code;
+		this.retryAfterSeconds = retryAfterSeconds;
 	}
 }
 
@@ -77,19 +85,18 @@ function normalizeAttachment(value: unknown): MailAttachment | null {
 	};
 }
 
+// 会话使用同源 HttpOnly Cookie，前端从不接触上游令牌；
+// fetch 默认同源携带 Cookie，这里显式声明以保证语义。
 async function request<T>({
 	path,
 	method = "GET",
 	body,
-	token,
 	signal,
 }: MailRequestOptions): Promise<T> {
 	const headers = new Headers({
 		accept: "application/json",
-		"x-lang": "zh-CN",
 	});
 
-	if (token) headers.set("authorization", `Bearer ${token}`);
 	if (body !== undefined) headers.set("content-type", "application/json");
 
 	let response: Response;
@@ -97,6 +104,7 @@ async function request<T>({
 		response = await fetch(`${MAIL_API_BASE_URL}${path}`, {
 			method,
 			headers,
+			credentials: "same-origin",
 			body: body === undefined ? undefined : JSON.stringify(body),
 			signal,
 		});
@@ -155,43 +163,138 @@ async function request<T>({
 		} else if (typeof parsedBody === "string" && parsedBody) {
 			message = parsedBody;
 		}
-		throw new MailApiError(message, response.status, code);
+		const retryAfterHeader = response.headers.get("retry-after");
+		const retryAfterSeconds = retryAfterHeader
+			? Number(retryAfterHeader)
+			: undefined;
+		throw new MailApiError(
+			message,
+			response.status,
+			code,
+			Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : undefined,
+		);
 	}
 
 	return parsedBody as T;
 }
 
-export async function createMailbox(
-	domain?: string,
+function validDomainList(value: unknown): string[] | null {
+	if (!Array.isArray(value) || value.length === 0) return null;
+	return value.every((domain) => typeof domain === "string" && domain.includes("."))
+		? (value as string[])
+		: null;
+}
+
+export async function getMailAuthConfig(
 	signal?: AbortSignal,
-): Promise<MailSession> {
-	const body = domain ? { domain } : {};
-	const response = await request<Partial<MailSession>>({
-		path: "/new_address",
-		method: "POST",
-		body,
+): Promise<MailAuthConfig> {
+	const response = await request<Partial<MailAuthConfig>>({
+		path: "/config",
 		signal,
 	});
+	const domains = validDomainList(response?.domains);
+	if (!domains) {
+		throw new MailApiError(
+			"邮箱服务返回了无效的注册配置。",
+			502,
+			"INVALID_RESPONSE",
+		);
+	}
+	// 登录侧域名清单缺失时回退注册清单，保证登录表单始终可用
+	const loginDomains = validDomainList(response?.loginDomains) ?? domains;
+	const intOr = (value: unknown, fallback: number) =>
+		typeof value === "number" && Number.isInteger(value) && value > 0
+			? value
+			: fallback;
+	return {
+		domains,
+		loginDomains,
+		addressMinLength: intOr(response?.addressMinLength, 3),
+		addressMaxLength: intOr(response?.addressMaxLength, 30),
+		passwordMinLength: intOr(response?.passwordMinLength, 8),
+	};
+}
 
+// 管理员创建（地址 / 用户账号）可用的后缀清单，须凭管理员会话获取
+export async function getMailAdminConfig(
+	signal?: AbortSignal,
+): Promise<MailAdminDomainConfig> {
+	const response = await request<Partial<MailAdminDomainConfig>>({
+		path: "/admin/config",
+		signal,
+	});
+	const domains = validDomainList(response?.domains);
+	if (!domains || !response?.defaultDomain || !domains.includes(response.defaultDomain)) {
+		throw new MailApiError(
+			"邮箱服务返回了无效的管理员域名配置。",
+			502,
+			"INVALID_RESPONSE",
+		);
+	}
+	return { domains, defaultDomain: response.defaultDomain };
+}
+
+export async function registerMailbox(
+	name: string,
+	domain: string,
+	password: string,
+	signal?: AbortSignal,
+): Promise<{ address: string }> {
+	const response = await request<{ address?: unknown }>({
+		path: "/register",
+		method: "POST",
+		body: { name, domain, password },
+		signal,
+	});
 	if (
 		!response ||
 		typeof response.address !== "string" ||
-		typeof response.jwt !== "string" ||
-		!response.address.trim() ||
-		!response.jwt.trim()
+		!response.address.trim()
 	) {
-		throw new MailApiError("邮箱服务返回了无效的邮箱会话。", 502);
+		throw new MailApiError("注册返回了无效的数据。", 502, "INVALID_RESPONSE");
 	}
-	return { address: response.address, jwt: response.jwt };
+	return { address: response.address };
+}
+
+export async function loginMailbox(
+	email: string,
+	password: string,
+	signal?: AbortSignal,
+): Promise<MailUserProfile> {
+	const response = await request<{ profile?: Partial<MailUserProfile> }>({
+		path: "/login",
+		method: "POST",
+		body: { email, password },
+		signal,
+	});
+	if (!response?.profile || typeof response.profile.address !== "string") {
+		throw new MailApiError("登录返回了无效的数据。", 502, "INVALID_RESPONSE");
+	}
+	return { address: response.profile.address };
+}
+
+export async function getMailSession(
+	signal?: AbortSignal,
+): Promise<MailUserProfile> {
+	const response = await request<{ profile?: Partial<MailUserProfile> }>({
+		path: "/session",
+		signal,
+	});
+	if (!response?.profile || typeof response.profile.address !== "string") {
+		throw new MailApiError("会话返回了无效的数据。", 502, "INVALID_RESPONSE");
+	}
+	return { address: response.profile.address };
+}
+
+export async function logoutMailbox(): Promise<void> {
+	await request({ path: "/logout", method: "POST" });
 }
 
 export async function getMailboxMessages(
-	token: string,
 	signal?: AbortSignal,
 ): Promise<MailListResponse> {
 	const response = await request<Partial<MailListResponse>>({
-		path: "/parsed_mails?limit=30&offset=0",
-		token,
+		path: "/mails?limit=30&offset=0",
 		signal,
 	});
 
@@ -211,12 +314,10 @@ export async function getMailboxMessages(
 
 export async function getMailMessage(
 	id: string,
-	token: string,
 	signal?: AbortSignal,
 ): Promise<MailDetail> {
 	const detail = await request<MailDetail>({
-		path: `/parsed_mail/${encodeURIComponent(id)}`,
-		token,
+		path: `/mails/${encodeURIComponent(id)}`,
 		signal,
 	});
 	if (!detail) throw new MailApiError("这封邮件已不存在，请刷新收件箱。", 404);
@@ -234,38 +335,24 @@ export async function getMailMessage(
 	};
 }
 
-export async function markMailRead(id: string, token: string): Promise<void> {
+export async function markMailRead(id: string): Promise<void> {
 	await request({
 		path: `/mails/${encodeURIComponent(id)}/read`,
 		method: "PATCH",
 		body: { isUnread: false },
-		token,
 	});
 }
 
-export async function deleteMailMessage(
-	id: string,
-	token: string,
-): Promise<void> {
+export async function deleteMailMessage(id: string): Promise<void> {
 	await request({
 		path: `/mails/${encodeURIComponent(id)}`,
 		method: "DELETE",
-		token,
 	});
 }
 
-export async function clearMailbox(token: string): Promise<void> {
+export async function clearMailbox(): Promise<void> {
 	await request({
-		path: "/clear_inbox",
+		path: "/inbox",
 		method: "DELETE",
-		token,
-	});
-}
-
-export async function deleteMailbox(token: string): Promise<void> {
-	await request({
-		path: "/delete_address",
-		method: "DELETE",
-		token,
 	});
 }

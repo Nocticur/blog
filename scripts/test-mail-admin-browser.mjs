@@ -64,6 +64,38 @@ try {
 	await page.route("**/*", async (route) => {
 		const url = new URL(route.request().url());
 		if (url.origin !== new URL(base).origin) return route.abort();
+		if (url.pathname === "/api/mail-auth/config") {
+			return route.fulfill({
+				json: {
+					domains: ["nocticur.eu.cc", "noctis.eu.cc", "caelus.eu.cc"],
+					loginDomains: [
+						"nocticur.eu.cc",
+						"noctis.eu.cc",
+						"caelus.eu.cc",
+						"mourn.top",
+					],
+					addressMinLength: 3,
+					addressMaxLength: 30,
+					passwordMinLength: 8,
+				},
+			});
+		}
+		if (url.pathname === "/api/mail-auth/admin/config") {
+			if (!(state.loggedIn && state.sessionOk)) {
+				return route.fulfill({ status: 401, json: { error: "管理员会话已过期" } });
+			}
+			return route.fulfill({
+				json: {
+					domains: [
+						"nocticur.eu.cc",
+						"noctis.eu.cc",
+						"caelus.eu.cc",
+						"mourn.top",
+					],
+					defaultDomain: "mourn.top",
+				},
+			});
+		}
 		if (!url.pathname.startsWith("/api/mail-admin/")) return route.continue();
 		requests.push({ path: url.pathname, method: route.request().method() });
 		if (url.pathname === "/api/mail-admin/session") {
@@ -108,7 +140,13 @@ try {
 	const loginIfNeeded = async () => {
 		await page.goto(`${base}/mail/admin/`);
 		await page.getByRole("heading", { name: "邮件管理后台" }).waitFor();
-		await page.getByLabel("账号邮箱").fill("admin@example.com");
+		await page.locator("#mail-admin-prefix").fill("admin");
+		// 管理员登录使用包含 mourn.top 的四后缀下拉
+		assert.equal(
+			await page.locator("#mail-admin-domain option[value='mourn.top']").count(),
+			1,
+		);
+		await page.locator("#mail-admin-domain").selectOption("mourn.top");
 		await page.getByLabel("密码").fill("correct-password");
 		await page.getByRole("button", { name: "登录管理后台" }).click();
 		await page.getByRole("heading", { name: "系统概览" }).waitFor();
@@ -405,7 +443,8 @@ try {
 	await page.getByRole("button", { name: "开始首次设置" }).waitFor();
 	await page.getByRole("button", { name: "开始首次设置" }).click();
 	await page.getByRole("button", { name: "返回登录" }).click();
-	await page.getByLabel("账号邮箱").fill("admin@example.com");
+	await page.locator("#mail-admin-prefix").fill("admin");
+	await page.locator("#mail-admin-domain").selectOption("mourn.top");
 	await page.getByLabel("密码").fill("correct-password");
 	await page.getByRole("button", { name: "登录管理后台" }).click();
 	await page.getByRole("heading", { name: "系统概览" }).waitFor();
