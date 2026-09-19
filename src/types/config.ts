@@ -87,6 +87,13 @@ export type SiteConfig = {
 		about: boolean; // 关于页面开关
 		categories: boolean; // 图谱页面开关（/categories/，导航栏显示为「图谱」）
 		writing: boolean; // 写作页面开关（/writing/，导航栏显示为「写作」）
+		dynamic: boolean;
+		calendar: boolean;
+		places: boolean;
+		routines: boolean;
+		books: boolean;
+		pengyou: boolean;
+		timeline: boolean;
 	};
 
 	// 分页配置

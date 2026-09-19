@@ -137,6 +137,13 @@ export const siteConfig: SiteConfig = {
 		categories: true,
 		// 写作页面开关（/writing/，导航栏显示为「写作」，需输入密码，仅本地 dev 可发布）
 		writing: true,
+		dynamic: true,
+		calendar: true,
+		places: true,
+		routines: true,
+		books: true,
+		pengyou: true,
+		timeline: true,
 	},
 
 	// 分页配置

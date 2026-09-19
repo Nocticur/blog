@@ -306,6 +306,7 @@ const serializedJsonLd = serializeJsonLd(jsonLd);
 
                   <div class="post-hero__share-content">
                     <span class="post-hero__share-title">{i18n(I18nKey.shareArticle)}</span>
+                    <button type="button" class="post-hero__share-action post-hero__share-action--copy" data-post-share-poster data-poster-title={shareTitle} data-poster-url={canonicalUrl}>生成海报</button>
 
                     <div class="post-hero__share-actions">
                       <a
@@ -651,7 +652,29 @@ const serializedJsonLd = serializeJsonLd(jsonLd);
     }
 
     function initPostShare() {
-      document.querySelectorAll<HTMLButtonElement>("[data-post-share-copy]").forEach((button) => {
+            document.querySelectorAll<HTMLButtonElement>("[data-post-share-poster]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const title = button.dataset.posterTitle || "文章分享";
+          const link = button.dataset.posterUrl || window.location.href;
+          const canvas = document.createElement("canvas");
+          canvas.width = 1200; canvas.height = 630;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return;
+          ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--card-bg") || "#fff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--deep-text") || "#111";
+          ctx.font = "bold 54px sans-serif";
+          const words = title.slice(0, 36);
+          ctx.fillText(words, 72, 230);
+          ctx.font = "28px sans-serif";
+          ctx.fillText(link, 72, 310);
+          const anchor = document.createElement("a");
+          anchor.download = `${title.slice(0, 20) || "share"}.png`;
+          anchor.href = canvas.toDataURL("image/png");
+          anchor.click();
+        });
+      });
+document.querySelectorAll<HTMLButtonElement>("[data-post-share-copy]").forEach((button) => {
         if (button.dataset.initialized === "true") return;
         button.dataset.initialized = "true";
         button.addEventListener("click", () => void copyPostShareLink(button));

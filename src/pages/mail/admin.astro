@@ -1,20 +1,4 @@
 ---
-import MailAdmin from "@components/features/MailAdmin.svelte";
-import MainGridLayout from "@layouts/MainGridLayout.astro";
-import "@/styles/pages/mail-admin.css";
-
-const title = "邮件管理后台";
-const description = "邮件系统管理员控制台。";
+// 邮箱功能已关闭，旧链接返回首页。
+return Astro.redirect("/", 302);
 ---
-
-<MainGridLayout
-	title={title}
-	description={description}
-	robots="noindex,nofollow"
-	hasOwnH1={true}
-	sidebarPosition="none"
->
-	<div class="mail-admin-page">
-		<MailAdmin client:only="svelte" />
-	</div>
-</MainGridLayout>

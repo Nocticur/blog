@@ -1,3 +1,4 @@
+import { MAIL_ENABLED } from "./mail-feature.js";
 import {
 	clearSessionCookie,
 	createSessionCookie,
@@ -338,6 +339,10 @@ async function handleMailAdmin(request, env) {
 export default {
 	async fetch(request, env) {
 		const { pathname } = new URL(request.url);
+
+		if (!MAIL_ENABLED && (MAIL_ADMIN_PATH.test(pathname) || MAIL_AUTH_PATH.test(pathname))) {
+			return jsonResponse({ error: "邮箱功能已关闭", code: "MAIL_DISABLED" }, 410);
+		}
 
 		if (pathname === "/registerSW.js" || pathname === "/sw.js") {
 			return emptyServiceWorkerResponse();

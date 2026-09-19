@@ -1,3 +1,4 @@
+import { MAIL_ENABLED } from "../../worker/mail-feature.js";
 import worker from "../../worker/index.js";
 
 // vercel.json 将 /api/mail-auth/<多段路径> 重写到本函数，查询参数 __suffix
@@ -51,6 +52,12 @@ function mailAuthEnv() {
 }
 
 export default async function handler(req, res) {
+	if (!MAIL_ENABLED) {
+		res.setHeader("Cache-Control", "no-store");
+		res.status(410).json({ error: "邮箱功能已关闭", code: "MAIL_DISABLED" });
+		return;
+	}
+
 	if (
 		!process.env.MAIL_USER_SESSION_SECRET &&
 		!process.env.MAIL_ADMIN_SESSION_SECRET

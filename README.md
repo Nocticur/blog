@@ -38,6 +38,19 @@ Firefly-Mod 是个性化魔改版本，已独立演进。
 - 分类页使用 D3.js 力导向布局与 Canvas 绘制标签关系图谱：构建时根据文章标签生成节点与共现边，客户端支持缩放、拖拽、悬停和键盘跳转。
 - 封面图构建期优化：列表与文章页统一收口封面解析，本地封面经 Astro 图片服务转码并生成多格式 `srcset`，配合 LQIP 占位渐变（每张图仅 18 字节）消除图片加载闪白。
 
+## 功能补齐
+
+在保留首页和现有视觉风格的基础上，项目现在还提供：
+
+- 动态 `/dynamic/`
+- 笔记本 `/life/notebooks/`、日常规划 `/life/routines/`、离线足迹 `/life/places/`
+- 文章与纪念日日历 `/calendar/`
+- RSS／Atom 朋友圈 `/pengyou/`
+- Git 提交时间线 `/timeline/`
+- 文章分享菜单中的 PNG 海报下载
+
+动态和生活记录使用 `src/content/` 内容集合；朋友圈订阅源配置在 `src/config/pengyouConfig.ts`。示例文件均为草稿，不会进入公开页面。详细字段说明见 [`docs/feature-parity.md`](docs/feature-parity.md)。
+
 ## 常用命令
 
 | 用途 | 命令 |
@@ -85,7 +98,8 @@ Firefly-Mod 是个性化魔改版本，已独立演进。
 |----------|------|
 | `siteConfig.ts` | 核心配置：语言、主题色、页面开关、文章列表布局、分页、分析、图片优化、字体 |
 | `sidebarConfig.ts` | 侧边栏布局与组件配置 |
-| `navBarConfig.ts` | 导航栏链接配置（根据页面开关动态生成） |
+|
+avBarConfig.ts` | 导航栏链接配置（根据页面开关动态生成） |
 | `homeConfig.ts` | 首页与用户资料配置：头像、昵称、签名、社交链接、首页图片、技能图标、作品百叶窗 |
 | `commentConfig.ts` | 评论系统配置（Waline/Twikoo/Giscus/Artalk/Disqus） |
 | `musicConfig.ts` | 音乐播放器配置（Meting API / 本地音乐） |

@@ -18,11 +18,6 @@ export const footerConfig: FooterConfig = {
 			href: "https://space.bilibili.com/645892937",
 			icon: "fa7-brands:bilibili",
 		},
-		{
-			label: "邮箱",
-			href: "mailto:nocticur@mourn.top",
-			icon: "material-symbols:mail",
-		},
 	],
 
 	// 备案信息（icp/police 留空则不显示对应条目）

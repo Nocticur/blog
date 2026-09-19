@@ -1,0 +1,20 @@
+---
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import { getCollection } from "astro:content";
+import { siteConfig } from "@/config";
+import { calendarConfig } from "@/config/calendarConfig";
+import { buildBirthdayEvents } from "@/utils/calendar-events";
+if (!siteConfig.pages.calendar) return Astro.redirect("/404/");
+const now = new Date();
+const year = now.getFullYear();
+const month = now.getMonth();
+const first = new Date(year, month, 1).getDay();
+const days = new Date(year, month + 1, 0).getDate();
+const posts = (await getCollection("posts")).filter((post) => !post.data.draft);
+const postDays = new Map(posts.map((post) => [post.data.published.toISOString().slice(0, 10), post.data.title]));
+const birthdayDays = new Map(buildBirthdayEvents(calendarConfig.birthdays || [], [year]).map((event) => [event.date, event.title]));
+const cells = Array.from({ length: first + days }, (_, index) => index < first ? null : index - first + 1);
+---
+<MainGridLayout title="日历" description="文章、纪念日和站点时间表">
+  <div class="card-base p-6 md:p-9"><header class="mb-8"><p class="text-xs uppercase tracking-[0.25em] text-[var(--primary)]">Calendar</p><h1 class="text-3xl font-semibold mt-2">{year} 年 {month + 1} 月</h1></header><div class="grid grid-cols-7 gap-2 text-center text-xs text-neutral-500">{["日","一","二","三","四","五","六"].map((day) => <span class="p-2">{day}</span>)}{cells.map((day) => { const key = day ? `${year}-${String(month + 1).padStart(2,"0")}-${String(day).padStart(2,"0")}` : ""; return <div class={`min-h-20 rounded-xl border p-2 text-left ${day ? "border-black/8 dark:border-white/10" : "border-transparent"}`}><span class="text-sm">{day || ""}</span>{key && postDays.has(key) && <span class="mt-2 block truncate rounded bg-[var(--primary)]/10 px-1 py-0.5 text-[10px] text-[var(--primary)]" title={postDays.get(key)}>{postDays.get(key)}</span>}{key && birthdayDays.has(key) && <span class="mt-1 block truncate rounded bg-amber-500/10 px-1 py-0.5 text-[10px] text-amber-600" title={birthdayDays.get(key)}>{birthdayDays.get(key)}</span>}</div>})}</div><div class="mt-8 grid gap-3 md:grid-cols-2"><div class="rounded-xl bg-[var(--primary)]/8 p-4 text-sm">文章记录：{postDays.size} 天</div><div class="rounded-xl bg-amber-500/8 p-4 text-sm">纪念日：{birthdayDays.size} 项</div></div></div>
+</MainGridLayout>

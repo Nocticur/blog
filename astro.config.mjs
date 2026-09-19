@@ -620,8 +620,8 @@ export default defineConfig({
 				if (pathname === "/writing/") {
 					return false;
 				}
-				// 管理后台使用 noindex，且不应出现在站点 sitemap
-				if (pathname === "/mail/admin/") {
+				// 已关闭的邮箱页面不再出现在站点 sitemap
+				if (pathname === "/mail" || pathname.startsWith("/mail/")) {
 					return false;
 				}
 				// 文档列表页及其分页（/list/、/list/2/ …）

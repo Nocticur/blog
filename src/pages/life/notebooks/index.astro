@@ -1,0 +1,20 @@
+---
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import { getCollection } from "astro:content";
+import { siteConfig } from "@/config";
+if (!siteConfig.pages.books) return Astro.redirect("/404/");
+const entries = (await getCollection("life")).filter((entry) => entry.id.startsWith("notebooks/") && !entry.data.draft);
+const books = new Map<string, typeof entries>();
+for (const entry of entries) {
+  const key = entry.id.split("/")[1] || "default";
+  const bucket = books.get(key) || [];
+  bucket.push(entry);
+  books.set(key, bucket);
+}
+---
+<MainGridLayout title="笔记本" description="成长日记、学习复盘和灵感随笔">
+  <div class="card-base p-6 md:p-9">
+    <header class="mb-8"><p class="text-xs uppercase tracking-[0.25em] text-[var(--primary)]">Notebooks</p><h1 class="text-3xl font-semibold mt-2">笔记本</h1></header>
+    {books.size ? <div class="grid gap-6 md:grid-cols-2">{[...books].map(([name, items]) => <section class="rounded-2xl border border-black/8 p-5 dark:border-white/10"><h2 class="text-xl font-medium">{name}</h2><p class="mt-1 text-sm text-neutral-500">{items.length} 篇记录</p><ul class="mt-4 space-y-3">{items.map((entry) => <li><a class="block rounded-xl bg-black/4 p-3 transition hover:bg-[var(--primary)]/10 dark:bg-white/5" href={`/life/notebooks/${entry.id.split("/").slice(2).join("/").replace(/\.mdx?$/, "")}/`}><span class="font-medium">{entry.data.title || entry.data.name || entry.id}</span>{entry.data.description && <span class="mt-1 block text-sm text-neutral-500">{entry.data.description}</span>}</a></li>)}</ul></section>)}</div> : <div class="rounded-2xl border border-dashed border-black/15 p-12 text-center text-sm text-neutral-500">还没有笔记本记录。</div>}
+  </div>
+</MainGridLayout>

@@ -1,6 +1,4 @@
 import { LinkPresets } from "../constants/link-presets";
-import I18nKey from "../i18n/i18nKey";
-import { i18n } from "../i18n/translation";
 import {
 	LinkPreset,
 	type NavBarConfig,
@@ -32,7 +30,9 @@ const buildNavBarConfig = (): NavBarConfig => {
 		postsChildren.push(LinkPreset.Writing);
 	}
 
-	// 子项全部关闭时不渲染空的下拉菜单
+	if (siteConfig.pages.dynamic) {
+		postsChildren.push({ name: "动态", url: "/dynamic/", icon: "material-symbols:dynamic-feed" });
+	}	// 子项全部关闭时不渲染空的下拉菜单
 	const postsNav: NavBarLink | null =
 		postsChildren.length > 0
 			? {
@@ -42,25 +42,7 @@ const buildNavBarConfig = (): NavBarConfig => {
 				}
 			: null;
 
-	// 2. 构建联系我下拉菜单
-	// 留言板不再走导航入口：全站由 dock 按钮唤起弹窗（FloatingDock / MobileDock）
-	const contactChildren: (NavBarLink | LinkPreset)[] = [];
-	contactChildren.push({
-		name: i18n(I18nKey.email),
-		url: "/mail/",
-		icon: "material-symbols:mail",
-	});
-	if (siteConfig.pages.friends) {
-		contactChildren.push(LinkPreset.Friends);
-	}
-
-	const contactNav: NavBarLink | null =
-		contactChildren.length > 0
-			? {
-					...LinkPresets[LinkPreset.ContactMe],
-					children: contactChildren,
-				}
-			: null;
+	// 联系菜单已关闭。
 
 	// 3. 构建我的下拉菜单
 	const myChildren: (NavBarLink | LinkPreset)[] = [];
@@ -77,7 +59,20 @@ const buildNavBarConfig = (): NavBarConfig => {
 		myChildren.push(LinkPreset.About);
 	}
 
-	// 子项全部关闭时不渲染空的下拉菜单
+	if (siteConfig.pages.calendar) {
+		myChildren.push({ name: "日历", url: "/calendar/", icon: "material-symbols:calendar-month" });
+	}
+	if (siteConfig.pages.pengyou) {
+		myChildren.push({ name: "朋友圈", url: "/pengyou/", icon: "material-symbols:group" });
+	}
+	if (siteConfig.pages.places) {
+		myChildren.push({ name: "足迹", url: "/life/places/", icon: "material-symbols:map" });
+		myChildren.push({ name: "规划", url: "/life/routines/", icon: "material-symbols:checklist" });
+		myChildren.push({ name: "笔记本", url: "/life/notebooks/", icon: "material-symbols:menu-book" });
+	}
+	if (siteConfig.pages.timeline) {
+		myChildren.push({ name: "时间线", url: "/timeline/", icon: "material-symbols:history" });
+	}	// 子项全部关闭时不渲染空的下拉菜单
 	const myNav: NavBarLink | null =
 		myChildren.length > 0
 			? {
@@ -98,12 +93,11 @@ const buildNavBarConfig = (): NavBarConfig => {
 		children: linksChildren,
 	};
 
-	// 5. 统一组装导航栏链接（顺序：主页 → 导航 → 文章 → 联系我 → 我的）
+	// 5. 统一组装导航栏链接（顺序：主页 → 导航 → 文章 → 我的）
 	const links: (NavBarLink | LinkPreset)[] = [
 		LinkPreset.Home,
 		linksNav,
 		...(postsNav ? [postsNav] : []),
-		...(contactNav ? [contactNav] : []),
 		...(myNav ? [myNav] : []),
 	];
 

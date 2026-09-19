@@ -38,7 +38,50 @@ const specCollection = defineCollection({
 	schema: z.object({}),
 });
 
+
+const dynamicCollection = defineCollection({
+	loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/dynamic" }),
+	schema: z.object({
+		published: z.coerce.date(),
+		updated: z.coerce.date().optional(),
+		title: z.string().optional().default(""),
+		description: z.string().optional().default(""),
+		pinned: z.boolean().optional().default(false),
+		tags: z.array(z.string()).optional().default([]),
+		location: z.string().optional().default(""),
+		device: z.string().optional().default(""),
+		draft: z.boolean().optional().default(false),
+		comment: z.boolean().optional().default(true),
+	}),
+});
+
+const lifeEntrySchema = z.object({
+	title: z.string().optional().default(""),
+	name: z.string().optional().default(""),
+	description: z.string().optional().default(""),
+	date: z.coerce.date().optional(),
+	updatedAt: z.coerce.date().optional(),
+	status: z.enum(["done", "todo", "active"]).optional().default("todo"),
+	icon: z.string().optional().default(""),
+	time: z.string().optional().default(""),
+	province: z.string().optional().default(""),
+	city: z.string().optional().default(""),
+	experience: z.string().optional().default(""),
+	lat: z.number().optional(),
+	lng: z.number().optional(),
+	photos: z.array(z.string()).optional().default([]),
+	tags: z.array(z.string()).optional().default([]),
+	cover: z.string().optional().default(""),
+	draft: z.boolean().optional().default(false),
+});
+
+const lifeCollection = defineCollection({
+	loader: glob({ pattern: "**/*.{md,mdx,json}", base: "./src/content/life" }),
+	schema: lifeEntrySchema,
+});
 export const collections = {
 	posts: postsCollection,
 	spec: specCollection,
+	dynamic: dynamicCollection,
+	life: lifeCollection,
 };
