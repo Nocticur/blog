@@ -13,7 +13,14 @@
       method, headers: {"Content-Type":"application/json","x-writing-auth":token},
       ...(body?{body:JSON.stringify(body)}:{}),
     });
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(response.ok
+        ? `内容管理接口返回了无效数据（HTTP ${response.status}）`
+        : `内容管理接口不可用（HTTP ${response.status}）`);
+    }
     if (!response.ok) throw new Error(data.error || "请求失败");
     return data;
   }

@@ -627,8 +627,12 @@ export default async function handler(request, response) {
 			? request
 			: adaptNodeRequest(request);
 		const url = new URL(normalizedRequest.url);
+		// Vercel may expose the rewritten function pathname; recover the original
+		// multi-segment route from the suffix supplied by vercel.json.
+		const suffix = url.searchParams.get("__suffix");
 		const route =
-			url.pathname.slice("/api/writing".length).replace(/\/+$/, "") || "/";
+			(suffix !== null ? `/${suffix.replace(/^\/+/, "")}` :
+				url.pathname.slice("/api/writing".length)).replace(/\/+$/, "") || "/";
 		let result;
 		if (normalizedRequest.method === "POST" && route === "/auth") {
 			result = await handleAuth(normalizedRequest);

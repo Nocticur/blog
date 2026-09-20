@@ -13,8 +13,8 @@
 			"destination": "/api/mail-auth/[[...path]]?...path=$1&__suffix=$1"
 		},
 		{
-			"source": "/api/writing/:path*/",
-			"destination": "/api/writing/:path*"
+			"source": "/api/writing/(.+)",
+			"destination": "/api/writing/[[...path]]?...path=$1&__suffix=$1"
 		}
 	],
 	"headers": [

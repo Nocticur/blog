@@ -17,7 +17,7 @@
 		"icons": "node scripts/generate-icons.js",
 		"lqips": "tsx scripts/generate-lqips.ts",
 		"indexnow": "tsx scripts/indexnow.ts",
-		"test:writing-api": "node scripts/test-writing-api.mjs",
+		"test:writing-api": "node scripts/test-writing-api.mjs && node --test scripts/test-writing-routing.mjs",
 		"test:features": "node --import tsx --test scripts/test-feature-data.mjs scripts/test-content-management.mjs",
 		"check:friends": "tsx scripts/check-friends.ts",
 		"check:configuration": "node scripts/configuration-status.mjs",
