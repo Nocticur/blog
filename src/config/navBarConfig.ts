@@ -67,7 +67,11 @@ const buildNavBarConfig = (): NavBarConfig => {
 	}
 	if (siteConfig.pages.places) {
 		myChildren.push({ name: "足迹", url: "/life/places/", icon: "material-symbols:map" });
+	}
+	if (siteConfig.pages.routines) {
 		myChildren.push({ name: "规划", url: "/life/routines/", icon: "material-symbols:checklist" });
+	}
+	if (siteConfig.pages.books) {
 		myChildren.push({ name: "笔记本", url: "/life/notebooks/", icon: "material-symbols:menu-book" });
 	}
 	if (siteConfig.pages.timeline) {

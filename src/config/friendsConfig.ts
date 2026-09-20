@@ -1,3 +1,5 @@
+import friends from "../data/friends.json";
+import siteInfo from "../data/friend-site.json";
 import type { FriendLink, FriendsPageConfig } from "../types/config";
 
 // 友链页面配置
@@ -20,13 +22,7 @@ export const friendsPageConfig: FriendsPageConfig = {
 		"https://github.com/Nocticur",
 
 	// 本站信息，用于友链申请指南弹窗中的站点信息展示
-	siteInfo: {
-		name: "Nocticur的博客",
-		desc: "哈基米，南北绿豆",
-		url: "https://blog.mourn.top",
-		avatar: "https://mourn.eu.cc/file/1788886353387_Codex_图像_2026年9月9日_00_52_08.png",
-		email: "nocticur@mourn.top",
-	},
+	siteInfo,
 
 	// 注意事项，用于友链申请指南弹窗中的注意事项展示
 	notes: [
@@ -54,7 +50,7 @@ export const friendsPageConfig: FriendsPageConfig = {
 };
 
 // 友链配置
-export const friendsConfig: FriendLink[] = [];
+export const friendsConfig: FriendLink[] = friends;
 
 // 获取启用的友链并进行排序
 export const getEnabledFriends = (): FriendLink[] => {

@@ -45,3 +45,7 @@ AGENTS.md
 # Waline 管理凭证与留言导出（本地迁移用，勿提交）
 scripts/.waline-admin.json
 scripts/.old-guestbook-export.json
+
+# Local feature verification output
+.feature-*
+reports/friend-links.json

@@ -24,11 +24,10 @@
  */
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import matter from "gray-matter";
+import {createGithubStore,executeContent,uploadContentImage} from "../_lib/content-management.mjs";
 
 // ── 与 src/lib/writing-server.mjs 同步的内联实现 ──────────────────────────
 
-const DEFAULT_PASSWORD_HASH =
-	"afac327e73694e68c02f5c62f3bc0bcf0f239744ff12921e781487a0f9b3d5d0";
 const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
 const VALID_SEGMENT = /^[\p{L}\p{N}][\p{L}\p{N}._-]*$/u;
 const IMAGE_MIME_TYPES = {
@@ -50,7 +49,7 @@ const sha256Hex = (text) => createHash("sha256").update(text).digest("hex");
 function resolvePasswordHash(env = process.env) {
 	if (env.WRITING_PASSWORD) return sha256Hex(env.WRITING_PASSWORD);
 	if (env.WRITING_PASSWORD_HASH) return env.WRITING_PASSWORD_HASH;
-	return DEFAULT_PASSWORD_HASH;
+	return "";
 }
 
 function verifyPassword(password, env = process.env) {
@@ -77,7 +76,7 @@ function signSession(env = process.env, ttlMs = SESSION_TTL_MS) {
 }
 
 function verifySession(token, env = process.env) {
-	if (typeof token !== "string") return false;
+	if (!resolvePasswordHash(env) || typeof token !== "string") return false;
 	const [payload, sig] = token.split(".");
 	if (!payload || !sig) return false;
 	const expected = createHmac("sha256", resolveSessionSecret(env))
@@ -151,8 +150,9 @@ function resolveImageUpload(body) {
 
 // 表单 + 正文 → Markdown。js-yaml 会给形如日期的字符串加引号，而引号字符串
 // 经 z.date() 校验会失败，这里还原为日期字面量
-function buildMarkdown(fm, content) {
+function buildMarkdown(fm, content, existing = {}) {
 	const data = {
+        ...existing,
 		title: String(fm.title || "").trim(),
 		published: formatDate(fm.published) || formatDate(new Date()),
 		description: String(fm.description || ""),
@@ -162,10 +162,11 @@ function buildMarkdown(fm, content) {
 			: [],
 		category: String(fm.category || ""),
 		draft: fm.draft === true,
-		lang: String(fm.lang || ""),
+		lang: String(fm.lang ?? existing.lang ?? ""),
 	};
 	const updated = formatDate(fm.updated);
 	if (updated) data.updated = updated;
+ else delete data.updated;
 	let md = matter.stringify(String(content || ""), data);
 	md = md.replace(/^(published|updated): '(\d{4}-\d{2}-\d{2})'$/gm, "$1: $2");
 	return md;
@@ -202,7 +203,7 @@ class HttpError extends Error {
 function json(data, status = 200) {
 	return new Response(JSON.stringify(data), {
 		status,
-		headers: { "Content-Type": "application/json; charset=utf-8" },
+		headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-store" },
 	});
 }
 
@@ -397,6 +398,7 @@ async function mapWithConcurrency(items, worker) {
 // --- 各路由 ---
 
 async function handleAuth(request) {
+ if (!resolvePasswordHash()) return fail("请先配置 WRITING_PASSWORD 或 WRITING_PASSWORD_HASH",503);
 	const body = await readJson(request);
 	if (!body || !verifyPassword(body.password)) {
 		return fail("密码不正确", 401);
@@ -549,14 +551,17 @@ async function handleSave(request, isCreate) {
 		);
 	}
 	let sha = null;
+ let existingData = {};
 	if (existing.status === 200) {
 		if (isCreate) return fail(`File ${file} already exists`, 409);
-		sha = (await existing.json()).sha;
+		const previous = await existing.json();
+ sha = previous.sha;
+ existingData = matter(Buffer.from(previous.content || "", "base64").toString("utf8")).data;
 	} else if (existing.status !== 404) {
 		return fail(`GitHub API 错误（HTTP ${existing.status}）`, 502);
 	}
 
-	const md = buildMarkdown(body, body.content);
+	const md = buildMarkdown(body, body.content, existingData);
 	const put = await githubFetch(
 		`/repos/${repo}/contents/${remotePath}`,
 		token,
@@ -632,7 +637,15 @@ export default async function handler(request, response) {
 		) {
 			// 会话 token 校验：登录以外的所有接口都要带有效 token
 			result = fail("登录已过期，请重新登录", 401);
-		} else if (normalizedRequest.method === "GET" && route === "/posts") {
+		} else if (route.startsWith("/content/")) {
+ const match = /^\/content\/([a-z]+)(\/images)?$/.exec(route);
+ if (!match) return sendResponse(fail("Not found",404),response);
+ const repo=pickRepo(), token=requireToken(), branch=await resolveBranch(repo,token);
+ const store=createGithubStore({repo,branch,request:(path,init)=>githubFetch(path,token,init)});
+ const body=normalizedRequest.method==="GET"?Object.fromEntries(url.searchParams):await readJson(normalizedRequest);
+ if(match[2] && normalizedRequest.method!=="POST") return sendResponse(fail("Method not allowed",405),response);
+ result=json(await(match[2]?uploadContentImage(store,match[1],body):executeContent(store,match[1],normalizedRequest.method,body||{})));
+ } else if (normalizedRequest.method === "GET" && route === "/posts") {
 			// 与 dev middleware 一致：带 file 参数读单篇，否则返回列表
 			result = url.searchParams.get("file")
 				? await handleRead(url)

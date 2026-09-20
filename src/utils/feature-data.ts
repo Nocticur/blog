@@ -1,48 +1,29 @@
-export type FeedItem = {
-	title: string;
-	link: string;
-	date: string;
-	description: string;
-};
-
-function decodeEntities(value: string): string {
-	return value
-		.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-		.replace(/&amp;/g, "&")
-		.replace(/&lt;/g, "<")
-		.replace(/&gt;/g, ">")
-		.replace(/&quot;/g, '"')
-		.replace(/&#39;/g, "'")
-		.trim();
+import { XMLParser } from "fast-xml-parser";
+export type FeedItem = {title:string;link:string;date:string;description:string};
+const asArray=(value:any):any[]=>value?Array.isArray(value)?value:[value]:[];
+const text=(value:any):string=>typeof value==="string"?value:String(value?.["#text"] || "");
+export function parseFeedItems(xml:string):FeedItem[] {
+ if(xml.length>2*1024*1024 || /<!DOCTYPE|<!ENTITY/i.test(xml)) return [];
+ try {
+ const doc=new XMLParser({ignoreAttributes:false,removeNSPrefix:true,parseTagValue:false}).parse(xml);
+ const entries=asArray(doc.rss?.channel?.item || doc.feed?.entry || doc.RDF?.item);
+ const seen=new Set<string>(),result:FeedItem[]=[];
+ for(const entry of entries) {
+ const links=asArray(entry.link);
+ const alternate=links.find(x=>x?.["@_rel"]==="alternate") || links.find(x=>!x?.["@_rel"]);
+ const link=text(alternate?.["@_href"] || alternate);
+ let url:URL;try{url=new URL(link);}catch{continue;}
+ if(!["http:","https:"].includes(url.protocol)) continue;
+ url.hash="";
+ const title=text(entry.title).replace(/<[^>]+>/g,"").trim();
+ if(!title || seen.has(url.href)) continue;
+ seen.add(url.href);
+ const date=new Date(text(entry.pubDate || entry.published || entry.updated));
+ result.push({title,link:url.href,date:Number.isFinite(date.getTime())?date.toISOString().slice(0,10):"",description:text(entry.description || entry.summary || entry.content).replace(/<[^>]+>/g,"").trim().slice(0,500)});
+ }
+ return result;
+ }catch{return [];}
 }
-
-function tagValue(block: string, tag: string): string {
-	const match = block.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, "i"));
-	return match ? decodeEntities(match[1]) : "";
-}
-
-function toDate(value: string): string {
-	const parsed = new Date(value);
-	return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
-}
-
-export function parseFeedItems(xml: string): FeedItem[] {
-	const blocks = [...xml.matchAll(/<(?:item|entry)\b[^>]*>([\s\S]*?)<\/(?:item|entry)>/gi)].map((match) => match[1]);
-	const seen = new Set<string>();
-	const items: FeedItem[] = [];
-	for (const block of blocks) {
-		const title = tagValue(block, "title");
-		const linkTag = block.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*\/?\s*>/i);
-		const link = decodeEntities(linkTag?.[1] || tagValue(block, "link"));
-		const date = toDate(tagValue(block, "pubDate") || tagValue(block, "published") || tagValue(block, "updated"));
-		const description = tagValue(block, "description") || tagValue(block, "summary") || tagValue(block, "content");
-		if (!title || !link || seen.has(link)) continue;
-		seen.add(link);
-		items.push({ title, link, date, description: description.replace(/<[^>]+>/g, "").trim() });
-	}
-	return items;
-}
-
 export function sortDynamicEntries<T extends { data: { published: Date | string; pinned?: boolean } }>(entries: T[]): T[] {
 	return [...entries].sort((a, b) => {
 		if (Boolean(a.data.pinned) !== Boolean(b.data.pinned)) return a.data.pinned ? -1 : 1;

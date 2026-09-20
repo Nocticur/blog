@@ -1,3 +1,4 @@
+import sponsors from "../data/sponsors.json";
 import type { SponsorConfig } from "../types/config";
 
 export const sponsorConfig: SponsorConfig = {
@@ -36,5 +37,5 @@ export const sponsorConfig: SponsorConfig = {
 	],
 
 	// 赞助者列表（可选）
-	sponsors: [],
+	sponsors,
 };

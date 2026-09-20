@@ -1,4 +1,5 @@
 import sitemap from "@astrojs/sitemap";
+import {createLocalStore,executeContent,uploadContentImage} from "./api/_lib/content-management.mjs";
 import svelte from "@astrojs/svelte";
 import tailwindcss from "@tailwindcss/vite";
 import { setMaxListeners } from "node:events";
@@ -42,6 +43,7 @@ import {
 	buildMarkdown,
 	formatDate,
 	resolveRepo,
+	resolvePasswordHash,
 	signSession,
 	verifyPassword,
 	verifySession,
@@ -152,6 +154,7 @@ function writingDevApi() {
 	function json(res, status, data) {
 		res.statusCode = status;
 		res.setHeader("Content-Type", "application/json; charset=utf-8");
+		res.setHeader("Cache-Control", "private, no-store");
 		res.end(JSON.stringify(data));
 	}
 
@@ -269,6 +272,7 @@ function writingDevApi() {
 				const handle = async () => {
 					// 登录：服务端校验密码并签发会话 token（与线上 Vercel Function 同契约）
 					if (req.method === "POST" && route === "/auth") {
+ if(!resolvePasswordHash()) return error(res,503,"请先配置 WRITING_PASSWORD 或 WRITING_PASSWORD_HASH");
 						let body;
 						try {
 							body = JSON.parse(await readBody(req));
@@ -293,7 +297,15 @@ function writingDevApi() {
 						error(res, 401, "登录已过期，请重新登录");
 						return;
 					}
-					if (route === "/posts" && req.method === "GET") {
+					if(route.startsWith("/content/")) {
+ const match=/^\/content\/([a-z]+)(\/images)?$/.exec(route);
+ if(!match) return error(res,404,"Not found");
+ const body=req.method==="GET"?Object.fromEntries(requestUrl.searchParams):JSON.parse(await readBody(req));
+ if(match[2] && req.method!=="POST") return error(res,405,"Method not allowed");
+ const store=createLocalStore(process.cwd());
+ return json(res,200,await(match[2]?uploadContentImage(store,match[1],body):executeContent(store,match[1],req.method,body)));
+ }
+ if (route === "/posts" && req.method === "GET") {
 						if (fileParam) {
 							const fullPath = resolvePostPath(fileParam);
 							if (!fullPath) return error(res, 400, "Invalid file name");
@@ -394,7 +406,8 @@ function writingDevApi() {
 								return error(res, 404, "Post not found");
 						}
 						const fullPath = path.resolve(postsDir, targetFile);
-						const md = buildMarkdown(body, body.content);
+						const existingData = isCreate ? {} : matter.read(fullPath).data;
+ const md = buildMarkdown(body, body.content, existingData);
 						fs.writeFileSync(fullPath, md, { encoding: "utf8" });
 						// Astro 7 的 content watcher 对新增文件的热更新不可靠（withastro/astro#17335），
 						// 手动派发 chokidar 事件，借 glob loader 自己的 onChange 管线完成同步
@@ -420,7 +433,7 @@ function writingDevApi() {
 				};
 
 				handle().catch((err) => {
-					error(res, 500, err && err.message ? err.message : "Internal error");
+					error(res, err.status || 500, err && err.message ? err.message : "Internal error");
 				});
 			});
 		},

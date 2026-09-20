@@ -1,5 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {fetchCircle} from "../src/utils/feed-fetch.ts";
+test("circle deduplicates across feeds and survives failures",async()=>{
+ const feeds=[{name:"one",url:"https://one.test"},{name:"two",url:"https://two.test"},{name:"broken",url:"https://broken.test"}];
+ const result=await fetchCircle(feeds,async url=>{
+  if(String(url).includes("broken"))throw new Error("offline");
+  return new Response('<rss><channel><item><title>A</title><link>https://post.test/a</link><pubDate>2026-01-02</pubDate></item></channel></rss>');
+ });
+ assert.equal(result.length,1);assert.equal(result[0].author,"one");
+});
+test("Atom picks alternate URLs and rejects script URLs and declarations", () => {
+ const xml='<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>A</title><link rel="self" href="https://a.test/feed"/><link rel="alternate" href="https://a.test/post"/><updated>2026-01-01</updated></entry><entry><title>bad</title><link href="javascript:alert(1)"/></entry></feed>';
+ assert.deepEqual(parseFeedItems(xml).map(item=>item.link),["https://a.test/post"]);
+ assert.deepEqual(parseFeedItems('<!DOCTYPE rss [<!ENTITY x "test">]><rss/>'),[]);
+});
 import {
 	groupTimelineCommits,
 	normalizePlace,

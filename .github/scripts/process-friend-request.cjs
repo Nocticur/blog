@@ -4,15 +4,10 @@ const { spawnSync } = require('node:child_process');
 const { URL } = require('node:url');
 const { chromium } = require('playwright');
 
-const FRIENDS_CONFIG_RELATIVE_PATH = 'src/config/friendsConfig.ts';
+const FRIENDS_CONFIG_RELATIVE_PATH = 'src/data/friends.json';
 
-// 站点信息 - 请根据你的实际站点信息修改
-const SITE_INFO = {
-	name: 'MmzMing',
-	url: 'https://tblog.mmzhiku.xyz',
-	avatar: 'https://tblog.mmzhiku.xyz/favicon/MyLogo.ico',
-	desc: 'MmzMing的博客',
-};
+// 与友链页面共享已有站点资料。
+const SITE_INFO = require('../../src/data/friend-site.json');
 
 const DEFAULT_TAG = 'Blog';
 
@@ -160,56 +155,14 @@ function extractTags(block) {
 }
 
 function parseFriendsConfig(content) {
-	const listMatch = content.match(/export const friendsConfig: FriendLink\[\] = \[([\s\S]*?)\n\];/);
-	if (!listMatch) {
-		throw new Error('未找到 friendsConfig 数组，请检查 src/config/friendsConfig.ts 的格式。');
-	}
-
-	const friendBlocks = [...listMatch[1].matchAll(/\{([\s\S]*?)\n\t\},?/g)].map((item) => item[1]);
-	return friendBlocks.map((block) => ({
-		title: extractString(block, 'title'),
-		imgurl: extractString(block, 'imgurl'),
-		desc: extractString(block, 'desc'),
-		siteurl: extractString(block, 'siteurl'),
-		image: extractString(block, 'image'),
-		tags: extractTags(block),
-		weight: extractNumber(block, 'weight', 5),
-		enabled: extractBoolean(block, 'enabled', true),
-	}));
-}
-
-function renderFriend(friend, indent) {
-	const tags = (friend.tags && friend.tags.length ? friend.tags : [DEFAULT_TAG])
-		.map((tag) => `"${escapeString(tag)}"`)
-		.join(', ');
-
-	const lines = [
-		`${indent}{`,
-		`${indent}\ttitle: "${escapeString(friend.title)}",`,
-		`${indent}\timgurl: "${escapeString(friend.imgurl)}",`,
-		`${indent}\tdesc: "${escapeString(friend.desc)}",`,
-		`${indent}\tsiteurl: "${escapeString(friend.siteurl)}",`,
-	];
-	// 封面图为可选字段，仅在填写时写入，保证与旧数据格式兼容
-	if (friend.image) {
-		lines.push(`${indent}\timage: "${escapeString(friend.image)}",`);
-	}
-	lines.push(
-		`${indent}\ttags: [${tags}],`,
-		`${indent}\tweight: ${Number.isFinite(friend.weight) ? friend.weight : 5},`,
-		`${indent}\tenabled: ${friend.enabled !== false},`,
-		`${indent}},`,
-	);
-
-	return lines.join('\n');
+ const data=JSON.parse(content);
+ if(!Array.isArray(data)) throw new Error("友链数据必须为数组");
+ return data;
 }
 
 function updateFriendsConfig(repoRoot, data) {
 	const filePath = path.join(repoRoot, FRIENDS_CONFIG_RELATIVE_PATH);
 	const content = fs.readFileSync(filePath, 'utf8');
-	const eol = content.includes('\r\n') ? '\r\n' : '\n';
-	const indentMatch = content.match(/\n(\s*)\{/);
-	const indent = indentMatch ? indentMatch[1] : '\t';
 
 	const friends = parseFriendsConfig(content);
 	const normalizedUrl = trimTrailingSlash(data.site_url);
@@ -236,14 +189,7 @@ function updateFriendsConfig(repoRoot, data) {
 		friends.push(nextFriend);
 	}
 
-	const renderedFriends = friends
-		.map((friend) => renderFriend(friend, indent))
-		.join(eol);
-
-	const updatedContent = content.replace(
-		/export const friendsConfig: FriendLink\[\] = \[[\s\S]*?\n\];/,
-		`export const friendsConfig: FriendLink[] = [${eol}${renderedFriends}${eol}];`
-	);
+	const updatedContent = JSON.stringify(friends, null, 2) + "\n";
 
 	const changed = updatedContent !== content;
 	if (changed) {
@@ -276,7 +222,7 @@ function formatFriendsConfig(repoRoot) {
 		process.platform === "win32" ? "biome.cmd" : "biome"
 	);
 	if (!fs.existsSync(biomeBinary)) {
-		throw new Error("未找到 Biome 可执行文件，无法格式化 friendsConfig.ts。");
+		throw new Error("未找到 Biome 可执行文件，无法格式化 friends.json。");
 	}
 	run(biomeBinary, ["format", "--write", FRIENDS_CONFIG_RELATIVE_PATH], { cwd: repoRoot });
 }

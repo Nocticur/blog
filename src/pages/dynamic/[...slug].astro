@@ -1,0 +1,20 @@
+---
+import {getCollection,render} from "astro:content";
+import {siteConfig} from "@/config";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import Comment from "@/components/comment/index.astro";
+export async function getStaticPaths(){
+ if(!siteConfig.pages.dynamic) return [];
+ return (await getCollection("dynamic")).filter(entry=>!entry.data.draft).map(entry=>({params:{slug:entry.id},props:{entry}}));
+}
+const {entry}=Astro.props;
+const {Content}=await render(entry);
+---
+<MainGridLayout title={entry.data.title || "动态"} description={entry.data.description}>
+ <article class="card-base p-6 md:p-9 prose dark:prose-invert max-w-none">
+  <a href="/dynamic/">返回动态</a><h1>{entry.data.title || "动态"}</h1>
+  <time>{entry.data.published.toLocaleDateString("zh-CN")}</time><Content />
+  <div class="grid grid-cols-2 gap-3">{entry.data.photos.map(photo=><img src={photo} alt={entry.data.title || "动态照片"} loading="lazy"/>)}</div>
+ </article>
+ {entry.data.comment && <Comment customPath={`/dynamic/${entry.id}/`} title={entry.data.title}/>}
+</MainGridLayout>

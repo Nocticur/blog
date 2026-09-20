@@ -1,4 +1,5 @@
 ---
+import FilteredList from "@/components/features/FilteredList.astro";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { getCollection, render } from "astro:content";
 import { siteConfig } from "@/config";
@@ -15,10 +16,11 @@ const renderedEntries = await Promise.all(entries.map(async (entry) => ({ entry,
       <h1 class="text-3xl font-semibold mt-2">动态</h1>
       <p class="text-sm text-neutral-500 mt-2">短内容、灵感和正在发生的事情。</p>
     </header>
+    <FilteredList years>
     {entries.length ? (
       <div class="grid gap-4">
         {renderedEntries.map(({ entry, Content }) => (
-          <article class="rounded-2xl border border-black/8 dark:border-white/10 p-5">
+          <article data-filter-item data-tags={JSON.stringify(entry.data.tags)} data-year={entry.data.published.getFullYear()} class="rounded-2xl border border-black/8 dark:border-white/10 p-5">
             <div class="flex flex-wrap items-center gap-3 text-xs text-neutral-500">
               <time datetime={entry.data.published.toISOString()}>{entry.data.published.toLocaleDateString("zh-CN")}</time>
               {entry.data.pinned && <span class="rounded-full bg-[var(--primary)]/10 px-2 py-1 text-[var(--primary)]">置顶</span>}
@@ -26,10 +28,13 @@ const renderedEntries = await Promise.all(entries.map(async (entry) => ({ entry,
             </div>
             {entry.data.title && <h2 class="mt-3 text-xl font-medium">{entry.data.title}</h2>}
             {entry.data.description && <p class="mt-2 text-sm leading-7 text-neutral-600 dark:text-neutral-300">{entry.data.description}</p>}<div class="prose prose-sm mt-4 max-w-none dark:prose-invert"><Content /></div>
+            <div class="mt-4 grid grid-cols-2 gap-2">{entry.data.photos.map(photo=><a href={photo} data-fancybox={entry.id}><img src={photo} alt={entry.data.title || "动态照片"} loading="lazy" class="rounded-xl w-full aspect-square object-cover"/></a>)}</div>
+            <a class="inline-block mt-4 text-sm underline" href={`/dynamic/${entry.id}/`}>查看详情{entry.data.comment ? "与评论" : ""}</a>
             {entry.data.tags.length > 0 && <div class="mt-4 flex flex-wrap gap-2">{entry.data.tags.map((tag) => <span class="rounded-full bg-black/5 px-2 py-1 text-xs dark:bg-white/10">#{tag}</span>)}</div>}
           </article>
         ))}
       </div>
     ) : <div class="rounded-2xl border border-dashed border-black/15 p-12 text-center text-sm text-neutral-500 dark:border-white/15">还没有公开动态，登录写作后台后创建第一条记录。</div>}
+    </FilteredList>
   </div>
 </MainGridLayout>

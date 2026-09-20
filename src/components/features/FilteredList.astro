@@ -1,0 +1,54 @@
+---
+interface Props { label?:string; years?:boolean; pageSize?:number; }
+const {label="标签",years=false,pageSize=12}=Astro.props;
+---
+<filtered-content data-size={pageSize}>
+  <div class="flex flex-wrap items-center gap-3 my-5" data-controls hidden>
+    <label class="text-sm">{label} <select data-filter class="rounded border border-neutral-400/40 bg-transparent p-2"><option value="">全部</option></select></label>
+    {years && <label class="text-sm">年份 <select data-year class="rounded border border-neutral-400/40 bg-transparent p-2"><option value="">全部</option></select></label>}
+    <span data-count class="text-sm text-neutral-500" aria-live="polite"></span>
+  </div>
+  <slot />
+  <p data-empty hidden class="py-8 text-center text-neutral-500">没有匹配的记录。</p>
+  <div data-pagination hidden class="flex items-center justify-center gap-4 mt-6">
+    <button data-prev class="rounded border px-3 py-2">上一页</button>
+    <span data-page aria-live="polite"></span>
+    <button data-next class="rounded border px-3 py-2">下一页</button>
+  </div>
+</filtered-content>
+<script>
+  class FilteredContent extends HTMLElement {
+    connectedCallback() {
+      // Custom elements reconnect naturally after Swup replaces the page.
+      queueMicrotask(()=>this.setup());
+    }
+    setup() {
+      if(this.dataset.ready) return; this.dataset.ready="true";
+      const rows=[...this.querySelectorAll<HTMLElement>("[data-filter-item]")];
+      const select=this.querySelector<HTMLSelectElement>("[data-filter]")!;
+      const year=this.querySelector<HTMLSelectElement>("[data-year]");
+      const values=(row:HTMLElement):string[]=>JSON.parse(row.dataset.tags || "[]");
+      const add=(el:HTMLSelectElement,list:string[])=>{for(const value of list){const option=document.createElement("option");option.value=value;option.textContent=value;el.append(option);}};
+      add(select,[...new Set(rows.flatMap(values))].sort());
+      if(year) add(year,[...new Set(rows.map(row=>row.dataset.year || "").filter(Boolean))].sort().reverse());
+      let page=1;const size=Number(this.dataset.size)||12;
+      const previous=this.querySelector<HTMLButtonElement>("[data-prev]")!, next=this.querySelector<HTMLButtonElement>("[data-next]")!;
+      const draw=()=>{
+        const filtered=rows.filter(row=>(!select.value || values(row).includes(select.value)) && (!year?.value || row.dataset.year===year.value));
+        const pages=Math.max(1,Math.ceil(filtered.length/size));page=Math.min(page,pages);
+        const shown=new Set(filtered.slice((page-1)*size,page*size));
+        rows.forEach(row=>row.hidden=!shown.has(row));
+        this.querySelector<HTMLElement>("[data-empty]")!.hidden=filtered.length>0 || rows.length===0;
+        this.querySelector("[data-count]")!.textContent=`共 ${filtered.length} 条`;
+        this.querySelector("[data-page]")!.textContent=`${page} / ${pages}`;
+        this.querySelector<HTMLElement>("[data-pagination]")!.hidden=pages<2;
+        previous.disabled=page===1;next.disabled=page===pages;
+      };
+      select.onchange=()=>{page=1;draw();};if(year) year.onchange=()=>{page=1;draw();};
+      previous.onclick=()=>{page--;draw();};next.onclick=()=>{page++;draw();};
+      this.querySelector<HTMLElement>("[data-controls]")!.hidden=rows.length===0;draw();
+    }
+  }
+  if(!customElements.get("filtered-content")) customElements.define("filtered-content",FilteredContent);
+</script>
+<style>filtered-content{display:block}filtered-content :global([hidden]){display:none!important}</style>

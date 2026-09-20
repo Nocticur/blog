@@ -1,13 +1,15 @@
 ---
+import { siteConfig } from "@/config";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { getCollection, render } from "astro:content";
 export async function getStaticPaths() {
+ if(!siteConfig.pages.books) return [];
   const entries = (await getCollection("life")).filter((entry) => entry.id.startsWith("notebooks/") && !entry.data.draft);
-  return entries.map((entry) => ({ params: { slug: entry.id.split("/").slice(2).join("/").replace(/\.mdx?$/, "") }, props: { entry } }));
+  return entries.map((entry) => ({ params: { slug: entry.id.split("/").slice(1).join("/").replace(/\.mdx?$/, "") }, props: { entry } }));
 }
 const { entry } = Astro.props;
 const { Content } = await render(entry);
 ---
 <MainGridLayout title={entry.data.title || entry.data.name || "笔记"} description={entry.data.description}>
-  <article class="card-base prose prose-neutral dark:prose-invert max-w-none p-6 md:p-9"><Content /></article>
+  <article class="card-base prose prose-neutral dark:prose-invert max-w-none p-6 md:p-9"><h1>{entry.data.title || entry.data.name}</h1><p>{entry.data.tags.join(" · ")}</p><Content /></article>
 </MainGridLayout>

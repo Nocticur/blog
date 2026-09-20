@@ -1,13 +1,15 @@
 ---
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { siteConfig } from "@/config";
 import { groupTimelineCommits } from "@/utils/feature-data";
 if (!siteConfig.pages.timeline) return Astro.redirect("/404/");
 let commits: { hash: string; subject: string; date: string }[] = [];
-try { commits = execSync("git log -300 --date=short --pretty=format:%h%x09%s%x09%ad", { encoding: "utf8" }).trim().split(/\r?\n/).filter(Boolean).map((line) => { const [hash, subject, date] = line.split("\t"); return { hash, subject, date }; }); } catch {}
+try { commits = execFileSync("git", ["log","-300","--date=short","--pretty=format:%H%x09%s%x09%ad"], { encoding: "utf8" }).trim().split(/\r?\n/).filter(Boolean).map((line) => { const [hash, subject, date] = line.split("\t"); return { hash, subject, date }; }); } catch {}
+let repoUrl="";
+try {const remote=execFileSync("git",["remote","get-url","origin"],{encoding:"utf8",stdio:["ignore","pipe","ignore"]}).trim();const match=remote.match(/github\.com[/:]([\w.-]+)\/([\w.-]+?)(?:\.git)?$/);if(match) repoUrl=`https://github.com/${match[1]}/${match[2]}`;} catch {}
 const groups = groupTimelineCommits(commits);
 ---
 <MainGridLayout title="时间线" description="博客开发与写作记录">
-  <div class="card-base p-6 md:p-9"><header class="mb-8"><p class="text-xs uppercase tracking-[0.25em] text-[var(--primary)]">Timeline</p><h1 class="text-3xl font-semibold mt-2">提交时间线</h1><p class="mt-2 text-sm text-neutral-500">最近 {commits.length} 次提交</p></header>{groups.length ? <div class="space-y-8">{groups.map((group) => <section><h2 class="mb-3 text-lg font-medium">{group.month}</h2><ol class="space-y-2 border-l border-black/10 pl-5 dark:border-white/10">{group.commits.map((commit) => <li class="relative"><span class="absolute -left-[1.65rem] top-2 h-2 w-2 rounded-full bg-[var(--primary)]"></span><time class="text-xs text-neutral-500">{commit.date}</time><p class="mt-1 text-sm">{commit.subject}<code class="ml-2 text-xs text-neutral-400">{commit.hash}</code></p></li>)}</ol></section>)}</div> : <div class="rounded-2xl border border-dashed border-black/15 p-12 text-center text-sm text-neutral-500">当前构建没有可用的 Git 历史。</div>}</div>
+  <div class="card-base p-6 md:p-9"><header class="mb-8"><p class="text-xs uppercase tracking-[0.25em] text-[var(--primary)]">Timeline</p><h1 class="text-3xl font-semibold mt-2">提交时间线</h1><p class="mt-2 text-sm text-neutral-500">最近 {commits.length} 次提交</p></header>{groups.length ? <div class="space-y-8">{groups.map((group) => <section><h2 class="mb-3 text-lg font-medium">{group.month}</h2><ol class="space-y-2 border-l border-black/10 pl-5 dark:border-white/10">{group.commits.map((commit) => <li class="relative"><span class="absolute -left-[1.65rem] top-2 h-2 w-2 rounded-full bg-[var(--primary)]"></span><time class="text-xs text-neutral-500">{commit.date}</time><p class="mt-1 text-sm">{commit.subject}<code class="ml-2 text-xs text-neutral-400">{repoUrl ? <a href={`${repoUrl}/commit/${commit.hash}`} target="_blank" rel="noopener noreferrer">{commit.hash.slice(0,7)}</a> : commit.hash.slice(0,7)}</code></p></li>)}</ol></section>)}</div> : <div class="rounded-2xl border border-dashed border-black/15 p-12 text-center text-sm text-neutral-500">当前构建没有可用的 Git 历史。</div>}</div>
 </MainGridLayout>

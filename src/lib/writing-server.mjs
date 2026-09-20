@@ -15,19 +15,17 @@ import { execSync } from "node:child_process";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import matter from "gray-matter";
 
-// 内置默认密码（firefly）的 SHA-256，仅兜底用
-const DEFAULT_PASSWORD_HASH =
-	"afac327e73694e68c02f5c62f3bc0bcf0f239744ff12921e781487a0f9b3d5d0";
+// 没有显式密码时拒绝登录。
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const sha256Hex = (text) => createHash("sha256").update(text).digest("hex");
 
-/** 服务端密码哈希解析：WRITING_PASSWORD（明文现算）→ WRITING_PASSWORD_HASH → 内置默认 */
+/** 服务端密码哈希解析：WRITING_PASSWORD（明文现算）→ WRITING_PASSWORD_HASH ；未设置时关闭登录 */
 export function resolvePasswordHash(env = process.env) {
 	if (env.WRITING_PASSWORD) return sha256Hex(env.WRITING_PASSWORD);
 	if (env.WRITING_PASSWORD_HASH) return env.WRITING_PASSWORD_HASH;
-	return DEFAULT_PASSWORD_HASH;
+	return "";
 }
 
 /** 登录校验：明文密码与服务端哈希比对（哈希不再下发前端） */
@@ -58,7 +56,7 @@ export function signSession(env = process.env, ttlMs = SESSION_TTL_MS) {
 
 /** 校验会话 token：签名（恒时比较）+ 有效期 */
 export function verifySession(token, env = process.env) {
-	if (typeof token !== "string") return false;
+	if (!resolvePasswordHash(env) || typeof token !== "string") return false;
 	const [payload, sig] = token.split(".");
 	if (!payload || !sig) return false;
 	const expected = createHmac("sha256", resolveSessionSecret(env))
@@ -130,8 +128,9 @@ export function formatDate(value) {
  * js-yaml 会给形如日期的字符串加引号（published: '2026-06-14'），
  * 引号字符串经 z.date() 校验会失败，还原为与现有文章一致的日期字面量
  */
-export function buildMarkdown(fm, content) {
+export function buildMarkdown(fm, content, existing = {}) {
 	const data = {
+        ...existing,
 		title: String(fm.title || "").trim(),
 		published: formatDate(fm.published) || formatDate(new Date()),
 		description: String(fm.description || ""),
@@ -141,10 +140,11 @@ export function buildMarkdown(fm, content) {
 			: [],
 		category: String(fm.category || ""),
 		draft: fm.draft === true,
-		lang: String(fm.lang || ""),
+		lang: String(fm.lang ?? existing.lang ?? ""),
 	};
 	const updated = formatDate(fm.updated);
 	if (updated) data.updated = updated;
+ else delete data.updated;
 	let md = matter.stringify(String(content || ""), data);
 	md = md.replace(/^(published|updated): '(\d{4}-\d{2}-\d{2})'$/gm, "$1: $2");
 	return md;
