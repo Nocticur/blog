@@ -1,4 +1,5 @@
 import type { AnnouncementConfig } from "../types/config";
+import announcementData from "../data/announcements.json";
 
 export const announcementConfig: AnnouncementConfig = {
 	// 公告标题
@@ -36,3 +37,5 @@ export const announcementConfig: AnnouncementConfig = {
 	// 是否允许用户关闭公告
 	closable: false,
 };
+
+Object.assign(announcementConfig, announcementData);

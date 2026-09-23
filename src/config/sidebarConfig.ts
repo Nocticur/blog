@@ -1,4 +1,5 @@
 import type { SidebarLayoutConfig } from "../types/config";
+import sidebarData from "../data/sidebar.json";
 
 /**
  * 侧边栏布局配置
@@ -137,3 +138,5 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 	// 本站移动端已有 MobileDock 底栏，故保持为空
 	mobileBottomComponents: [],
 };
+
+Object.assign(sidebarLayoutConfig, sidebarData);

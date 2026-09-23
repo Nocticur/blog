@@ -1,0 +1,19 @@
+{
+  "enable": true,
+  "position": "both",
+  "tabletSidebar": "left",
+  "showBothSidebarsOnPostPage": true,
+  "leftComponents": [
+    { "type": "profile", "enable": true, "position": "top", "showOnPostPage": true },
+    { "type": "announcement", "enable": true, "position": "top", "showOnPostPage": true },
+    { "type": "music", "enable": true, "position": "sticky", "showOnPostPage": true },
+    { "type": "categories", "enable": false, "position": "sticky", "showOnPostPage": true, "responsive": { "collapseThreshold": 5 } },
+    { "type": "tags", "enable": false, "position": "sticky", "showOnPostPage": true, "responsive": { "collapseThreshold": 10 } }
+  ],
+  "rightComponents": [
+    { "type": "stats", "enable": true, "position": "top", "showOnPostPage": true },
+    { "type": "calendar", "enable": true, "position": "sticky", "showOnPostPage": true },
+    { "type": "sidebarToc", "enable": false, "position": "sticky", "showOnPostPage": true, "showOnNonPostPage": false }
+  ],
+  "mobileBottomComponents": []
+}

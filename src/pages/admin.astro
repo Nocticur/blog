@@ -1,0 +1,7 @@
+---
+import Layout from "@layouts/Layout.astro";
+import AdminDashboard from "@components/pages/AdminDashboard.svelte";
+---
+<Layout title="博客管理" description="个人博客管理工作台" robots="noindex,nofollow">
+  <AdminDashboard client:load />
+</Layout>

@@ -13,6 +13,8 @@ const modules = {
   gallery: { file: 'src/data/gallery.json' },
   sponsors: { file: 'src/data/sponsors.json' },
   feeds: { file: 'src/data/feeds.json' },
+  sidebar: { file: 'src/data/sidebar.json' },
+  announcements: { file: 'src/data/announcements.json' },
 };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const version = (buffer) => createHash('sha256').update(buffer).digest('hex');
@@ -23,7 +25,20 @@ function validate(module, source) {
   if (modules[module].file) {
     let items;
     try { items = JSON.parse(source); } catch { fail('JSON 格式错误'); }
-    if (!Array.isArray(items)) fail('内容必须为 JSON 数组');
+    const objectConfig = ['sidebar', 'announcements'].includes(module);
+    if (objectConfig && (!items || typeof items !== 'object' || Array.isArray(items))) fail('设置内容必须为 JSON 对象');
+    if (!objectConfig && !Array.isArray(items)) fail('内容必须为 JSON 数组');
+    if (objectConfig) {
+      if (module === 'announcements') {
+        if (typeof items.title !== 'string' || !Array.isArray(items.items) || typeof items.closable !== 'boolean') fail('公告设置格式错误');
+        for (const item of items.items) {
+          if (!item || typeof item !== 'object' || typeof item.tag !== 'string' || typeof item.title !== 'string' || typeof item.content !== 'string' || typeof item.time !== 'string' || !Number.isFinite(item.sort)) fail('公告项格式错误');
+          if (item.link !== undefined && !webUrl(item.link) && !(typeof item.link === 'string' && item.link.startsWith('/'))) fail('公告链接必须为站内路径或 HTTP(S) 地址');
+        }
+      } else if (items.position && !['left', 'right', 'both'].includes(items.position)) fail('侧栏位置无效');
+      for (const key of ["leftComponents", "rightComponents", "mobileBottomComponents"]) if (key in items && !Array.isArray(items[key])) fail(`${key} 必须为数组`);
+      return;
+    }
     const ids = new Set();
     for (const item of items) {
       if (!item || typeof item !== 'object' || Array.isArray(item)) fail('列表项必须为对象');
