@@ -89,6 +89,7 @@
 	.mobile-dock__context-action,
 	.mobile-dock__menu-toggle,
 	.mobile-dock__toolbar button,
+	.mobile-dock__toolbar a,
 	.mobile-dock__transport button,
 	.mobile-dock__playlist-item,
 	.mobile-dock__menu-row,
@@ -133,6 +134,7 @@
 	.mobile-dock__context-action:active,
 	.mobile-dock__menu-toggle:active,
 	.mobile-dock__toolbar button:active,
+	.mobile-dock__toolbar a:active,
 	.mobile-dock__transport button:active {
 		background: var(--btn-plain-bg-active);
 	}
@@ -916,8 +918,10 @@
 		display: none;
 	}
 
-	.mobile-dock__toolbar button {
+	.mobile-dock__toolbar button,
+	.mobile-dock__toolbar a {
 		display: flex;
+		text-decoration: none;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
@@ -930,7 +934,8 @@
 		transition: color 160ms ease, background-color 160ms ease, transform 160ms ease;
 	}
 
-	.mobile-dock__toolbar button span {
+	.mobile-dock__toolbar button span,
+	.mobile-dock__toolbar a span {
 		max-width: 3.2rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -947,6 +952,7 @@
 	.mobile-dock__context:focus-visible,
 	.mobile-dock__menu-toggle:focus-visible,
 	.mobile-dock__toolbar button:focus-visible,
+	.mobile-dock__toolbar a:focus-visible,
 	.mobile-dock__transport button:focus-visible,
 	.mobile-dock__menu-row:focus-visible,
 	.mobile-dock__submenu-row:focus-visible,
@@ -1020,7 +1026,8 @@
 		font-size: 0.9rem;
 	}
 
-	.mobile-dock__toolbar button {
+	.mobile-dock__toolbar button,
+	.mobile-dock__toolbar a {
 		min-width: 3.2rem;
 	}
 }

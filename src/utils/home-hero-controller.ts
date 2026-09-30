@@ -4,7 +4,7 @@ import type { HeroMosaicConfig } from "@/types/config";
 import { initHomeHeroDialogue } from "@/utils/home-hero-dialogue";
 import { createFlyText, type FlyTextHandle } from "@/utils/home-hero-fly-text";
 import { getHeroPinEndDistance } from "@/utils/home-hero-motion";
-import { initHomeHeroRain } from "@/utils/home-hero-rain";
+import { initHomeHeroStars } from "@/utils/home-hero-stars";
 import { initHomeHeroSticker } from "@/utils/home-hero-sticker";
 import { navigateToPage } from "@/utils/navigation-utils";
 import {
@@ -14,7 +14,7 @@ import {
 
 gsap.registerPlugin(ScrollTrigger);
 
-const RAIN_ACTIVATE_TIME = 0.99;
+const STARS_ACTIVATE_TIME = 0.99;
 const DIALOGUE_REVEAL_TIME = 1.08;
 const DIALOGUE_REVEAL_DURATION = 0.11;
 const DIALOGUE_REVEAL_END_TIME =
@@ -56,13 +56,17 @@ function resetHeroScrollOnReload() {
 	return true;
 }
 
+type HeroStarsRuntimeConfig = {
+	enabled?: boolean;
+	intensity?: number;
+	color?: string;
+};
+
 type HeroRuntimeConfig = {
 	mosaic: HeroMosaicConfig;
-	rain: {
-		enabled?: boolean;
-		intensity?: number;
-		color?: string;
-	};
+	stars?: HeroStarsRuntimeConfig;
+	/** @deprecated 旧版雨效配置，仅用于兼容仍带 rain 字段的缓存页面 */
+	rain?: HeroStarsRuntimeConfig;
 };
 
 type TileState = {
@@ -199,7 +203,7 @@ export function mountHomeHero() {
 	const abortController = new AbortController();
 	const dialogue = initHomeHeroDialogue(hero);
 	const destroySticker = initHomeHeroSticker(hero);
-	const rain = initHomeHeroRain(hero, config.rain);
+	const stars = initHomeHeroStars(hero, config.stars ?? config.rain);
 	const reducedMotionQuery = window.matchMedia(
 		"(prefers-reduced-motion: reduce)",
 	);
@@ -320,28 +324,29 @@ export function mountHomeHero() {
 	};
 
 	/**
-	 * 雨的激活条件原本只有下界（时间线过了 RAIN_ACTIVATE_TIME 就一直为真），
+	 * 星光原本只有下界（时间线过了 STARS_ACTIVATE_TIME 就一直为真），
 	 * 于是滚过首屏之后 canvas 的 rAF 仍在每帧整屏清屏重绘，白白和下方的
-	 * 影像层抢主线程。这里补一个视口闸门：hero 离开视口即停，回来再恢复。
+	 * 影像层抢主线程。这里补一个视口闸门：hero 离开背景区域即停，回来再恢复。
+	 * 减少动态效果时交给星光模块自己画静态星点，闸门不再屏蔽激活。
 	 */
 	let heroInView = true;
-	let rainWanted = false;
-	const syncRain = () => {
-		rain.setActive(rainWanted && heroInView && !reducedMotionQuery.matches);
+	let starsWanted = false;
+	const syncStars = () => {
+		stars.setActive(starsWanted && heroInView);
 	};
 	const heroVisibility = new IntersectionObserver(
 		(entries) => {
 			for (const entry of entries) heroInView = entry.isIntersecting;
-			syncRain();
+			syncStars();
 		},
-		// 留一点提前量，滚回首屏时雨已经在跑，不会看到空档
+		// 留一点提前量，滚回首屏时星光已经在跑，不会看到空档
 		{ rootMargin: "15% 0px" },
 	);
 	heroVisibility.observe(hero);
 
 	const updateSceneState = (progress: number) => {
 		const timelineTime = progress * (timeline?.duration() ?? 1);
-		const rainActive = timelineTime >= RAIN_ACTIVATE_TIME;
+		const starsActive = timelineTime >= STARS_ACTIVATE_TIME;
 		const dialogueVisible = timelineTime >= DIALOGUE_REVEAL_TIME;
 		const layerActive = timelineTime >= QUICK_ACTIONS_REVEAL_TIME;
 		dialogue.setSceneVisible(dialogueVisible);
@@ -350,8 +355,8 @@ export function mountHomeHero() {
 			action.tabIndex = layerActive ? 0 : -1;
 			action.setAttribute("aria-hidden", String(!layerActive));
 		});
-		rainWanted = rainActive;
-		syncRain();
+		starsWanted = starsActive;
+		syncStars();
 		if (progress > 0.002) {
 			stopIdleRotation();
 			completePendingIntros();
@@ -884,6 +889,9 @@ export function mountHomeHero() {
 
 	if (reducedMotionQuery.matches) {
 		setReducedMotionState(hero, dialogue);
+		// 减少动态效果时也要有星空，只是停在静态一帧
+		starsWanted = true;
+		syncStars();
 	} else {
 		buildTimeline();
 		playTilesIntro();
@@ -917,7 +925,7 @@ export function mountHomeHero() {
 		flyHandles = [];
 		contactScatterTimeline = null;
 		heroVisibility.disconnect();
-		rain.destroy();
+		stars.destroy();
 		dialogue.destroy();
 		destroySticker();
 		abortController.abort();

@@ -13,6 +13,11 @@
 	display: none !important;
 }
 
+/* 后台入口是普通链接，保持与按钮一致的尺寸、圆角与悬停效果 */
+a.dock-btn {
+	text-decoration: none;
+}
+
 /* 顶部按钮从右下角气泡式展开，隐藏时不占用悬浮坞的布局空间。 */
 .floating-dock .dock-btn.dock-btn-top {
 	display: inline-flex;

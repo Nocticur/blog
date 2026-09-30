@@ -16,8 +16,7 @@ export const siteConfig: SiteConfig = {
 	site_url: "https://blog.mourn.top",
 
 	// 站点描述
-	description:
-		"Nocticur的博客，记录个人学习、工作、AI相关的内容",
+	description: "Nocticur的博客，记录个人学习、工作、AI相关的内容",
 
 	// 站点关键词
 	keywords: [
@@ -135,7 +134,8 @@ export const siteConfig: SiteConfig = {
 		about: true,
 		// 图谱页面开关（/categories/，导航栏显示为「图谱」）
 		categories: true,
-		// 写作页面开关（/writing/，导航栏显示为「写作」，需输入密码，仅本地 dev 可发布）
+		// 后台入口开关：导航栏不再显示「写作」，/writing/ 仅保留兼容跳转；
+		// 桌面工具栏与移动底栏的「后台管理」入口跟随此开关
 		writing: true,
 		dynamic: true,
 		calendar: true,

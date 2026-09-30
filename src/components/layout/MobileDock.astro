@@ -336,6 +336,17 @@ const isGuestbookPage = /^\/guestbook\/?$/.test(Astro.url.pathname);
 					<Icon name="material-symbols:calendar-month-rounded" is:inline />
 					<span>{i18n(I18nKey.calendar)}</span>
 				</button>
+
+				{/*
+					手机端右侧工具栏不显示，后台入口放在底栏日历之后；
+					可见文字用短文案，无障碍名称仍是完整的「后台管理」。
+				*/}
+				{siteConfig.pages.writing && (
+					<a href="/admin/" data-no-swup aria-label={i18n(I18nKey.admin)}>
+						<Icon name="material-symbols:admin-panel-settings-outline-rounded" is:inline />
+						<span>{i18n(I18nKey.adminShort)}</span>
+					</a>
+				)}
 				{showMusic && (
 					<button type="button" data-view-target="music" aria-label={i18n(I18nKey.music)}>
 						<Icon name="material-symbols:music-note-rounded" is:inline />

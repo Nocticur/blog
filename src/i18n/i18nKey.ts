@@ -59,7 +59,6 @@ enum I18nKey {
 	author = "author",
 	publishedAt = "publishedAt",
 	license = "license",
-	email = "email",
 	friends = "friends",
 	friendsDescription = "friendsDescription",
 	guestbook = "guestbook",
@@ -278,6 +277,10 @@ enum I18nKey {
 	menu = "menu",
 	theme = "theme",
 	tools = "tools",
+	/** 后台入口（桌面工具栏 / 移动底栏的完整名称） */
+	admin = "admin",
+	/** 后台入口在窄屏上的可见短文案 */
+	adminShort = "adminShort",
 	breadcrumb = "breadcrumb",
 	copyPrefix = "copyPrefix",
 	copyTemplate = "copyTemplate",

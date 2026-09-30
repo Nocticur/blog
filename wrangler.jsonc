@@ -1,7 +1,7 @@
 {
 	// 编辑器智能提示与校验（自动补全、错误红线），不影响部署行为
 	"$schema": "./node_modules/wrangler/config-schema.json",
-	// 静态资产优先；指定 Cloud Mail 相关路径进入 Worker，其余内容仍由静态资产服务分发
+	// 静态资产优先；旧 Service Worker 脚本由 Worker 返回兼容响应
 	// Worker 名称，必须与 Cloudflare 后台已连接 Git 构建的那个 Worker 一致
 	"name": "my-blog",
 	"main": "./worker/index.js",
@@ -17,6 +17,6 @@
 		"not_found_handling": "404-page",
 		// Worker 通过该绑定回退读取博客静态资产
 		"binding": "ASSETS",
-		"run_worker_first": ["/api/*", "/registerSW.js", "/sw.js"]
+		"run_worker_first": ["/registerSW.js", "/sw.js"]
 	}
 }

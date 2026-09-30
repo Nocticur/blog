@@ -6,17 +6,15 @@ import HeroQuickActions from "@components/layout/HeroQuickActions.astro";
 import { homeConfig } from "@/config";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
+import { resolveHeroStarsConfig } from "@/utils/home-hero-stars";
 
 const { hero } = homeConfig;
 const dialogueEnabled =
 	hero.dialogue?.enabled !== false && Boolean(hero.dialogue);
 const runtimeConfig = {
 	mosaic: hero.mosaic,
-	rain: {
-		enabled: hero.rain?.enabled ?? true,
-		intensity: hero.rain?.intensity ?? 0.6,
-		color: hero.rain?.color ?? "",
-	},
+	// 以 hero.stars 为准，缺失字段逐项回落到旧的 hero.rain（新字段优先）
+	stars: resolveHeroStarsConfig({ stars: hero.stars, rain: hero.rain }),
 };
 ---
 
@@ -78,7 +76,7 @@ const runtimeConfig = {
 		/>
 	)}
 
-	<canvas class="home-hero__rain" data-hero-rain aria-hidden="true"></canvas>
+	<canvas class="home-hero__stars" data-hero-stars aria-hidden="true"></canvas>
 </section>
 
 <script>

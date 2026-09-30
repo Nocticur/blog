@@ -4,7 +4,6 @@ const robotsTxt = `
 User-agent: *
 
 # The search page declares noindex,follow in its HTML metadata.
-Disallow: /mail/admin/
 
 Sitemap: ${new URL("sitemap-index.xml", import.meta.env.SITE).href}
 `.trim();

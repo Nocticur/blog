@@ -39,7 +39,7 @@ html:has(.home-hero) #top-row {
 .home-hero__visual,
 .home-hero__backdrop,
 .home-hero__shade,
-.home-hero__rain {
+.home-hero__stars {
 	position: absolute;
 	inset: 0;
 }
@@ -129,14 +129,15 @@ html:has(.home-hero) #top-row {
 	background: var(--home-hero-overlay);
 }
 
-.home-hero__rain {
-	z-index: 20;
+.home-hero__stars {
+	/* 背景图与遮罩之上、文字与交互内容之下，且不拦截点击 */
+	z-index: 2;
 	pointer-events: none;
 	opacity: 0;
 	transition: opacity 240ms ease;
 }
 
-.home-hero__rain.is-active {
+.home-hero__stars.is-active {
 	opacity: 1;
 }
 
@@ -506,7 +507,8 @@ html:has(.home-hero) #top-row {
 		transform: none;
 	}
 
-	.home-hero__rain {
-		display: none;
+	/* 减少动态效果时不跑动画，但静态星点保留 */
+	.home-hero__stars {
+		opacity: 1;
 	}
 }

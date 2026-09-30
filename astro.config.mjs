@@ -95,7 +95,6 @@ import rehypeExternalLinks from "./src/plugins/rehype-external-links.mjs";
 import rehypeFigure from "./src/plugins/rehype-figure.mjs";
 import { remarkImageGrid } from "./src/plugins/remark-image-grid.js";
 import { unified } from "@astrojs/markdown-remark";
-import mailAdminWorker from "./worker/index.js";
 
 if (process.env.NODE_ENV === "development") {
 	setMaxListeners(20);
@@ -440,80 +439,12 @@ function writingDevApi() {
 	};
 }
 
-function mailApiDevProxy() {
-	const apiPrefixPattern = /^\/api\/(mail-admin|mail-auth)\//;
-	return {
-		name: "firefly-mail-api-dev-proxy",
-		configureServer(server) {
-			const middleware = async (req, res, next) => {
-				const requestUrl = new URL(req.url || "/", "http://localhost");
-				if (!apiPrefixPattern.test(requestUrl.pathname)) {
-					next();
-					return;
-				}
-				try {
-					const chunks = [];
-					if (!["GET", "HEAD"].includes(req.method || "GET")) {
-						for await (const chunk of req) chunks.push(chunk);
-					}
-					const headers = new Headers();
-					for (const name of [
-						"accept",
-						"content-type",
-						"cookie",
-						"origin",
-						"referer",
-					]) {
-						const value = req.headers[name];
-						if (typeof value === "string") headers.set(name, value);
-					}
-					const host = req.headers.host || "localhost";
-					const request = new Request(
-						`http://${host}${requestUrl.pathname}${requestUrl.search}`,
-						{
-							method: req.method,
-							headers,
-							body: chunks.length > 0 ? Buffer.concat(chunks) : undefined,
-						},
-					);
-					const response = await mailAdminWorker.fetch(request, {
-						MAIL_ADMIN_SESSION_SECRET: process.env.MAIL_ADMIN_SESSION_SECRET,
-						MAIL_USER_SESSION_SECRET: process.env.MAIL_USER_SESSION_SECRET,
-						MAIL_UPSTREAM_ORIGIN: process.env.MAIL_UPSTREAM_ORIGIN,
-						CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
-						CLOUDFLARE_D1_DATABASE_ID: process.env.CLOUDFLARE_D1_DATABASE_ID,
-						CLOUDFLARE_D1_API_TOKEN: process.env.CLOUDFLARE_D1_API_TOKEN,
-						ASSETS: {
-							fetch: async () => new Response("Not found", { status: 404 }),
-						},
-					});
-					res.statusCode = response.status;
-					for (const [name, value] of response.headers)
-						res.setHeader(name, value);
-					res.end(Buffer.from(await response.arrayBuffer()));
-				} catch (error) {
-					res.statusCode = 502;
-					res.end(
-						error instanceof Error ? error.message : "Mail admin proxy failed",
-					);
-				}
-			};
-			return () => {
-				server.middlewares.stack.unshift({ route: "", handle: middleware });
-			};
-		},
-	};
-}
-
 // https://astro.build/config
 export default defineConfig({
 	site: siteConfig.site_url,
 
 	base: "/",
 	trailingSlash: "always",
-	redirects: {
-		"/role": "/mail/",
-	},
 	// 图像优化配置
 	image: {
 		// 全局响应式布局
@@ -631,10 +562,6 @@ export default defineConfig({
 				}
 				// 写作页是站长的私人工具，无论开关状态都不进 sitemap
 				if (pathname === "/writing/") {
-					return false;
-				}
-				// 已关闭的邮箱页面不再出现在站点 sitemap
-				if (pathname === "/mail" || pathname.startsWith("/mail/")) {
 					return false;
 				}
 				// 文档列表页及其分页（/list/、/list/2/ …）
@@ -765,7 +692,6 @@ export default defineConfig({
 		plugins: [
 			tailwindcss(),
 			writingDevApi(),
-			mailApiDevProxy(),
 		],
 		server: {
 			watch: {

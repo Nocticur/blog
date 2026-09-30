@@ -131,8 +131,8 @@ export const homeConfig: HomeConfig = {
 				},
 			],
 		},
-		// 玻璃雨珠 + 撞击水花（移动端自动降低密度，尊重 prefers-reduced-motion）
-		rain: {
+		// 背景星光（固定星点 + 3–6 秒缓慢明暗变化；≤768px 的独立移动首页不创建粒子层）
+		stars: {
 			enabled: true,
 			intensity: 0.6,
 			// 留空则随主题自动取色（暗色→白 / 浅色→深灰）；也可填 "#7fb0ff" 或 "127,176,255"

@@ -69,6 +69,24 @@ const isGuestbookPage = /^\/guestbook\/?$/.test(Astro.url.pathname);
 			<span class="dock-btn-label">{i18n(I18nKey.calendar)}</span>
 		</button>
 
+		{/*
+			后台入口紧跟在日历下方：同标签页普通链接，data-no-swup 跳过 Swup 局部切换，
+			让后台布局整页加载；不依赖公告是否存在。
+		*/}
+		{siteConfig.pages.writing && (
+			<a
+				class="dock-btn dock-btn-admin"
+				id="dock-admin-link"
+				href="/admin/"
+				data-no-swup
+				aria-label={i18n(I18nKey.admin)}
+				data-tooltip={i18n(I18nKey.admin)}
+			>
+				<span class="dock-btn-icon"><Icon name="material-symbols:admin-panel-settings-outline-rounded" class="text-3xl" /></span>
+				<span class="dock-btn-label">{i18n(I18nKey.admin)}</span>
+			</a>
+		)}
+
 		{spineModelConfig?.enable && (
 			<button class="dock-btn" id="dock-spine-btn" aria-label={i18n(I18nKey.spineModel)} type="button" data-active="true" data-tooltip={i18n(I18nKey.spineModel)}>
 				<span class="dock-btn-icon"><Icon name="material-symbols:image-outline" class="text-3xl" /></span>

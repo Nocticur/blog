@@ -86,7 +86,7 @@ export type SiteConfig = {
 		archive: boolean; // 归档页面开关
 		about: boolean; // 关于页面开关
 		categories: boolean; // 图谱页面开关（/categories/，导航栏显示为「图谱」）
-		writing: boolean; // 写作页面开关（/writing/，导航栏显示为「写作」）
+		writing: boolean; // 后台入口开关（/writing/ 保留兼容跳转；桌面工具栏与移动底栏的「后台管理」入口跟随此开关）
 		dynamic: boolean;
 		calendar: boolean;
 		places: boolean;
@@ -404,12 +404,21 @@ export type HomeConfig = {
 		sticker: HeroStickerConfig;
 		/** galgame 对话框（写死暗黑主题）。配置后替代底部简介气泡 */
 		dialogue?: HeroDialogueConfig;
-		/** 玻璃雨珠 + 撞击水花动效，移动端自动降低密度。 */
+		/** 背景星光：固定星点 + 3–6 秒缓慢明暗变化；≤768px 的独立移动首页不创建粒子层。 */
+		stars?: {
+			enabled?: boolean;
+			/** 星点密度，0–1，默认 0.6（克制） */
+			intensity?: number;
+			/** 主星点颜色（十六进制如 "#ffffff" 或 "r,g,b"）。留空则随主题自动取色（暗→白/亮→深灰） */
+			color?: string;
+		};
+		/**
+		 * @deprecated 旧的玻璃雨珠配置，已由 stars 取代。
+		 * 仅在 stars 缺字段时逐项兜底，新配置请使用 hero.stars。
+		 */
 		rain?: {
 			enabled?: boolean;
-			/** 雨量强度，0–1，默认 0.6（克制） */
 			intensity?: number;
-			/** 雨珠颜色（十六进制如 "#ffffff" 或 "r,g,b"）。留空则随主题自动取色（暗→白/亮→深灰） */
 			color?: string;
 		};
 	};

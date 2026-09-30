@@ -26,9 +26,6 @@ const buildNavBarConfig = (): NavBarConfig => {
 	if (siteConfig.pages.categories) {
 		postsChildren.push(LinkPreset.Categories);
 	}
-	if (siteConfig.pages.writing) {
-		postsChildren.push(LinkPreset.Writing);
-	}
 
 	if (siteConfig.pages.dynamic) {
 		postsChildren.push({ name: "动态", url: "/dynamic/", icon: "material-symbols:dynamic-feed" });

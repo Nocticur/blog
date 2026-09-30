@@ -5,36 +5,11 @@
 	"framework": "astro",
 	"rewrites": [
 		{
-			"source": "/api/mail-admin/(.+)",
-			"destination": "/api/mail-admin/[[...path]]?...path=$1&__suffix=$1"
-		},
-		{
-			"source": "/api/mail-auth/(.+)",
-			"destination": "/api/mail-auth/[[...path]]?...path=$1&__suffix=$1"
-		},
-		{
 			"source": "/api/writing/(.+)",
 			"destination": "/api/writing/[[...path]]?...path=$1&__suffix=$1"
 		}
 	],
 	"headers": [
-		{
-			"source": "/api/mail-admin/(.*)",
-			"headers": [
-				{ "key": "Cache-Control", "value": "private, no-store" },
-				{ "key": "CDN-Cache-Control", "value": "no-store" },
-				{ "key": "Vercel-CDN-Cache-Control", "value": "no-store" }
-			]
-		},
-		{
-			"source": "/api/mail-auth/(.*)",
-			"headers": [
-				{ "key": "Cache-Control", "value": "private, no-store" },
-				{ "key": "CDN-Cache-Control", "value": "no-store" },
-				{ "key": "Vercel-CDN-Cache-Control", "value": "no-store" },
-				{ "key": "x-vercel-enable-rewrite-caching", "value": "0" }
-			]
-		},
 		{
 			"source": "/(.*)",
 			"headers": [
