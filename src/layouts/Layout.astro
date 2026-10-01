@@ -47,10 +47,11 @@ interface Props {
 	setOGTypeArticle?: boolean;
 	postSlug?: string;
 	robots?: string;
+	admin?: boolean;
 	articleMeta?: ArticleMeta;
 }
 
-const { title, description, setOGTypeArticle, postSlug, articleMeta, robots } =
+const { title, description, setOGTypeArticle, postSlug, articleMeta, robots, admin = false } =
 	Astro.props;
 let { lang } = Astro.props;
 
@@ -202,21 +203,30 @@ const siteLang = lang.replace("_", "-");
         defaultMode: siteConfig.themeColor.defaultMode ?? "light",
         darkTheme: expressiveCodeConfig.darkTheme,
         lightTheme: expressiveCodeConfig.lightTheme,
+        adminMode: admin,
       }}
     >
-      const stored = localStorage.getItem("theme");
+      let stored = null;
+      let hue = configHue;
+      try {
+        stored = localStorage.getItem(adminMode ? "firefly-admin-theme" : "theme");
+        hue = localStorage.getItem("hue") || configHue;
+      } catch { /* Optional preferences are unavailable when browser storage is blocked. */ }
       // 如果没有存储过主题，使用配置的默认值（不写入 localStorage，让用户后续切换才持久化）
-      const theme = stored === "system"
-        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      const preference = adminMode
+        ? (["dark", "light", "system"].includes(stored) ? stored : "system")
         : (stored || defaultMode);
+      const theme = preference === "system"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : preference;
       const isDark = theme === "dark";
       if (isDark) document.documentElement.classList.add("dark");
       else document.documentElement.classList.remove("dark");
       document.documentElement.setAttribute("data-theme", isDark ? darkTheme : lightTheme);
       // Persist resolved value if it was "system"
-      if (stored === "system") localStorage.setItem("theme", theme);
-
-      const hue = localStorage.getItem("hue") || configHue;
+      if (!adminMode && stored === "system") {
+        try { localStorage.setItem("theme", theme); } catch { /* Keep the applied theme. */ }
+      }
       document.documentElement.style.setProperty("--hue", hue);
     </script>
     <style
@@ -260,8 +270,8 @@ const siteLang = lang.replace("_", "-");
     <MobileDock />
     <div id="search-modal-root"></div>
     {siteConfig.pages.guestbook && <div id="guestbook-modal-root"></div>}
-    <PrivacyModal />
-    <UserAgreementModal />
+    {!robots?.includes("noindex") && <PrivacyModal />}
+    {!robots?.includes("noindex") && <UserAgreementModal />}
     <FancyboxManager />
     <CodeGroupManager />
     <CopyNoticeManager />

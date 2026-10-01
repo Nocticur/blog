@@ -18,6 +18,7 @@ import { LinkPreset, type NavBarLink } from "@/types/config";
 import { getTagList } from "@/utils/content-utils";
 import { getFallbackFormat, getImageFormats } from "@/utils/image-utils";
 import { getTagUrl, url } from "@/utils/url-utils";
+import { announcementTitle, visibleAnnouncements } from "@/utils/announcement-data.mjs";
 
 const resolveLink = (link: NavBarLink | LinkPreset): NavBarLink =>
 	typeof link === "number" ? LinkPresets[link] : link;
@@ -27,9 +28,7 @@ const navLinks = navBarConfig.links.map(resolveLink).map((link) => ({
 	children: link.children?.map(resolveLink),
 }));
 const tags = await getTagList();
-const announcements = announcementConfig.items
-	.slice()
-	.sort((a, b) => b.sort - a.sort);
+const announcements = visibleAnnouncements(announcementConfig);
 const siteTitle = siteConfig.navbar.title || siteConfig.title;
 const logoValue = siteConfig.navbar.logo?.value || "";
 const isLocalSrcLogo =
@@ -254,7 +253,7 @@ const isGuestbookPage = /^\/guestbook\/?$/.test(Astro.url.pathname);
 				</section>
 
 				{showAnnouncement && (
-					<section id="mobile-dock-announcement-view" class="mobile-dock__view" data-dock-view="announcement" data-title={announcementConfig.title || i18n(I18nKey.announcement)} hidden>
+					<section id="mobile-dock-announcement-view" class="mobile-dock__view" data-dock-view="announcement" data-title={announcementTitle(announcementConfig)} hidden>
 						<div class="mobile-dock__announcement-list">
 							{announcements.map((item) => {
 								const external = !!item.link && /^https?:\/\//.test(item.link);
@@ -342,7 +341,7 @@ const isGuestbookPage = /^\/guestbook\/?$/.test(Astro.url.pathname);
 					可见文字用短文案，无障碍名称仍是完整的「后台管理」。
 				*/}
 				{siteConfig.pages.writing && (
-					<a href="/admin/" data-no-swup aria-label={i18n(I18nKey.admin)}>
+					<a href={url("/admin/")} data-no-swup data-dock-navigation aria-label={i18n(I18nKey.admin)}>
 						<Icon name="material-symbols:admin-panel-settings-outline-rounded" is:inline />
 						<span>{i18n(I18nKey.adminShort)}</span>
 					</a>

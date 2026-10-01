@@ -23,10 +23,13 @@ import {
 } from "lucide-svelte";
 import { marked } from "marked";
 import { onMount } from "svelte";
+import { sanitizeMarkdownHtml } from "@/utils/admin-markdown-preview";
+import { buildPostMutation, getTabBufferKey, loadLocalBuffer, postDeleteUrl, removeLocalBuffer, saveLocalBuffer, type PostEditorState, type PostIntent } from "@/utils/admin-editor-state";
 import "@/styles/components/writing-studio.css";
 
 interface PostItem {
 	file: string;
+	version: string;
 	title: string;
 	published: string;
 	draft: boolean;
@@ -37,6 +40,7 @@ interface PostItem {
 
 interface PostDetail {
 	file: string;
+	version: string;
 	frontmatter: {
 		title: string;
 		published: string;
@@ -51,15 +55,16 @@ interface PostDetail {
 	content: string;
 }
 
-let { defaultRepo = "" }: { defaultRepo?: string } = $props();
+let { defaultRepo = "", authenticated = false, isActive = true, embedded = false, onsessionexpired }: { defaultRepo?: string; authenticated?: boolean; isActive?: boolean; embedded?: boolean; onsessionexpired?: () => void } = $props();
 
 // --- 会话与视图状态 ---
-const AUTH_KEY = "firefly-writing-auth";
+const bufferKey = () => getTabBufferKey(sessionStorage, "posts:editor");
 type View = "login" | "list" | "editor" | "offline";
 let view = $state<View>("login");
 let password = $state("");
 let loginError = $state("");
 let loggingIn = $state(false);
+let mounted = $state(false);
 // 服务端运行模式："dev" 本地写文件 / "deployed" 线上走 GitHub 提交
 let mode = $state<"dev" | "deployed">("dev");
 // 服务端是否已配置 GITHUB_TOKEN（登录/列表接口返回）
@@ -75,6 +80,14 @@ let justSavedUrl = $state("");
 
 // --- 编辑器状态 ---
 let editingFile = $state<string | null>(null);
+let editingVersion = $state("");
+let originalDraft = $state(true);
+let bufferEnabled = $state(false);
+let baseline = $state("");
+let bufferStatus = $state("");
+let conflict = $state(false);
+let repositoryCopy = $state<PostDetail | null>(null);
+let previousLocalCopy = $state("");
 let slugTouched = $state(false);
 let form = $state({
 	title: "",
@@ -84,7 +97,7 @@ let form = $state({
 	description: "",
 	image: "",
 	category: "",
-	draft: false,
+	draft: true,
 });
 let tags = $state<string[]>([]);
 let tagInput = $state("");
@@ -101,7 +114,7 @@ let coverFileInput: HTMLInputElement | undefined = $state();
 let uploadingCover = $state(false);
 let coverUploadError = $state("");
 
-const previewHtml = $derived(marked.parse(content) as string);
+const previewHtml = $derived(sanitizeMarkdownHtml(marked.parse(content) as string));
 const allCategories = $derived([
 	...new Set(posts.map((p) => p.category).filter(Boolean)),
 ]);
@@ -142,23 +155,38 @@ $effect(() => {
 	}
 });
 
+$effect(() => {
+	if (mounted && embedded && authenticated && isActive && view === "login" && !listLoading) {
+		void initializeWorkspace();
+	}
+});
+
+async function initializeWorkspace() {
+	await loadList();
+	if (view === "list") restoreBuffer();
+}
+
 // --- 登录 ---
-function logout() {
-	sessionStorage.removeItem(AUTH_KEY);
+async function logout() {
+	persistNow();
+	const res = await fetch("/api/writing/logout/", { method: "POST" }).catch(() => null);
+	if (!res?.ok) { listError = "退出失败，请重试"; return; }
 	password = "";
 	loginError = "";
 	view = "login";
+	onsessionexpired?.();
 }
 
 function handleSessionExpired() {
-	sessionStorage.removeItem(AUTH_KEY);
+	persistNow();
 	password = "";
-	view = "login";
+	if (!embedded) view = "login";
 	loginError = "登录已过期，请重新输入密码";
+	if (embedded) saveError = "登录已过期，输入仍保留；请重新登录后手动保存。";
+	onsessionexpired?.();
 }
 
-// 登录改为服务端校验：密码 POST 给 /api/writing/auth/，换回 HMAC 会话
-// token（本地 dev middleware 与线上 Vercel Function 同契约）
+// 会话由服务端 HttpOnly Cookie 管理，前端不保存凭据。
 async function handleLogin(event: SubmitEvent) {
 	event.preventDefault();
 	if (!password || loggingIn) return;
@@ -176,16 +204,10 @@ async function handleLogin(event: SubmitEvent) {
 			return;
 		}
 		const auth = data as {
-			token?: string;
 			mode?: string;
 			repo?: string;
 			tokenReady?: boolean;
 		};
-		if (!auth.token) {
-			loginError = "登录响应异常，请重试";
-			return;
-		}
-		sessionStorage.setItem(AUTH_KEY, auth.token);
 		mode = auth.mode === "deployed" ? "deployed" : "dev";
 		if (typeof auth.tokenReady === "boolean")
 			githubTokenReady = auth.tokenReady;
@@ -193,6 +215,7 @@ async function handleLogin(event: SubmitEvent) {
 		repoInput = auth.repo ?? "";
 		password = "";
 		await loadList();
+		restoreBuffer();
 	} catch {
 		loginError = "登录失败：无法连接写作服务";
 	} finally {
@@ -204,8 +227,66 @@ async function handleLogin(event: SubmitEvent) {
 function authHeaders(): Record<string, string> {
 	return {
 		"Content-Type": "application/json",
-		"x-writing-auth": sessionStorage.getItem(AUTH_KEY) ?? "",
 	};
+}
+
+function editorState(): PostEditorState {
+	return { file: editingFile, version: editingVersion, originalDraft, form: { ...form }, tags: [...tags], content };
+}
+
+function persistNow() {
+	if (!bufferEnabled || JSON.stringify(editorState()) === baseline) return;
+	try {
+		const result = saveLocalBuffer(localStorage, bufferKey(), { ...editorState(), previousLocalCopy });
+		bufferStatus = result.ok ? "已暂存到本机" : result.error;
+	} catch { bufferStatus = "本机暂存失败，请保留当前页面或复制正文。"; }
+}
+
+$effect(() => {
+	// Explicit dependencies also capture changes while the session has expired.
+	JSON.stringify(editorState());
+	if (bufferEnabled) persistNow();
+});
+
+function restoreBuffer(expectedFile?: string | null) {
+	try {
+		const restored = loadLocalBuffer<PostEditorState & { previousLocalCopy?: string }>(localStorage, bufferKey());
+		if (restored.error) { bufferStatus = restored.error; return; }
+		const saved = restored.value;
+		if (!saved || typeof saved.content !== "string" || typeof saved.version !== "string" || typeof saved.originalDraft !== "boolean" || !saved.form || !Array.isArray(saved.tags) || (expectedFile !== undefined && saved.file !== expectedFile)) return;
+		editingFile = saved.file; editingVersion = saved.version; originalDraft = saved.originalDraft;
+		form = { ...form, ...saved.form } as typeof form; tags = [...saved.tags]; content = saved.content;
+		previousLocalCopy = typeof saved.previousLocalCopy === "string" ? saved.previousLocalCopy : "";
+		slugTouched = true; bufferEnabled = true; baseline = "restored";
+		bufferStatus = "已恢复本机暂存；保存时仍校验最初读取的版本";
+		view = "editor";
+	} catch { bufferStatus = "无法读取本机暂存，请检查浏览器存储权限。"; }
+}
+
+function applyRepository(data: PostDetail) {
+	const fm = data.frontmatter;
+	editingFile = data.file; editingVersion = data.version; originalDraft = fm.draft;
+	slugTouched = true;
+	form = { title: fm.title, slug: data.file.replace(/\.(md|mdx)$/i, ""), published: fm.published, updated: fm.updated, description: fm.description, image: fm.image, category: fm.category, draft: fm.draft };
+	tags = [...fm.tags]; tagInput = ""; content = data.content;
+	baseline = JSON.stringify(editorState()); bufferEnabled = true; bufferStatus = "";
+}
+
+async function compareRepository() {
+	if (!editingFile) return;
+	try {
+		const res = await fetch(`/api/writing/posts/?file=${encodeURIComponent(editingFile)}`, { cache: "no-store" });
+		if (res.status === 401) { handleSessionExpired(); return; }
+		if (!res.ok) throw new Error(`HTTP ${res.status}`);
+		repositoryCopy = await res.json();
+	} catch { saveError = "读取仓库版本失败，当前输入已保留，请重试。"; }
+}
+
+function useRepositoryCopy() {
+	if (!repositoryCopy || !confirm("将仓库版作为新的编辑基础？当前本机内容将保留在下方比较区，请手动合并后再保存。")) return;
+	previousLocalCopy = JSON.stringify(editorState(), null, 2);
+	applyRepository(repositoryCopy); conflict = false; saveError = "";
+	baseline = "merged"; persistNow();
 }
 
 async function loadList() {
@@ -257,26 +338,13 @@ async function openEdit(item: PostItem) {
 		}
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		const data: PostDetail = await res.json();
-		const fm = data.frontmatter;
-		editingFile = data.file;
-		slugTouched = true;
-		form = {
-			title: fm.title,
-			slug: data.file.replace(/\.(md|mdx)$/i, ""),
-			published: fm.published,
-			updated: fm.updated,
-			description: fm.description,
-			image: fm.image,
-			category: fm.category,
-			draft: fm.draft,
-		};
-		tags = [...fm.tags];
-		tagInput = "";
-		content = data.content;
+		applyRepository(data);
 		saveError = "";
 		coverUploadError = "";
 		mobilePane = "edit";
 		view = "editor";
+		conflict = false; repositoryCopy = null; previousLocalCopy = "";
+		restoreBuffer(data.file);
 	} catch {
 		listError = "读取文章失败，请重试";
 	}
@@ -284,6 +352,7 @@ async function openEdit(item: PostItem) {
 
 function openCreate() {
 	editingFile = null;
+	editingVersion = ""; originalDraft = true;
 	slugTouched = false;
 	form = {
 		title: "",
@@ -293,7 +362,7 @@ function openCreate() {
 		description: "",
 		image: "",
 		category: "",
-		draft: false,
+		draft: true,
 	};
 	tags = [];
 	tagInput = "";
@@ -304,12 +373,16 @@ function openCreate() {
 	justSavedUrl = "";
 	mobilePane = "edit";
 	view = "editor";
+	conflict = false; repositoryCopy = null; previousLocalCopy = "";
+	baseline = ""; bufferEnabled = true;
+	restoreBuffer(null);
 }
 
 async function uploadCover(event: Event) {
 	const input = event.currentTarget as HTMLInputElement;
 	const file = input.files?.[0];
 	if (!file || uploadingCover) return;
+	if (file.size > 3 * 1024 * 1024) { coverUploadError = "图片不能超过 3 MiB"; input.value = ""; return; }
 
 	coverUploadError = "";
 	uploadingCover = true;
@@ -345,21 +418,18 @@ async function uploadCover(event: Event) {
 	}
 }
 
-async function savePost(): Promise<string | null> {
+async function savePost(intent: PostIntent = "save"): Promise<string | null> {
 	if (!canSave || saving) return null;
 	saving = true;
 	saveError = "";
 	coverUploadError = "";
 	try {
+		persistNow();
+		const body = buildPostMutation(editorState(), intent);
 		const res = await fetch("/api/writing/posts/", {
 			method: editingFile ? "PUT" : "POST",
 			headers: authHeaders(),
-			body: JSON.stringify({
-				...form,
-				tags,
-				content,
-				...(editingFile ? { file: editingFile } : {}),
-			}),
+			body: JSON.stringify(body),
 		});
 		if (res.status === 401) {
 			handleSessionExpired();
@@ -369,6 +439,7 @@ async function savePost(): Promise<string | null> {
 			.json()
 			.catch(() => ({}) as { error?: string; file?: string; url?: string });
 		if (!res.ok) {
+			conflict = res.status === 409;
 			saveError =
 				(data as { error?: string }).error || `保存失败（HTTP ${res.status}）`;
 			return null;
@@ -376,13 +447,15 @@ async function savePost(): Promise<string | null> {
 		justSavedFile = (data as { file?: string }).file ?? "";
 		// 线上模式保存即提交，响应里带 commit 链接
 		justSavedUrl = (data as { url?: string }).url ?? "";
+		bufferEnabled = false; baseline = JSON.stringify(editorState());
+		try { const cleared = removeLocalBuffer(localStorage, bufferKey()); bufferStatus = cleared.ok ? "" : cleared.error; } catch { bufferStatus = "本机暂存无法清除，请核对仓库内容。"; }
 		// 发布的文章回到「我的文章」，草稿留在草稿箱
-		if (!form.draft) listTab = "published";
+		listTab = body.draft ? "drafts" : "published";
 		await loadList();
 		return justSavedFile || null;
-	} catch {
+	} catch (error) {
 		saveError =
-			mode === "deployed"
+			error instanceof Error && error.message.includes("版本") ? error.message : mode === "deployed"
 				? "保存失败：无法连接写作服务，请重试"
 				: "保存失败：无法连接本地写作服务（请确认 npm run dev 正在运行）";
 		return null;
@@ -396,7 +469,7 @@ async function deletePost(item: PostItem) {
 	listError = "";
 	try {
 		const res = await fetch(
-			`/api/writing/posts/?file=${encodeURIComponent(item.file)}`,
+			postDeleteUrl(item.file, item.version),
 			{
 				method: "DELETE",
 				headers: authHeaders(),
@@ -419,6 +492,7 @@ async function deletePost(item: PostItem) {
 
 function handleKeydown(event: KeyboardEvent) {
 	if (
+		isActive &&
 		view === "editor" &&
 		(event.ctrlKey || event.metaKey) &&
 		event.key.toLowerCase() === "s"
@@ -490,19 +564,32 @@ function insertCodeBlock() {
 }
 
 onMount(() => {
+	mounted = true;
 	// 仓库由服务端解析并只读展示，这里先用页面传入的默认仓库占位
 	repoInput = defaultRepo;
-	// 会话恢复：token 是否有效由服务端在首次列表请求时校验，失效走 401 → 登录页
-	if (sessionStorage.getItem(AUTH_KEY)) {
-		loadList();
-	}
+	const start = async () => {
+		try {
+			if (!authenticated) {
+				const res = await fetch("/api/writing/session/", { cache: "no-store" });
+				if (!res.ok) return;
+			}
+			await initializeWorkspace();
+		} catch { loginError = "无法连接管理服务，请重试。"; }
+	};
+	if (!embedded) void start();
+	window.addEventListener("beforeunload", persistNow);
+	return () => { persistNow(); window.removeEventListener("beforeunload", persistNow); };
 });
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="mx-auto w-full max-w-4xl">
+	{#if bufferStatus}<p role="status" class="mb-4 rounded-lg border border-black/10 p-3 text-sm dark:border-white/15">{bufferStatus}</p>{/if}
 	{#if view === "login"}
+		{#if embedded}
+			<p role="status" class="py-8 text-sm text-black/55 dark:text-white/55">正在读取文章…</p>
+		{:else}
 		<!-- 密码门 -->
 		<div class="mx-auto mt-10 max-w-sm rounded-xl border border-black/15 px-8 py-10 text-center dark:border-white/15">
 			<div
@@ -532,6 +619,7 @@ onMount(() => {
 				</button>
 			</form>
 		</div>
+		{/if}
 	{:else if view === "offline"}
 		<!-- 静态部署提示 -->
 		<div class="mx-auto mt-10 max-w-md rounded-xl border border-black/15 px-8 py-12 text-center dark:border-white/15">
@@ -571,7 +659,7 @@ onMount(() => {
 						{#if listTab === "drafts"}
 							共 {draftPosts.length} 篇 · 保存草稿后统一在这里管理
 						{:else}
-							共 {publishedPosts.length} 篇 · 发布后立即出现在站上
+							共 {publishedPosts.length} 篇 · 线上更新将在构建部署后生效
 						{/if}
 					</p>
 				</div>
@@ -604,20 +692,20 @@ onMount(() => {
 				>
 					<span class="inline-flex items-center gap-2"><ListPlus size={17} /> 新建文章</span>
 				</button>
-				<button
+				{#if !embedded}<button
 					class="flex h-10 items-center gap-2 rounded-lg px-3 text-sm text-black/55 transition hover:text-(--primary) dark:text-white/55"
 					onclick={logout}
 					title="退出登录"
 				>
 					<LogOut size={15} /> 退出
-				</button>
+				</button>{/if}
 			</div>
 
 			{#if justSavedFile}
 				<p
 					class="mb-4 rounded-lg bg-(--btn-regular-bg) px-4 py-2.5 text-sm text-(--btn-content) dark:text-white/85"
 				>
-					已保存：{justSavedFile}
+					{mode === "deployed" ? "已保存到仓库" : "已保存到本地文件"}：{justSavedFile}
 					{#if justSavedUrl}
 						·
 						<a
@@ -627,7 +715,7 @@ onMount(() => {
 							class="underline underline-offset-2"
 						>
 							查看提交
-						</a>（Vercel 构建约 2-3 分钟后生效）
+						</a>（等待构建部署）
 					{:else if mode === "dev"}
 						（可在站上即时预览）
 					{/if}
@@ -650,7 +738,7 @@ onMount(() => {
 			{:else if visiblePosts.length === 0}
 				<p class="py-10 text-center text-sm text-black/45 dark:text-white/45">
 					{#if listTab === "drafts"}
-						暂无草稿，新建文章时勾选「存为草稿」即可保存到这里。
+						暂无草稿，新建文章默认保存为草稿。
 					{:else}
 						还没有文章，点右上角「新建文章」开始写作吧。
 					{/if}
@@ -692,6 +780,7 @@ onMount(() => {
 			{/if}
 		</div>
 	{:else if view === "editor"}
+		<fieldset disabled={saving} class="m-0 min-w-0 border-0 p-0">
 		<!-- 编辑器 -->
 		<div class="card-base mb-4 px-5 py-6 md:px-8">
 			<div class="mb-5 flex items-center justify-between">
@@ -737,7 +826,7 @@ onMount(() => {
 						list="ws-categories"
 					/>
 					<datalist id="ws-categories">
-						{#each allCategories as c (c)}<option value={c} />{/each}
+						{#each allCategories as c (c)}<option value={c}></option>{/each}
 					</datalist>
 				</label>
 
@@ -761,7 +850,7 @@ onMount(() => {
 							list="ws-tags"
 						/>
 						<datalist id="ws-tags">
-							{#each allTags as t (t)}<option value={t} />{/each}
+							{#each allTags as t (t)}<option value={t}></option>{/each}
 						</datalist>
 					</div>
 					<span class="ws-field-hint">支持中英文标签，回车或逗号添加</span>
@@ -816,14 +905,12 @@ onMount(() => {
 					></textarea>
 				</label>
 
-				<label class="flex items-center gap-2.5 select-none">
-					<input type="checkbox" class="ws-checkbox" bind:checked={form.draft} />
-					<span class="text-sm">存为草稿（仅本地可见，构建后不发布）</span>
-				</label>
+				<p class="text-sm md:col-span-2">{originalDraft ? "当前为草稿；点击“发布文章”后才公开。" : "当前已发布；编辑自动暂存到本机，点击“更新发布”后才提交。"}</p>
 			</div>
 		</div>
 
 		<div class="card-base px-5 py-6 md:px-8">
+			{#if editingFile?.endsWith(".mdx")}<p class="ws-field-hint mb-3">MDX 支持源码编辑。预览不执行组件代码，最终效果以构建结果为准。</p>{/if}
 			<div class="ws-toolbar">
 				<button class="ws-tool" onclick={() => insertLinePrefix("## ")} title="二级标题">
 					<Heading2 size={17} />
@@ -923,15 +1010,20 @@ onMount(() => {
 					{/if}
 					<button
 						class="btn-regular flex h-10 items-center gap-2 rounded-lg px-6 font-bold disabled:cursor-not-allowed disabled:opacity-50"
-						onclick={savePost}
+						onclick={() => savePost()}
 						disabled={!canSave || saving}
 						title={mode === "deployed"
-							? "保存后将直接提交到 GitHub 仓库，Vercel 构建约 2-3 分钟后生效"
+							? "保存后提交到 GitHub 仓库，等待构建部署"
 							: ""}
 					>
 						<Save size={16} />
-						{saving ? "保存中…" : editingFile ? "保存修改" : form.draft ? "保存草稿" : "发布文章"}
+						{saving ? "保存中…" : originalDraft ? "保存草稿" : "更新发布"}
 					</button>
+					{#if originalDraft}
+						<button class="btn-regular h-10 rounded-lg px-4" disabled={!canSave || saving} onclick={() => savePost("publish")}>发布文章</button>
+					{:else}
+						<button class="ws-action h-10 px-4" disabled={saving} onclick={() => { if (confirm("确认撤下这篇文章并保存为草稿？")) void savePost("withdraw"); }}>撤下文章</button>
+					{/if}
 					<button
 						class="flex h-10 items-center rounded-lg px-4 text-sm text-black/55 transition hover:text-(--primary) dark:text-white/55"
 						onclick={() => loadList()}
@@ -953,10 +1045,24 @@ onMount(() => {
 							class="text-(--primary) underline underline-offset-2"
 						>
 							查看提交
-						</a>（Vercel 构建约 2-3 分钟后生效）
+						</a>（等待构建部署）
 					</p>
+				{/if}
+				{#if conflict}
+					<div class="mt-4 rounded-lg border border-amber-500/40 p-4">
+						<p class="text-sm">仓库内容已被其他页面修改。当前输入仍保留，先读取并比较后手动合并。</p>
+						<button class="ws-action mt-2" onclick={compareRepository}>读取仓库版进行比较</button>
+						{#if repositoryCopy}
+							<label class="block text-sm mt-3">仓库版本（只读）<textarea readonly class="ws-textarea min-h-48 font-mono" value={JSON.stringify(repositoryCopy, null, 2)}></textarea></label>
+							<button class="ws-action mt-2" onclick={useRepositoryCopy}>以仓库版为基础合并</button>
+						{/if}
+					</div>
+				{/if}
+				{#if previousLocalCopy}
+					<label class="block text-sm mt-4">重新读取前的本机内容（只读，供手动合并）<textarea readonly class="ws-textarea min-h-48 font-mono" value={previousLocalCopy}></textarea></label>
 				{/if}
 			</div>
 		</div>
+		</fieldset>
 	{/if}
 </div>

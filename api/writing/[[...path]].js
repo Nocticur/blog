@@ -6,25 +6,24 @@
  * 后台的 Git 写回通道同思路），提交后 Vercel 自动重新构建，约 2-3 分钟生效。
  *
  * 路由契约与 astro.config.mjs 的 writing-dev-api 完全一致，前端一套代码自适应：
- * - POST /api/writing/auth          登录：服务端校验密码，签发 HMAC 会话 token
+ * - POST /api/writing/auth          登录：签发 HttpOnly Cookie 会话
+ * - GET /api/writing/session        检查会话
+ * - POST /api/writing/logout        退出登录并清除 Cookie
  * - GET  /api/writing/posts         文章列表（含草稿）
  * - GET  /api/writing/posts?file=   读取单篇（frontmatter + 正文）
  * - POST/PUT /api/writing/posts     保存 = 提交到仓库（草稿以 draft:true 一并入库）
  * - POST /api/writing/images        上传本地图片 = 提交到仓库现有文章图片目录
  * - DELETE /api/writing/posts?file= 删除仓库中的文章文件
  *
- * 注意：本文件刻意做成「自包含」——鉴权/会话/buildMarkdown/仓库解析等逻辑直接
- * 内联，不 import 项目其他目录的模块。Vercel 对 api/ 目录做函数打包时不会可靠
- * 地带上 api/ 之外的文件，跨目录 import 会导致线上 FUNCTION_INVOCATION_FAILED。
- * 这些逻辑与 src/lib/writing-server.mjs（本地 dev middleware 使用）保持同步。
+ * 共享鉴权和存储模块位于 api/_lib，确保 Vercel 函数打包包含这些依赖。
  *
  * 安全：密钥只存在于服务端环境变量（GITHUB_TOKEN、WRITING_PASSWORD[_HASH]、
- * WRITING_SESSION_SECRET），除 /auth 外的所有请求都要求有效的会话 token；
+ * WRITING_SESSION_SECRET），除 /auth 和清除会话外的所有请求都要求有效 Cookie；
  * 密码哈希不随页面下发到浏览器。
  */
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import matter from "gray-matter";
 import {createGithubStore,executeContent,uploadContentImage} from "../_lib/content-management.mjs";
+import { resolvePasswordHash, verifyPassword, signSession, verifySession, cookieSession, sessionCookie, requireSameOrigin, MAX_IMAGE_BYTES, MAX_REQUEST_BYTES, assertRequestSize } from '../_lib/writing-session.mjs';
 
 // ── 与 src/lib/writing-server.mjs 同步的内联实现 ──────────────────────────
 
@@ -39,64 +38,9 @@ const IMAGE_MIME_TYPES = {
 };
 const IMAGE_DATA_URL_PATTERN =
 	/^data:(image\/(?:jpeg|png|webp|avif|gif));base64,([A-Za-z0-9+/]+={0,2})$/;
-const MAX_UPLOAD_SIZE = 4.5 * 1024 * 1024;
+const MAX_UPLOAD_SIZE = MAX_IMAGE_BYTES;
 const GITHUB_API = "https://api.github.com";
 const GITHUB_TIMEOUT_MS = 30 * 1000;
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
-const sha256Hex = (text) => createHash("sha256").update(text).digest("hex");
-
-function resolvePasswordHash(env = process.env) {
-	if (env.WRITING_PASSWORD) return sha256Hex(env.WRITING_PASSWORD);
-	if (env.WRITING_PASSWORD_HASH) return env.WRITING_PASSWORD_HASH;
-	return "";
-}
-
-function verifyPassword(password, env = process.env) {
-	const plain = String(password ?? "");
-	if (!plain) return false;
-	return sha256Hex(plain) === resolvePasswordHash(env);
-}
-
-function resolveSessionSecret(env = process.env) {
-	return (
-		env.WRITING_SESSION_SECRET ||
-		`firefly-writing-session:${resolvePasswordHash(env)}`
-	);
-}
-
-function signSession(env = process.env, ttlMs = SESSION_TTL_MS) {
-	const payload = Buffer.from(
-		JSON.stringify({ exp: Date.now() + ttlMs }),
-	).toString("base64url");
-	const sig = createHmac("sha256", resolveSessionSecret(env))
-		.update(payload)
-		.digest("base64url");
-	return `${payload}.${sig}`;
-}
-
-function verifySession(token, env = process.env) {
-	if (!resolvePasswordHash(env) || typeof token !== "string") return false;
-	const [payload, sig] = token.split(".");
-	if (!payload || !sig) return false;
-	const expected = createHmac("sha256", resolveSessionSecret(env))
-		.update(payload)
-		.digest();
-	let given;
-	try {
-		given = Buffer.from(sig, "base64url");
-	} catch {
-		return false;
-	}
-	if (given.length !== expected.length || !timingSafeEqual(given, expected))
-		return false;
-	try {
-		const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-		return Number.isFinite(data.exp) && data.exp > Date.now();
-	} catch {
-		return false;
-	}
-}
 
 // 线上目标仓库：WRITING_GITHUB_REPO → Vercel 所连仓库（平台自动注入）→ 空
 // （与本地不同：函数运行时没有 git 仓库，不尝试读 git remote）
@@ -200,10 +144,10 @@ class HttpError extends Error {
 	}
 }
 
-function json(data, status = 200) {
+function json(data, status = 200, headers = {}) {
 	return new Response(JSON.stringify(data), {
 		status,
-		headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-store" },
+		headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-store", ...headers },
 	});
 }
 
@@ -238,11 +182,14 @@ function absoluteRequestUrl(request) {
 
 async function readRequestBody(request) {
 	if (request.body !== undefined && request.body !== null) {
-		if (typeof request.body === "object" && !Buffer.isBuffer(request.body))
+		if (typeof request.body === "object" && !Buffer.isBuffer(request.body)) {
+			assertRequestSize(JSON.stringify(request.body));
 			return request.body;
+		}
 		const text = Buffer.isBuffer(request.body)
 			? request.body.toString("utf8")
 			: String(request.body);
+		assertRequestSize(text);
 		try {
 			return JSON.parse(text);
 		} catch {
@@ -251,7 +198,12 @@ async function readRequestBody(request) {
 	}
 	if (typeof request.on !== "function") return null;
 	const chunks = [];
-	for await (const chunk of request) chunks.push(Buffer.from(chunk));
+	let size = 0;
+	for await (const chunk of request) {
+		size += Buffer.byteLength(chunk);
+		if (size > MAX_REQUEST_BYTES) throw new HttpError(413, '请求体过大，图片上限为 3 MiB');
+		chunks.push(Buffer.from(chunk));
+	}
 	try {
 		return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 	} catch {
@@ -270,9 +222,31 @@ function adaptNodeRequest(request) {
 
 async function readJson(request) {
 	try {
-		const body = await request.json();
+		let body;
+		if (typeof request.text === 'function') {
+			const declaredSize = Number(request.headers.get('content-length') || 0);
+			if (declaredSize > MAX_REQUEST_BYTES) throw new HttpError(413, '请求体过大，图片上限为 3 MiB');
+			let text;
+			if (request.body?.getReader) {
+				const reader = request.body.getReader(), chunks = [];
+				let size = 0;
+				try {
+					while (true) {
+						const chunk = await reader.read();
+						if (chunk.done) break;
+						size += chunk.value.byteLength;
+						if (size > MAX_REQUEST_BYTES) { await reader.cancel(); throw new HttpError(413, '请求体过大，图片上限为 3 MiB'); }
+						chunks.push(Buffer.from(chunk.value));
+					}
+					text = Buffer.concat(chunks).toString('utf8');
+				} finally { reader.releaseLock(); }
+			} else text = await request.text();
+			assertRequestSize(text);
+			body = JSON.parse(text);
+		} else body = await request.json();
 		return body && typeof body === "object" ? body : null;
-	} catch {
+	} catch (error) {
+		if (error?.status === 413) throw error;
 		return null;
 	}
 }
@@ -303,6 +277,7 @@ function requireToken() {
 // 把 GitHub 的非 2xx 响应转成带中文提示的 HttpError；extra404 用于区分 404 的语境
 async function ghData(res, extra404 = "GitHub 资源不存在") {
 	if (res.ok) return res.json();
+	if (res.status === 409 || res.status === 422) throw new HttpError(409, '版本冲突，请重新读取后合并');
 	if (res.status === 404) throw new HttpError(404, extra404);
 	if (res.status === 401 || res.status === 403) {
 		throw new HttpError(
@@ -340,7 +315,7 @@ function isPostPath(path) {
 		return false;
 	const rel = path.slice(POSTS_DIR.length + 1);
 	const segments = rel.split("/");
-	if (segments.some((s) => s.startsWith("."))) return false;
+	if (segments.some((s) => !VALID_SEGMENT.test(s) || s.includes('..'))) return false;
 	if (!segments[1] && LIST_SKIP_DIRS.has(segments[0])) return false;
 	return true;
 }
@@ -373,7 +348,7 @@ async function readPostMeta(repo, branch, file, token) {
 		const { data: fm } = matter(md);
 		return {
 			file,
-			sha: data.sha,
+			version: data.sha,
 			title: String(fm.title || file),
 			published: formatDate(fm.published),
 			draft: fm.draft === true,
@@ -397,19 +372,16 @@ async function mapWithConcurrency(items, worker) {
 
 // --- 各路由 ---
 
+function sessionInfo() {
+	return { authenticated: true, mode: 'deployed', repo: resolveRepo(), branch: (process.env.WRITING_GITHUB_BRANCH || '').trim(), tokenReady: Boolean(process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN) };
+}
 async function handleAuth(request) {
  if (!resolvePasswordHash()) return fail("请先配置 WRITING_PASSWORD 或 WRITING_PASSWORD_HASH",503);
 	const body = await readJson(request);
 	if (!body || !verifyPassword(body.password)) {
 		return fail("密码不正确", 401);
 	}
-	return json({
-		token: signSession(),
-		mode: "deployed",
-		repo: resolveRepo(),
-		branch: (process.env.WRITING_GITHUB_BRANCH || "").trim(),
-		tokenReady: Boolean(process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN),
-	});
+	return json(sessionInfo(), 200, { 'Set-Cookie': sessionCookie(signSession()) });
 }
 
 // 仓库只由服务端解析（WRITING_GITHUB_REPO → Vercel 注入仓库），
@@ -435,7 +407,6 @@ async function handleList() {
 	);
 	const posts = metas
 		.filter(Boolean)
-		.map(({ sha, ...meta }) => meta)
 		.sort((a, b) => String(b.published).localeCompare(String(a.published)));
 	return json({
 		posts,
@@ -473,6 +444,7 @@ async function handleRead(url) {
 	}
 	return json({
 		file,
+		version: data.sha,
 		frontmatter: {
 			title: frontmatter.title || "",
 			published: formatDate(frontmatter.published),
@@ -535,6 +507,7 @@ async function handleSave(request, isCreate) {
 			.replace(/\\/g, "/");
 		if (!file || !isPostPath(`${POSTS_DIR}/${file}`))
 			return fail("Invalid file name");
+		if (!body.version || typeof body.version !== 'string') return fail('版本冲突，请重新读取后合并', 409);
 	}
 	const token = requireToken();
 	const branch = await resolveBranch(repo, token);
@@ -555,8 +528,11 @@ async function handleSave(request, isCreate) {
 	if (existing.status === 200) {
 		if (isCreate) return fail(`File ${file} already exists`, 409);
 		const previous = await existing.json();
+ if (body.version !== previous.sha) return fail('版本冲突，请重新读取后合并', 409);
  sha = previous.sha;
  existingData = matter(Buffer.from(previous.content || "", "base64").toString("utf8")).data;
+	} else if (existing.status === 404 && !isCreate) {
+		return fail('文章已删除，请重新读取后合并', 409);
 	} else if (existing.status !== 404) {
 		return fail(`GitHub API 错误（HTTP ${existing.status}）`, 502);
 	}
@@ -576,25 +552,27 @@ async function handleSave(request, isCreate) {
 		},
 	);
 	const data = await ghData(put, "提交失败");
-	return json({ ok: true, file, url: data.commit?.html_url || "" });
+	return json({ ok: true, file, version: data.content?.sha || '', commit: { sha: data.commit?.sha || '', url: data.commit?.html_url || '' }, url: data.commit?.html_url || "" });
 }
 
-async function handleDelete(url) {
+async function handleDelete(url, request) {
 	const file = (url.searchParams.get("file") || "").trim().replace(/\\/g, "/");
 	if (!file || !isPostPath(`${POSTS_DIR}/${file}`))
 		return fail("Invalid file name");
+	const version = url.searchParams.get('version') || (await readJson(request))?.version;
+	if (!version || typeof version !== 'string') return fail('版本冲突，请重新读取后合并', 409);
 	const repo = pickRepo();
 	const token = requireToken();
 	const branch = await resolveBranch(repo, token);
 
 	const remotePath = `${POSTS_DIR}/${file.split("/").map(encodeURIComponent).join("/")}`;
-	const data = await ghData(
-		await githubFetch(
-			`/repos/${repo}/contents/${remotePath}?ref=${encodeURIComponent(branch)}`,
-			token,
-		),
-		"Post not found",
+	const current = await githubFetch(
+		`/repos/${repo}/contents/${remotePath}?ref=${encodeURIComponent(branch)}`,
+		token,
 	);
+	if (current.status === 404) return fail('文章已删除，请重新读取后合并', 409);
+	const data = await ghData(current, 'Post not found');
+	if (version !== data.sha) return fail('版本冲突，请重新读取后合并', 409);
 	let title = "";
 	try {
 		title = String(
@@ -616,8 +594,8 @@ async function handleDelete(url) {
 			}),
 		},
 	);
-	await ghData(del, "删除失败");
-	return json({ ok: true });
+	const removed = await ghData(del, "删除失败");
+	return json({ ok: true, commit: { sha: removed.commit?.sha || '', url: removed.commit?.html_url || '' } });
 }
 
 export default async function handler(request, response) {
@@ -627,6 +605,7 @@ export default async function handler(request, response) {
 			? request
 			: adaptNodeRequest(request);
 		const url = new URL(normalizedRequest.url);
+		if (!['GET', 'HEAD', 'OPTIONS'].includes(normalizedRequest.method)) requireSameOrigin(normalizedRequest.headers, url.origin);
 		// Vercel may expose the rewritten function pathname; recover the original
 		// multi-segment route from the suffix supplied by vercel.json.
 		const suffix = url.searchParams.get("__suffix");
@@ -636,13 +615,17 @@ export default async function handler(request, response) {
 		let result;
 		if (normalizedRequest.method === "POST" && route === "/auth") {
 			result = await handleAuth(normalizedRequest);
+		} else if (normalizedRequest.method === 'POST' && route === '/logout') {
+			result = json({ ok: true, authenticated: false }, 200, { 'Set-Cookie': sessionCookie('') });
 		} else if (
-			!verifySession(normalizedRequest.headers.get("x-writing-auth"))
+			!verifySession(cookieSession(normalizedRequest.headers))
 		) {
-			// 会话 token 校验：登录以外的所有接口都要带有效 token
+			// 会话仅由 HttpOnly Cookie 提供，旧的客户端 token 头不再接受。
 			result = fail("登录已过期，请重新登录", 401);
-		} else if (route.startsWith("/content/")) {
- const match = /^\/content\/([a-z]+)(\/images)?$/.exec(route);
+		} else if (normalizedRequest.method === 'GET' && route === '/session') {
+			result = json(sessionInfo());
+		} else if (route.startsWith("/content/") || route.startsWith('/settings/')) {
+ const match = /^\/(?:content|settings)\/([a-z]+)(\/images)?$/.exec(route);
  if (!match) return sendResponse(fail("Not found",404),response);
  const repo=pickRepo(), token=requireToken(), branch=await resolveBranch(repo,token);
  const store=createGithubStore({repo,branch,request:(path,init)=>githubFetch(path,token,init)});
@@ -666,7 +649,7 @@ export default async function handler(request, response) {
 				normalizedRequest.method === "POST",
 			);
 		} else if (normalizedRequest.method === "DELETE" && route === "/posts") {
-			result = await handleDelete(url);
+			result = await handleDelete(url, normalizedRequest);
 		} else {
 			result = fail("Not found", 404);
 		}

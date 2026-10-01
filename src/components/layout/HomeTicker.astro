@@ -1,16 +1,13 @@
 ---
 import { announcementConfig } from "@/config";
-import I18nKey from "@/i18n/i18nKey";
-import { i18n } from "@/i18n/translation";
+import { visibleAnnouncements } from "@/utils/announcement-data.mjs";
 
-const items = [...announcementConfig.items].sort((a, b) => b.sort - a.sort);
+const items = visibleAnnouncements(announcementConfig);
 ---
 
-{
-	items.length > 0 && (
 		<home-ticker
 			class="home-ticker"
-			aria-label={i18n(I18nKey.announcementTicker)}
+			aria-label="访客问候与公告"
 			data-speed="100"
 			data-ready="false"
 		>
@@ -18,16 +15,13 @@ const items = [...announcementConfig.items].sort((a, b) => b.sort - a.sort);
 				<div class="home-ticker__track">
 					<div class="home-ticker__group">
 						<div class="home-ticker__sequence" data-ticker-source>
+							<span class="home-ticker__item home-ticker__welcome">
+								<span class="home-ticker__text" data-visitor-welcome>欢迎来到我的博客</span>
+								<span class="home-ticker__sep" aria-hidden="true">×</span>
+							</span>
 							{items.map((item) => (
 								<span class="home-ticker__item">
-									<span
-										class="home-ticker__text"
-										data-visitor-welcome={item.tag === "欢迎" ? true : undefined}
-									>
-										{item.tag === "欢迎"
-											? "[欢迎] 欢迎来到我的博客"
-											: `[${item.tag}] ${item.content}`}
-									</span>
+									<span class="home-ticker__text">{`[${item.tag}] ${item.content}`}</span>
 									<span class="home-ticker__sep" aria-hidden="true">×</span>
 								</span>
 							))}
@@ -36,8 +30,6 @@ const items = [...announcementConfig.items].sort((a, b) => b.sort - a.sort);
 				</div>
 			</div>
 		</home-ticker>
-	)
-}
 
 <script>
 	import { getVisitorWelcome } from "@/utils/visitor-location";
@@ -49,8 +41,12 @@ const items = [...announcementConfig.items].sort((a, b) => b.sort - a.sort);
 		private resizeObserver: ResizeObserver | null = null;
 		private visibilityObserver: IntersectionObserver | null = null;
 		private layoutFrame = 0;
+		private connection = 0;
+		private welcomeRequested = false;
 
 		connectedCallback() {
+			const connection = ++this.connection;
+			this.welcomeRequested = false;
 			this.track = this.querySelector<HTMLElement>(".home-ticker__track");
 			this.inner = this.querySelector<HTMLElement>(".home-ticker__inner");
 
@@ -73,15 +69,18 @@ const items = [...announcementConfig.items].sort((a, b) => b.sort - a.sort);
 			this.visibilityObserver?.disconnect();
 			this.visibilityObserver = new IntersectionObserver(
 				(entries) => {
+					if (!this.isConnected || connection !== this.connection) return;
 					for (const entry of entries) {
 						this.dataset.inView = String(entry.isIntersecting);
+						if (entry.isIntersecting && !this.welcomeRequested) {
+							this.welcomeRequested = true;
+							void this.updateVisitorWelcome(connection).catch(() => {});
+						}
 					}
 				},
-				{ rootMargin: "10% 0px" },
+				{ rootMargin: "0px" },
 			);
 			this.visibilityObserver.observe(this);
-
-			void this.updateVisitorWelcome().catch(() => {});
 
 			document.fonts?.ready.then(() => {
 				if (this.isConnected) this.scheduleLayout();
@@ -89,6 +88,7 @@ const items = [...announcementConfig.items].sort((a, b) => b.sort - a.sort);
 		}
 
 		disconnectedCallback() {
+			this.connection += 1;
 			this.resizeObserver?.disconnect();
 			this.resizeObserver = null;
 			this.visibilityObserver?.disconnect();
@@ -101,14 +101,14 @@ const items = [...announcementConfig.items].sort((a, b) => b.sort - a.sort);
 			this.layoutFrame = requestAnimationFrame(() => this.layout());
 		}
 
-		private async updateVisitorWelcome() {
+		private async updateVisitorWelcome(connection: number) {
 			const welcome = await getVisitorWelcome();
-			if (!this.sourceSequence) return;
+			if (!this.isConnected || connection !== this.connection || !this.sourceSequence) return;
 
 			this.sourceSequence
 				.querySelectorAll<HTMLElement>("[data-visitor-welcome]")
 				.forEach((node) => {
-					node.textContent = `[欢迎] ${welcome}`;
+					node.textContent = welcome;
 				});
 			this.scheduleLayout();
 		}

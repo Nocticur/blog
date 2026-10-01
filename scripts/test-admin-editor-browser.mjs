@@ -1,0 +1,64 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+const origin=process.env.BROWSER_BASE_URL || process.env.FEATURE_TEST_ORIGIN || 'http://127.0.0.1:4321';
+const browser=await chromium.launch({channel:'chrome',headless:true});
+try {
+ const page=await browser.newPage({viewport:{width:1280,height:900}});
+ page.on('pageerror',error=>console.error('PAGE ERROR:',error.message));
+ let saved, rejectSave=false, pauseSave=false, enteredSave, releaseSave;
+ const detail={file:'fixture.mdx',version:'read-v1',frontmatter:{title:'隔离文章',published:'2026-01-01',updated:'',description:'',image:'',category:'',draft:false,tags:[],lang:''},content:'仓库正文'};
+ const posts=[{...detail.frontmatter,file:detail.file,version:detail.version}];
+ await page.route('**/api/writing/**',async route=>{
+  const req=route.request(),url=new URL(req.url());
+  assert.equal(req.headers()['x-writing-auth'],undefined,'前端不得发送旧凭据');
+  if(url.pathname.endsWith('/session/'))return route.fulfill({json:{authenticated:true,mode:'deployed'}});
+  if(url.pathname.includes('/posts/')) {
+   if(req.method()==='GET')return route.fulfill({json:url.searchParams.has('file')?detail:{posts,mode:'deployed',tokenReady:true}});
+   saved=req.postDataJSON();
+   if(pauseSave) await new Promise(resolve=>{releaseSave=resolve;enteredSave();});
+   return route.fulfill(rejectSave?{status:409,json:{error:'版本冲突，请重新读取后合并'}}:{json:{ok:true,file:saved.file || saved.slug+'.md',version:'new-v2',url:'https://example.test/commit/fixture'}});
+  }
+  if(url.pathname.includes('/content/sidebar/'))return route.fulfill({json:{source:JSON.stringify({enable:true,position:'both',leftComponents:[],rightComponents:[],mobileBottomComponents:[]}),version:'s1'}});
+  if(url.pathname.includes('/content/announcements/'))return route.fulfill({json:{source:JSON.stringify({title:'隔离公告',closable:false,items:[]}),version:'a1'}});
+  return route.fulfill({json:{items:[]}});
+ });
+ const open=async()=>{await page.goto(origin+'/admin/',{waitUntil:'domcontentloaded'});await page.locator('.admin-shell').waitFor();await page.locator('.admin-sidebar nav button').filter({hasText:'文章管理'}).click();};
+ await open();
+ const writing=page.locator('#admin-writing');
+ await writing.getByRole('button',{name:'新建文章',exact:true}).click();
+ await writing.getByPlaceholder('文章标题').fill('隔离草稿');
+ await writing.locator('.ws-editor').fill('本机未提交正文');
+ await page.waitForFunction(()=>Object.values(localStorage).some(value=>value.includes('本机未提交正文')));
+ await page.reload({waitUntil:'domcontentloaded'});
+ await writing.locator('.ws-editor').waitFor();
+ assert.equal(await writing.locator('.ws-editor').inputValue(),'本机未提交正文','刷新恢复正文');
+ pauseSave=true;
+ const inFlight=new Promise(resolve=>enteredSave=resolve);
+ await writing.getByRole('button',{name:'保存草稿',exact:true}).click();
+ await inFlight;
+ assert.equal(await writing.locator('.ws-editor').isDisabled(),true,'慢保存期间应禁用正文，避免保存响应丢弃新输入');
+ assert.equal(await writing.getByPlaceholder('文章标题').isDisabled(),true,'慢保存期间应禁用属性');
+ releaseSave();pauseSave=false;
+ await writing.getByText(/已保存到仓库/).waitFor();
+ assert.equal(saved.draft,true,'新建文章手动保存默认草稿');
+ assert.equal(saved.content,'本机未提交正文');
+ await writing.getByRole('button',{name:'返回我的文章',exact:true}).click();
+ await writing.locator('button[title="编辑"]').click();
+ await writing.locator('.ws-editor').fill('Published local changes');
+ rejectSave=true;
+ await writing.getByRole('button',{name:'更新发布',exact:true}).click();
+ await writing.getByText(/版本冲突/).first().waitFor();
+ assert.equal(saved.version,'read-v1','不能先读取新版本绕过版本保护');
+ assert.equal(saved.draft,false,'已发布文章保存保持发布状态');
+ assert.equal(await writing.locator('.ws-editor').inputValue(),'Published local changes');
+ await writing.getByRole('button',{name:'读取仓库版进行比较',exact:true}).click();
+ assert.equal(await writing.locator('textarea[readonly]').inputValue(),JSON.stringify(detail,null,2));
+ await page.reload({waitUntil:'domcontentloaded'});
+ await writing.locator('.ws-editor').waitFor();
+ assert.equal(await writing.locator('.ws-editor').inputValue(),'Published local changes','409刷新仍恢复');
+ await writing.locator('.ws-editor').fill('<img src="missing-fixture" onerror="window.__unsafePreview=true"><a href="javascript:window.__unsafePreview=true">danger</a>\n\n**Safe Markdown**\n\n<Component onClick={alert(1)} />');
+ await writing.locator('.ws-preview strong').waitFor();
+ assert.equal(await writing.locator('.ws-preview [onerror],.ws-preview a[href^="javascript:"],.ws-preview component').count(),0,'危险HTML、脚本链接和MDX组件不可执行');
+ assert.equal(await page.evaluate(()=>Boolean(window.__unsafePreview)),false);
+ console.log('Admin editor browser tests passed: new draft, local restore, read version, 409 recovery and safe preview.');
+} finally {await browser.close();}

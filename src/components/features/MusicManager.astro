@@ -101,14 +101,16 @@ const managerConfigStr = JSON.stringify({
     audio.style.display = 'none';
     if (!audio.parentNode) document.body.appendChild(audio);
 
+    var savedVolume = null;
+    try { savedVolume = localStorage.getItem('music-player-volume'); } catch { /* Use configured volume. */ }
     // ── State ────────────────────────────────────────────────
     var state = {
         playlist: [],
         currentIndex: 0,
         isPlaying: false,
         playMode: 0, // 0: list, 1: one, 2: random
-        volume: localStorage.getItem('music-player-volume') !== null
-            ? parseFloat(localStorage.getItem('music-player-volume'))
+        volume: savedVolume !== null
+            ? parseFloat(savedVolume)
             : (config.volume || 0.7),
         isMuted: false,
         lyrics: [],
@@ -286,7 +288,7 @@ const managerConfigStr = JSON.stringify({
         state.isMuted = false;
         audio.volume = val;
         audio.muted = false;
-        localStorage.setItem('music-player-volume', val.toString());
+        try { localStorage.setItem('music-player-volume', val.toString()); } catch { /* Playback still works without saved preferences. */ }
         emit('fm:volume', { volume: val, isMuted: false });
     }
 

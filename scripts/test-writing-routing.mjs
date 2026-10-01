@@ -27,9 +27,10 @@ function setup() {
 }
 async function invoke(path, { method = "GET", body, token } = {}) {
 	let text = "";
+	const headers = new Map();
 	const res = {
 		statusCode: 200,
-		setHeader() {},
+		setHeader(name, value) { headers.set(name.toLowerCase(), value); },
 		end(value) {
 			text = value;
 		},
@@ -40,13 +41,14 @@ async function invoke(path, { method = "GET", body, token } = {}) {
 			method,
 			headers: {
 				host: "example.test",
-				...(token ? { "x-writing-auth": token } : {}),
+				origin: 'https://example.test',
+				...(token ? { cookie: token } : {}),
 			},
 			body,
 		},
 		res,
 	);
-	return { status: res.statusCode, data: JSON.parse(text) };
+	return { status: res.statusCode, data: JSON.parse(text), headers };
 }
 async function login() {
 	setup();
@@ -55,7 +57,7 @@ async function login() {
 			method: "POST",
 			body: { password: "test-only-password" },
 		})
-	).data.token;
+	).headers.get('set-cookie').split(';')[0];
 }
 
 test("Vercel explicitly routes deep content paths into the writing function", () => {
@@ -88,7 +90,9 @@ test("rewritten login still accepts credentials", async () => {
 		body: { password: "test-only-password" },
 	});
 	assert.equal(res.status, 200);
-	assert.equal(typeof res.data.token, "string");
+	assert.equal(res.data.authenticated, true);
+	assert.equal(res.data.token, undefined);
+	assert.match(res.headers.get('set-cookie'), /HttpOnly/);
 });
 test("rewritten deep content paths return the content listing", async () => {
 	const token = await login();

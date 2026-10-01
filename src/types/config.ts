@@ -568,6 +568,7 @@ export type AnnouncementItem = {
 	time: string; // 发布时间，如 "2025-06-10"
 	link?: string; // 可选跳转链接
 	sort: number; // 排序权重，越大越靠前
+	enabled?: boolean; // 未填写时启用；停用后从所有公告位置隐藏
 };
 
 export type AnnouncementConfig = {

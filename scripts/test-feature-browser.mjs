@@ -6,7 +6,7 @@ const browser=await chromium.launch({channel:"chrome",headless:true});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const errors=[];
 page.on("pageerror",error=>errors.push(error.message));
-const visit=async path=>{console.log(`Checking ${path}`);await page.goto(origin+path,{waitUntil:"domcontentloaded"});await page.waitForSelector("main");assert.equal(await page.locator("vite-error-overlay").count(),0);};
+const visit=async path=>{console.log(`Checking ${path}`);await page.goto(origin+path,{waitUntil:"domcontentloaded"});await page.waitForSelector(path==="/admin/"?".admin-shell":"main");assert.equal(await page.locator("vite-error-overlay").count(),0);};
 try{
  await visit("/calendar/");
  const month=page.locator("#calendar-month");await month.waitFor();
@@ -44,24 +44,27 @@ try{
  await page.evaluate(()=>window.swup.navigate("/calendar/"));
  await page.waitForSelector("#calendar-month");
  await page.getByRole("button",{name:"下个月",exact:true}).click();
- await visit("/writing/");
- await page.getByRole("button",{name:"打开 / 刷新内容管理"}).click();
- assert.ok(await page.getByText("请先在上方登录写作后台",{exact:true}).count());
  let saved;
+ await page.route("**/api/writing/session/**",route=>route.fulfill({json:{authenticated:true,mode:"dev"}}));
+ await page.route("**/api/writing/posts/**",route=>route.fulfill({json:{posts:[],mode:"dev"}}));
  await page.route("**/api/writing/content/**",async route=>{
   const request=route.request(),url=new URL(request.url());
-  if(request.method()==="GET") return route.fulfill({json:url.pathname.includes("/feeds/")?{source:"[]",version:"v1"}:{items:[]}});
+  if(request.method()==="GET") {
+   if(url.pathname.includes("/sidebar/"))return route.fulfill({json:{source:JSON.stringify({enable:true,position:"both",leftComponents:[],rightComponents:[],mobileBottomComponents:[]}),version:"s1"}});
+   if(url.pathname.includes("/announcements/"))return route.fulfill({json:{source:JSON.stringify({title:"公告",closable:false,items:[]}),version:"a1"}});
+   return route.fulfill({json:url.pathname.includes("/feeds/")?{source:"[]",version:"v1"}:{items:[]}});
+  }
   saved=request.postDataJSON();return route.fulfill({json:{ok:true,version:"v2",file:saved.file}});
  });
- await page.evaluate(()=>sessionStorage.setItem("firefly-writing-auth","browser-test-only"));
- await page.getByRole("button",{name:"打开 / 刷新内容管理"}).click();
- await page.getByRole("button",{name:"朋友圈订阅",exact:true}).click();
+ await visit("/admin/");
+ await page.getByRole("navigation",{name:"后台导航"}).getByRole("button",{name:"朋友圈订阅",exact:true}).click();
  await page.getByLabel("JSON 列表",{exact:true}).fill('[{"name":"Fixture","url":"https://example.test/rss"}]');
  await page.getByRole("button",{name:"保存",exact:true}).click();
- await page.getByText("已保存。线上内容将在重新构建后生效。",{exact:true}).waitFor();
+ await page.getByText(/已保存/).first().waitFor();
  assert.equal(saved.version,"v1");assert.equal(JSON.parse(saved.source)[0].name,"Fixture");
  await page.unroute("**/api/writing/content/**");
- await page.evaluate(()=>sessionStorage.removeItem("firefly-writing-auth"));
+ await page.unroute("**/api/writing/session/**");
+ await page.unroute("**/api/writing/posts/**");
  const posts=await fs.readdir("dist/posts",{withFileTypes:true});
  const first=posts.find(entry=>entry.isDirectory());assert.ok(first);
  await visit("/posts/"+encodeURIComponent(first.name)+"/");

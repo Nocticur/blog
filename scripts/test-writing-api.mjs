@@ -41,7 +41,7 @@ async function invoke(url, { method = "GET", body, headers = {} } = {}) {
 	const request = {
 		url,
 		method,
-		headers: { host: "example.test", ...headers },
+		headers: { host: "example.test", origin: 'https://example.test', ...headers },
 		body,
 	};
 	await handler(request, response);
@@ -67,12 +67,13 @@ try {
 		body: { password: "writing-api-test-password" },
 	});
 	assert.equal(auth.status, 200);
-	assert.equal(typeof auth.data.token, "string");
+	assert.equal(auth.data.token, undefined);
+	const cookie = auth.headers.get('set-cookie').split(';')[0];
 	assert.equal(auth.data.tokenReady, false);
 
 	for (const path of ["/api/writing/posts/", "/api/writing/posts"]) {
 		const list = await invoke(path, {
-			headers: { "x-writing-auth": auth.data.token },
+			headers: { cookie },
 		});
 		assert.equal(list.status, 500, path);
 		assert.match(list.data.error, /GITHUB_TOKEN/, path);

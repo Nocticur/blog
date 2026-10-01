@@ -39,8 +39,10 @@ import { i18n } from "@/i18n/translation";
 		closeBtn: container.querySelector(".btn-close"),
 	};
 
+	var savedVisible = true;
+	try { savedVisible = localStorage.getItem(STORAGE_KEY) !== "false"; } catch { /* Use the default visibility. */ }
 	var state = {
-		visible: localStorage.getItem(STORAGE_KEY) !== "false",
+		visible: savedVisible,
 		lyrics: [],
 		currentIndex: -1,
 		initialized: false,
@@ -143,7 +145,7 @@ import { i18n } from "@/i18n/translation";
 
 	function onToggleFloatingLyrics() {
 		state.visible = !state.visible;
-		localStorage.setItem(STORAGE_KEY, state.visible ? "true" : "false");
+		try { localStorage.setItem(STORAGE_KEY, state.visible ? "true" : "false"); } catch { /* Keep the current visibility. */ }
 		updateVisibility();
 	}
 
@@ -164,7 +166,7 @@ import { i18n } from "@/i18n/translation";
 	// Close button
 	ui.closeBtn.addEventListener("click", function () {
 		state.visible = false;
-		localStorage.setItem(STORAGE_KEY, "false");
+		try { localStorage.setItem(STORAGE_KEY, "false"); } catch { /* Keep the current visibility. */ }
 		updateVisibility();
 	});
 

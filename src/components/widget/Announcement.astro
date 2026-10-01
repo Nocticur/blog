@@ -4,9 +4,10 @@ import WidgetLayout from "@/components/common/WidgetLayout.astro";
 import { announcementConfig } from "@/config/announcementConfig";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
+import { announcementTitle, visibleAnnouncements } from "@/utils/announcement-data.mjs";
 
 const config = announcementConfig;
-const items = [...config.items].sort((a, b) => b.sort - a.sort);
+const items = visibleAnnouncements(config);
 
 interface Props {
 	class?: string;
@@ -17,8 +18,9 @@ const style = Astro.props.style;
 ---
 
 <!-- 组件显示现在由sidebarLayoutConfig统一控制，无需检查config.enable -->
+{items.length > 0 && (
 <WidgetLayout
-  name={config.title || i18n(I18nKey.announcement)}
+  name={announcementTitle(config)}
   id="announcement"
   class={className}
   style={style}
@@ -60,3 +62,4 @@ const style = Astro.props.style;
     )
   }
 </WidgetLayout>
+)}

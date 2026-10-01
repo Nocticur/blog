@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import matter from 'gray-matter';
+import { MAX_IMAGE_BYTES } from './writing-session.mjs';
+import { normalizeAnnouncements, validateAnnouncements } from '../../src/utils/announcement-data.mjs';
 
 const modules = {
   dynamic: { root: 'src/content/dynamic' },
@@ -30,11 +32,10 @@ function validate(module, source) {
     if (!objectConfig && !Array.isArray(items)) fail('内容必须为 JSON 数组');
     if (objectConfig) {
       if (module === 'announcements') {
-        if (typeof items.title !== 'string' || !Array.isArray(items.items) || typeof items.closable !== 'boolean') fail('公告设置格式错误');
-        for (const item of items.items) {
-          if (!item || typeof item !== 'object' || typeof item.tag !== 'string' || typeof item.title !== 'string' || typeof item.content !== 'string' || typeof item.time !== 'string' || !Number.isFinite(item.sort)) fail('公告项格式错误');
-          if (item.link !== undefined && !webUrl(item.link) && !(typeof item.link === 'string' && item.link.startsWith('/'))) fail('公告链接必须为站内路径或 HTTP(S) 地址');
-        }
+        const normalized = normalizeAnnouncements(items);
+        const error = validateAnnouncements(normalized);
+        if (error) fail(error);
+        return JSON.stringify(normalized, null, 2);
       } else if (items.position && !['left', 'right', 'both'].includes(items.position)) fail('侧栏位置无效');
       for (const key of ["leftComponents", "rightComponents", "mobileBottomComponents"]) if (key in items && !Array.isArray(items[key])) fail(`${key} 必须为数组`);
       return;
@@ -124,7 +125,9 @@ export function createLocalStore(root) {
       return results.sort();
     },
     async write(file, bytes, expected) {
-      return locked(path.join(root,file),async()=>{
+      const resolved = path.resolve(root, file);
+      const lockKey = process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+      return locked(lockKey,async()=>{
         const previous = await read(file);
         if((previous?.version || null) !== expected) fail('版本冲突，请重新读取后合并',409);
         const full = await target(file);
@@ -161,7 +164,7 @@ export function createGithubStore({request, repo, branch}) {
     },
     async write(file,bytes,expected) {
       const data = await checked(await request(contents(file), {method:bytes===null?'DELETE':'PUT',body:JSON.stringify({message:`${bytes===null?'删除':'保存'}内容：${file}`,branch,...(expected?{sha:expected}:{}),...(bytes===null?{}:{content:Buffer.from(bytes).toString('base64')})})}));
-      return data.content?.sha || null;
+      return { version: data.content?.sha || null, commit: { sha: data.commit?.sha || '', url: data.commit?.html_url || '' } };
     },
   };
 }
@@ -178,9 +181,9 @@ export async function executeContent(store,module,method,body={}) {
   if(!['POST','PUT','DELETE'].includes(method)) fail('不支持的请求方法',405);
   if(config.file && method !== 'PUT') fail('列表只能整体保存，清空请保存空数组');
   if(method === 'POST' ? Boolean(current) : (!current || !body.version || body.version !== current.version)) fail('版本冲突，请重新读取后合并',409);
-  if(method !== 'DELETE') validate(module,body.source);
-  const saved = await store.write(destination,method==='DELETE'?null:Buffer.from(body.source),current?.version || null);
-  return {ok:true,file,version:saved};
+  const source = method !== 'DELETE' ? validate(module,body.source) ?? body.source : null;
+  const saved = await store.write(destination,source === null ? null : Buffer.from(source),current?.version || null);
+  return {ok:true,file,...(saved && typeof saved === 'object' ? saved : {version:saved})};
 }
 
 export async function uploadContentImage(store,module,body) {
@@ -188,7 +191,7 @@ export async function uploadContentImage(store,module,body) {
   const match = /^data:image\/(png|jpeg|webp|gif|avif);base64,([A-Za-z0-9+/]+={0,2})$/.exec(body?.dataUrl || '');
   if(!match) fail('图片格式无效');
   const bytes = Buffer.from(match[2],'base64');
-  if(!bytes.length || bytes.length > 4*1024*1024) fail('图片不能超过 4 MB');
+  if(!bytes.length || bytes.length > MAX_IMAGE_BYTES) fail('图片不能超过 3 MiB');
   let directory = `uploads/${module}`;
   if(module === 'gallery') {
     if(!validPath(body.album) || body.album.includes('/')) fail('请填写相册 ID');
