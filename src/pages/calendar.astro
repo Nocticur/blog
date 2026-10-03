@@ -1,27 +1,69 @@
 ---
+import { getCollection } from "astro:content";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import FullCalendar from "@/components/pages/FullCalendar.svelte";
-import {getCollection} from "astro:content";
-import {siteConfig} from "@/config";
-import {calendarConfig} from "@/config/calendarConfig";
-import {buildBirthdayEvents} from "@/utils/calendar-events";
-import {getHolidays,expandBuiltinForYear} from "@/utils/holiday-data";
+import { siteConfig } from "@/config";
+import { calendarConfig } from "@/config/calendarConfig";
 import schedules from "@/data/schedules.json";
-if(!siteConfig.pages.calendar) return Astro.redirect("/404/");
-const now=new Date();
-const year=Number(now.toLocaleDateString("en-CA",{timeZone:"Asia/Shanghai",year:"numeric"}));
-const month=now.toLocaleDateString("en-CA",{timeZone:"Asia/Shanghai",month:"2-digit"});
-const posts=(await getCollection("posts")).filter(post=>!post.data.draft && !post.data.password);
-const minYear=Math.min(year-5,...posts.map(post=>post.data.published.getUTCFullYear()));
-const maxYear=year+5;
-const years=Array.from({length:maxYear-minYear+1},(_,i)=>minYear+i);
-const holidays=[...await getHolidays(),...years.filter(year=>!calendarConfig.holidayApi.years.includes(year)).flatMap(expandBuiltinForYear)];
-const events=[
- ...posts.map(post=>({date:post.data.published.toISOString().slice(0,10),title:post.data.title,type:"文章",url:`/posts/${post.id}/`})),
- ...buildBirthdayEvents(calendarConfig.birthdays || [],years).map(event=>({...event,type:"纪念日"})),
- ...holidays.map(holiday=>({date:holiday.date,title:holiday.name,type:holiday.isWorkday?"补班":"节日"})),
- ...(schedules as {date:string;title:string;note?:string;draft?:boolean}[]).filter(event=>!event.draft).map(event=>({...event,type:"日程"})),
-].sort((a,b)=>a.date.localeCompare(b.date));
+import { buildBirthdayEvents } from "@/utils/calendar-events";
+import { expandBuiltinForYear, getHolidays } from "@/utils/holiday-data";
+
+if (!siteConfig.pages.calendar) return Astro.redirect("/404/");
+const now = new Date();
+const year = Number(
+	now.toLocaleDateString("en-CA", {
+		timeZone: "Asia/Shanghai",
+		year: "numeric",
+	}),
+);
+const month = now.toLocaleDateString("en-CA", {
+	timeZone: "Asia/Shanghai",
+	month: "2-digit",
+});
+const posts = (await getCollection("posts")).filter(
+	(post) => !post.data.draft && !post.data.password,
+);
+const minYear = Math.min(
+	year - 5,
+	...posts.map((post) => post.data.published.getUTCFullYear()),
+);
+const maxYear = year + 5;
+const years = Array.from(
+	{ length: maxYear - minYear + 1 },
+	(_, i) => minYear + i,
+);
+const holidays = [
+	...(await getHolidays()),
+	...years
+		.filter((year) => !calendarConfig.holidayApi.years.includes(year))
+		.flatMap(expandBuiltinForYear),
+];
+const events = [
+	...posts.map((post) => ({
+		date: post.data.published.toISOString().slice(0, 10),
+		title: post.data.title,
+		type: "文章",
+		url: `/posts/${post.id}/`,
+	})),
+	...buildBirthdayEvents(calendarConfig.birthdays || [], years).map(
+		(event) => ({ ...event, type: "纪念日" }),
+	),
+	...holidays.map((holiday) => ({
+		date: holiday.date,
+		title: holiday.name,
+		type: holiday.isWorkday ? "补班" : "节日",
+	})),
+	...(
+		schedules as {
+			date: string;
+			title: string;
+			note?: string;
+			draft?: boolean;
+		}[]
+	)
+		.filter((event) => !event.draft)
+		.map((event) => ({ ...event, type: "日程" })),
+].sort((a, b) => a.date.localeCompare(b.date));
 ---
 <MainGridLayout title="日历" description="文章、纪念日和站点时间表">
  <div class="card-base p-4 sm:p-8"><FullCalendar client:load events={events} initialMonth={`${year}-${month}`} minYear={minYear} maxYear={maxYear}/></div>

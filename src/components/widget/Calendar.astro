@@ -105,6 +105,9 @@ const postUrlPrefix = url("/posts/");
 </WidgetLayout>
 
 <script is:inline data-swup-ignore-script define:vars={{ monthNames, weekDays, yearText, currentLang, calendarDataUrl, postUrlPrefix }}>
+  (() => {
+  const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+  let mountedCalendar = null;
   // State variables
   let displayYear = new Date().getFullYear();
   let displayMonth = new Date().getMonth();
@@ -362,8 +365,8 @@ const postUrlPrefix = url("/posts/");
         const date = new Date(post.published);
         const dateStr = `${date.getMonth() + 1}-${date.getDate()}`;
         return `
-        <a href="${postUrlPrefix}${post.id}/" class="flex justify-between items-center text-sm text-neutral-700 dark:text-neutral-300 hover:text-(--primary) dark:hover:text-(--primary) transition-colors px-2 py-1 rounded hover:bg-(--btn-plain-bg-hover)">
-          <span class="truncate">${post.title}</span>
+        <a href="${postUrlPrefix}${String(post.id).split('/').map(encodeURIComponent).join('/')}/" class="flex justify-between items-center text-sm text-neutral-700 dark:text-neutral-300 hover:text-(--primary) dark:hover:text-(--primary) transition-colors px-2 py-1 rounded hover:bg-(--btn-plain-bg-hover)">
+          <span class="truncate">${escapeHtml(post.title)}</span>
           <span class="text-xs text-neutral-500 dark:text-neutral-400 ml-2 whitespace-nowrap">${dateStr}</span>
         </a>
       `}).join('');
@@ -422,8 +425,8 @@ const postUrlPrefix = url("/posts/");
             const date = new Date(post.published);
             const dateStr = `${date.getMonth() + 1}-${date.getDate()}`;
             return `
-            <a href="${postUrlPrefix}${post.id}/" class="flex justify-between items-center text-sm text-neutral-700 dark:text-neutral-300 hover:text-(--primary) dark:hover:text-(--primary) transition-colors px-2 py-1 rounded hover:bg-(--btn-plain-bg-hover)">
-              <span class="truncate">${post.title}</span>
+            <a href="${postUrlPrefix}${String(post.id).split('/').map(encodeURIComponent).join('/')}/" class="flex justify-between items-center text-sm text-neutral-700 dark:text-neutral-300 hover:text-(--primary) dark:hover:text-(--primary) transition-colors px-2 py-1 rounded hover:bg-(--btn-plain-bg-hover)">
+              <span class="truncate">${escapeHtml(post.title)}</span>
               <span class="text-xs text-neutral-500 dark:text-neutral-400 ml-2 whitespace-nowrap">${dateStr}</span>
             </a>
           `}).join('');
@@ -462,6 +465,9 @@ const postUrlPrefix = url("/posts/");
   }
 
   function initCalendar() {
+      const grid = document.getElementById('calendar-grid');
+      if (!grid || mountedCalendar === grid) return;
+      mountedCalendar = grid;
       // Reset to current date on init
       const now = new Date();
       displayYear = now.getFullYear();
@@ -491,8 +497,10 @@ const postUrlPrefix = url("/posts/");
       }
   }
   
-  // astro:page-load 在首次加载和每次 Swup 导航后触发
   document.addEventListener("astro:page-load", initCalendar);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initCalendar, {once:true});
+  else initCalendar();
+  })();
 </script>
 
 <!-- 样式已迁移至 src/styles/widgets/calendar.css -->

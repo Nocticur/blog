@@ -2,7 +2,7 @@
 
 > 基于 [Firefly](https://github.com/CuteLeaf/Firefly) 的个人博客魔改版 `V3.0.0`
 
-![Node.js >= 22](https://img.shields.io/badge/node.js-%3E%3D22-brightgreen)
+![Node.js >= 22.12](https://img.shields.io/badge/node.js-%3E%3D22.12-brightgreen)
 ![pnpm >= 9](https://img.shields.io/badge/pnpm-%3E%3D9-blue)
 ![Astro](https://img.shields.io/badge/Astro-7.x-orange)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)
@@ -67,6 +67,11 @@ Firefly-Mod 是个性化魔改版本，已独立演进。
 | 重新生成图标 | `pnpm icons` |
 | 重新生成 LQIP 占位数据 | `pnpm lqips` |
 | 推送文章 URL | `pnpm indexnow --diff --dry-run` |
+| 单元与安全回归 | `pnpm test:unit` |
+| HTML 安全与音乐生命周期 | `pnpm test:security-browser` |
+| 页面与后台浏览器回归 | `pnpm build && pnpm test:browser`（需 Chrome） |
+| CI 代码质量检查 | `pnpm check:quality` |
+| 依赖漏洞检查 | `pnpm audit` |
 
 ## LLM Wiki（静态）
 
@@ -87,19 +92,20 @@ Firefly-Mod 是个性化魔改版本，已独立演进。
 - `/` 开头：`public` 下的资源，Astro 不做优化，原样引用。
 - `http(s)` / `data:`：远程图，原样引用，命中 `imageOptimization.noReferrerDomains` 时补 `referrerpolicy="no-referrer"`。
 
-`pnpm build` 会先运行 LQIP 生成脚本（`scripts/generate-lqips.ts`）：把 `src` 与 `public` 下的每张图片缩到 2x2 取角点颜色，压成 18 字符 hex 存入 `src/constants/lqips.json`，渲染时解码成 CSS 斜向渐变作为占位背景，不产生额外请求。脚本是增量的：已有条目直接复用，只处理新增图片并清理已删除图片的残留条目，新增或替换图片后重新构建即可，也可单独运行 `pnpm lqips`。
+`pnpm build` 会先运行 LQIP 生成脚本（`scripts/generate-lqips.ts`）：把 `src` 与 `public` 下的每张图片缩到 2x2 取角点颜色，压成 18 字符 hex 存入 `src/constants/lqips.json`，渲染时解码成 CSS 斜向渐变作为占位背景，不产生额外请求。缓存记录内容指纹，只复用内容未变的条目；新增、替换和删除图片后重新构建即可同步，也可单独运行 `pnpm lqips`。
+
+搜索索引由构建末尾的 Pagefind 生成。本地开发会提供 `dist/pagefind/` 下最近一次构建的索引；新增或修改文章后运行 `pnpm build` 更新索引。
 
 
 ## 配置系统
 
-所有配置集中在 `src/config/`，通过 `@/config`（barrel 文件 `index.ts` 统一导出）导入。
+站点功能配置位于 `src/config/`，通过 `@/config`（`index.ts` 统一导出）导入；友链、导航、相册等可编辑数据位于 `src/data/*.json`，后台凭据使用服务端环境变量。完整位置与生效方式见 [配置清单](docs/configuration-checklist.md)。
 
 | 配置文件 | 职责 |
 |----------|------|
 | `siteConfig.ts` | 核心配置：语言、主题色、页面开关、文章列表布局、分页、分析、图片优化、字体 |
 | `sidebarConfig.ts` | 侧边栏布局与组件配置 |
-|
-avBarConfig.ts` | 导航栏链接配置（根据页面开关动态生成） |
+| `navBarConfig.ts` | 导航栏链接配置（根据页面开关动态生成） |
 | `homeConfig.ts` | 首页与用户资料配置：头像、昵称、签名、社交链接、首页图片、技能图标、作品百叶窗 |
 | `commentConfig.ts` | 评论系统配置（Waline/Twikoo/Giscus/Artalk/Disqus） |
 | `musicConfig.ts` | 音乐播放器配置（Meting API / 本地音乐） |
@@ -122,8 +128,8 @@ avBarConfig.ts` | 导航栏链接配置（根据页面开关动态生成） |
 
 | 工作流 | 触发条件 | 说明 |
 |--------|----------|------|
-| `ci.yml` | push/PR 到 master | Astro 类型检查 + Biome Lint 代码质量检查 |
-| `friend-link-checker.yml` | Issue 创建/评论 | 通过 Issue 自动处理友链申请，提取信息并提交 PR |
+| `ci.yml` | push/PR 到 master 或 main | Astro / TypeScript 检查、Biome、单元与安全回归、完整构建和浏览器回归 |
+| `friend-link-checker.yml` | Issue 创建/评论 | 验证公开站点及真实回链后提交新增友链；已有记录的修改需人工审核 |
 
 注意：建议在 GitHub 仓库设置中关闭邮箱订阅，避免 CI 工作流频繁触发邮件通知。
 
@@ -151,6 +157,10 @@ avBarConfig.ts` | 导航栏链接配置（根据页面开关动态生成） |
 ## 静态部署方案
 
 构建产物 `dist/` 可直接部署到 Cloudflare Pages、Vercel、Netlify、Nginx 等静态托管平台，不需要 Cloudflare Worker、Wrangler、Vectorize、Embedding 或 Durable Object 资源。
+
+静态托管提供公开页面。线上 `/admin/` 保存与上传还需要部署 `api/writing/[[...path]].js`；仓库现有 `vercel.json` 配合 Vercel Functions 提供此接口。只上传 `dist/` 不会获得线上编辑能力。本地 `pnpm dev` 的保存直接写入项目文件；`pnpm preview` 用于预览静态产物。部署前核对评论、Umami、站长验证文件与 IndexNow 密钥是否属于自己的站点，见 [配置清单](docs/configuration-checklist.md)。
+
+本轮修复、参考项目功能补齐和验证范围见 [修复说明](docs/project-improvements.md)。
 
 ## Live2D 版权声明
 

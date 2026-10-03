@@ -24,6 +24,7 @@ import { defaultFavicons } from "@/constants/icon";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import type { Favicon } from "@/types/config";
+import { resolveShareImage } from "@/utils/share-image";
 import { url } from "@/utils/url-utils";
 
 import "@/styles/main.css";
@@ -46,13 +47,22 @@ interface Props {
 	lang?: string;
 	setOGTypeArticle?: boolean;
 	postSlug?: string;
+	ogImage?: string;
 	robots?: string;
 	admin?: boolean;
 	articleMeta?: ArticleMeta;
 }
 
-const { title, description, setOGTypeArticle, postSlug, articleMeta, robots, admin = false } =
-	Astro.props;
+const {
+	title,
+	description,
+	setOGTypeArticle,
+	postSlug,
+	articleMeta,
+	ogImage,
+	robots,
+	admin = false,
+} = Astro.props;
 let { lang } = Astro.props;
 
 const configHue = siteConfig.themeColor.hue;
@@ -69,10 +79,13 @@ if (title === siteConfig.title) {
 		: siteConfig.title;
 }
 
-let ogImageUrl: string | undefined;
-if (siteConfig.generateOgImages && postSlug) {
-	ogImageUrl = new URL(`/og/${postSlug}.png`, Astro.site).toString();
-}
+const ogImageUrl = resolveShareImage({
+	site: Astro.site,
+	cover: ogImage,
+	fallback: siteConfig.defaultOgImage,
+	generated:
+		siteConfig.generateOgImages && postSlug ? `/og/${postSlug}.png` : undefined,
+});
 
 const canonicalUrl = new URL(Astro.url.pathname, Astro.site).toString();
 
@@ -145,6 +158,7 @@ const siteLang = lang.replace("_", "-");
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description || siteConfig.description || pageTitle} />
     {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+    {ogImageUrl && <meta property="og:image:alt" content={pageTitle} />}
     {setOGTypeArticle ? (
       <meta property="og:type" content="article" />
     ) : (
@@ -173,6 +187,7 @@ const siteLang = lang.replace("_", "-");
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={description || siteConfig.description || pageTitle} />
     {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
+    {ogImageUrl && <meta name="twitter:image:alt" content={pageTitle} />}
     {/* 文章页 Twitter 卡片附加作者与阅读时间标签 */}
     {setOGTypeArticle && (
       <>

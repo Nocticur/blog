@@ -1,5 +1,5 @@
-import albums from "../data/gallery.json";
 import type { GalleryConfig } from "@/types/config";
+import albums from "../data/gallery.json";
 
 // 相册配置
 export const galleryConfig: GalleryConfig = {

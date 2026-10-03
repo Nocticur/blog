@@ -1,341 +1,784 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
-  import { LayoutDashboard, FileText, ListTodo, NotebookPen, Activity, MapPin, Settings, Bell, Link, Compass, Images, Heart, Rss, Sun, Moon, Monitor, Menu, ChevronDown, LogOut, ArrowUp, ArrowDown, Plus, RefreshCw, ExternalLink } from "lucide-svelte";
-  import WritingStudio from "./WritingStudio.svelte";
-  import ContentManager from "./ContentManager.svelte";
-  import { adminNavigationGroups, contentModules, isContentModule, resolveAdminPage } from "@/utils/admin-modules";
-  import { announcementDate, announcementTitle, normalizeAnnouncements, sortAnnouncementItems, validateAnnouncements, visibleAnnouncements } from "@/utils/announcement-data.mjs";
-  import { getTabBufferKey, loadLocalBuffer, saveLocalBuffer, removeLocalBuffer } from "@/utils/admin-editor-state";
+import {
+	Activity,
+	ArrowDown,
+	ArrowUp,
+	Bell,
+	ChevronDown,
+	Compass,
+	ExternalLink,
+	FileText,
+	Heart,
+	Images,
+	LayoutDashboard,
+	Link,
+	ListTodo,
+	LogOut,
+	MapPin,
+	Menu,
+	Monitor,
+	Moon,
+	NotebookPen,
+	Plus,
+	RefreshCw,
+	Rss,
+	Settings,
+	Sun,
+} from "lucide-svelte";
+import { onMount, tick } from "svelte";
+import {
+	getTabBufferKey,
+	loadLocalBuffer,
+	removeLocalBuffer,
+	saveLocalBuffer,
+} from "@/utils/admin-editor-state";
+import {
+	adminNavigationGroups,
+	contentModules,
+	isContentModule,
+	resolveAdminPage,
+} from "@/utils/admin-modules";
+import {
+	announcementDate,
+	announcementTitle,
+	normalizeAnnouncements,
+	sortAnnouncementItems,
+	validateAnnouncements,
+	visibleAnnouncements,
+} from "@/utils/announcement-data.mjs";
+import ContentManager from "./ContentManager.svelte";
+import WritingStudio from "./WritingStudio.svelte";
 
-  let { avatarUrl = "/assets/images/logo-nocticur.png", siteUrl = "/", darkTheme = "github-dark", lightTheme = "github-light" } = $props<{ avatarUrl?: string; siteUrl?: string; darkTheme?: string; lightTheme?: string }>();
-  type Post = { file: string; title?: string; draft?: boolean; published?: string; description?: string };
-  type Sidebar = { [key: string]: unknown; enable: boolean; position: "left" | "right" | "both"; leftComponents: Array<Record<string, unknown>>; rightComponents: Array<Record<string, unknown>>; mobileBottomComponents: Array<Record<string, unknown>> };
-  type AnnouncementItem = { [key: string]: unknown; tag: string; title: string; content: string; time: string; link?: string; sort: number; enabled?: boolean };
-  type Announcement = { [key: string]: unknown; title: string; closable: boolean; items: AnnouncementItem[] };
-  type ConfigModule = "sidebar" | "announcements";
-  type ConfigBuffer = { sidebar?: { value: Sidebar; version: string; previousLocal?: string }; announcements?: { value: Announcement; version: string; previousLocal?: string } };
-  class ApiError extends Error { status: number; constructor(message: string, status: number) { super(message); this.status = status; } }
-  const nav = adminNavigationGroups.flatMap(group => group.items);
-  const icons = { dashboard: LayoutDashboard, writing: FileText, routines: ListTodo, notebooks: NotebookPen, dynamic: Activity, places: MapPin, settings: Settings, announcements: Bell, friends: Link, navigation: Compass, gallery: Images, sponsors: Heart, feeds: Rss };
-  const componentLabels: Record<string, string> = { profile: "个人资料", announcement: "公告", music: "音乐播放器", categories: "分类", tags: "标签", stats: "站点统计", calendar: "日历", sidebarToc: "文章目录" };
-  let password = $state("");
-  let authenticated = $state(false);
-  let workspaceMounted = $state(false);
-  let preview = $state(false);
-  let loading = $state(false);
-  let message = $state("");
-  let commitUrl = $state("");
-  let posts = $state<Post[]>([]);
-  let routines = $state<{ file: string }[]>([]);
-  let dashboardReady = $state(false);
-  let sidebar = $state<Sidebar | null>(null);
-  let announcements = $state<Announcement | null>(null);
-  let active = $state("dashboard");
-  let recordsModule = $state("routines");
-  let accountOpen = $state(false);
-  let themeOpen = $state(false);
-  let theme = $state<"dark" | "light" | "system">("system");
-  let mobileOpen = $state(false);
-  let motionAllowed = $state(false);
-  let pageVisible = $state(true);
-  let announcementView = $state<"edit" | "preview">("edit");
-  let sidebarVersion = $state("");
-  let announcementVersion = $state("");
-  let sidebarBaselineVersion = $state("");
-  let announcementBaselineVersion = $state("");
-  let sidebarBaseline = $state("");
-  let announcementBaseline = $state("");
-  let sidebarBackup = $state("");
-  let announcementBackup = $state("");
-  let settingsReady = $state(false);
-  let settingsBufferKey = "settings";
-  let bufferMessage = $state("");
-  let conflictModule = $state<ConfigModule | null>(null);
-  let comparison = $state<{ module: ConfigModule; source: string; version: string } | null>(null);
-  const itemKeys = new WeakMap<object, number>();
-  let nextItemKey = 0;
-  const itemKey = (item: object) => { if (!itemKeys.has(item)) itemKeys.set(item, ++nextItemKey); return itemKeys.get(item)!; };
-  const announcementSource = (value: Announcement) => JSON.stringify(normalizeAnnouncements(value));
-  const sidebarDirty = $derived(Boolean(sidebar && JSON.stringify(sidebar) !== sidebarBaseline));
-  const announcementDirty = $derived(Boolean(announcements && announcementSource(announcements) !== announcementBaseline));
-  const settingsDirty = $derived(sidebarDirty || announcementDirty);
-  const hasRecovery = $derived(Boolean(sidebarBackup || announcementBackup));
-  const orderedAnnouncements = $derived(announcements ? sortAnnouncementItems(announcements.items) : []);
-  const publicAnnouncements = $derived(announcements ? visibleAnnouncements(announcements) : []);
-  const currentAnnouncement = $derived(publicAnnouncements[0]);
-  const ThemeIcon = $derived(theme === "light" ? Sun : theme === "dark" ? Moon : Monitor);
+let {
+	avatarUrl = "/assets/images/logo-nocticur.png",
+	siteUrl = "/",
+	darkTheme = "github-dark",
+	lightTheme = "github-light",
+} = $props<{
+	avatarUrl?: string;
+	siteUrl?: string;
+	darkTheme?: string;
+	lightTheme?: string;
+}>();
+type Post = {
+	file: string;
+	title?: string;
+	draft?: boolean;
+	published?: string;
+	description?: string;
+};
+type Sidebar = {
+	[key: string]: unknown;
+	enable: boolean;
+	position: "left" | "right" | "both";
+	leftComponents: Array<Record<string, unknown>>;
+	rightComponents: Array<Record<string, unknown>>;
+	mobileBottomComponents: Array<Record<string, unknown>>;
+};
+type AnnouncementItem = {
+	[key: string]: unknown;
+	tag: string;
+	title: string;
+	content: string;
+	time: string;
+	link?: string;
+	sort: number;
+	enabled?: boolean;
+};
+type Announcement = {
+	[key: string]: unknown;
+	title: string;
+	closable: boolean;
+	items: AnnouncementItem[];
+};
+type ConfigModule = "sidebar" | "announcements";
+type ConfigBuffer = {
+	sidebar?: { value: Sidebar; version: string; previousLocal?: string };
+	announcements?: {
+		value: Announcement;
+		version: string;
+		previousLocal?: string;
+	};
+};
+class ApiError extends Error {
+	status: number;
+	constructor(message: string, status: number) {
+		super(message);
+		this.status = status;
+	}
+}
+const nav = adminNavigationGroups.flatMap((group) => group.items);
+const icons = {
+	dashboard: LayoutDashboard,
+	writing: FileText,
+	routines: ListTodo,
+	notebooks: NotebookPen,
+	dynamic: Activity,
+	places: MapPin,
+	settings: Settings,
+	announcements: Bell,
+	friends: Link,
+	navigation: Compass,
+	gallery: Images,
+	sponsors: Heart,
+	feeds: Rss,
+};
+const componentLabels: Record<string, string> = {
+	profile: "个人资料",
+	announcement: "公告",
+	music: "音乐播放器",
+	categories: "分类",
+	tags: "标签",
+	stats: "站点统计",
+	calendar: "日历",
+	sidebarToc: "文章目录",
+};
+let password = $state("");
+let authenticated = $state(false);
+let workspaceMounted = $state(false);
+let preview = $state(false);
+let loading = $state(false);
+let message = $state("");
+let commitUrl = $state("");
+let posts = $state<Post[]>([]);
+let routines = $state<{ file: string }[]>([]);
+let dashboardReady = $state(false);
+let sidebar = $state<Sidebar | null>(null);
+let announcements = $state<Announcement | null>(null);
+let active = $state("dashboard");
+let recordsModule = $state("routines");
+let accountOpen = $state(false);
+let themeOpen = $state(false);
+let theme = $state<"dark" | "light" | "system">("system");
+let mobileOpen = $state(false);
+let motionAllowed = $state(false);
+let pageVisible = $state(true);
+let announcementView = $state<"edit" | "preview">("edit");
+let sidebarVersion = $state("");
+let announcementVersion = $state("");
+let sidebarBaselineVersion = $state("");
+let announcementBaselineVersion = $state("");
+let sidebarBaseline = $state("");
+let announcementBaseline = $state("");
+let sidebarBackup = $state("");
+let announcementBackup = $state("");
+let settingsReady = $state(false);
+let settingsBufferKey = "settings";
+let bufferMessage = $state("");
+let conflictModule = $state<ConfigModule | null>(null);
+let comparison = $state<{
+	module: ConfigModule;
+	source: string;
+	version: string;
+} | null>(null);
+const itemKeys = new WeakMap<object, number>();
+let nextItemKey = 0;
+const itemKey = (item: object) => {
+	if (!itemKeys.has(item)) itemKeys.set(item, ++nextItemKey);
+	return itemKeys.get(item)!;
+};
+const announcementSource = (value: Announcement) =>
+	JSON.stringify(normalizeAnnouncements(value));
+const sidebarDirty = $derived(
+	Boolean(sidebar && JSON.stringify(sidebar) !== sidebarBaseline),
+);
+const announcementDirty = $derived(
+	Boolean(
+		announcements && announcementSource(announcements) !== announcementBaseline,
+	),
+);
+const settingsDirty = $derived(sidebarDirty || announcementDirty);
+const hasRecovery = $derived(Boolean(sidebarBackup || announcementBackup));
+const orderedAnnouncements = $derived(
+	announcements ? sortAnnouncementItems(announcements.items) : [],
+);
+const publicAnnouncements = $derived(
+	announcements ? visibleAnnouncements(announcements) : [],
+);
+const currentAnnouncement = $derived(publicAnnouncements[0]);
+const ThemeIcon = $derived(
+	theme === "light" ? Sun : theme === "dark" ? Moon : Monitor,
+);
 
-  const api = async (path: string, init: RequestInit = {}) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
-    try {
-      const response = await fetch(path, { ...init, signal: controller.signal, credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", ...(init.headers || {}) } });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        if (response.status === 401) sessionExpired();
-        throw new ApiError(data.error || "请求失败（" + response.status + "）", response.status);
-      }
-      return data;
-    } finally { clearTimeout(timeout); }
-  };
-  const configPath = (module: ConfigModule) => "/api/writing/content/" + module + "/";
-  const errorMessage = (error: unknown) => error instanceof Error ? (error.name === "AbortError" ? "请求超时，输入已保留。" : error.message) : String(error);
-  async function login() {
-    if (!password || loading) return;
-    loading = true; message = "";
-    try {
-      await api("/api/writing/auth/", { method: "POST", body: JSON.stringify({ password }) });
-      authenticated = true; preview = false; password = "";
-      if (!workspaceMounted) {
-        active = resolveAdminPage(location.hash);
-        if (isContentModule(active)) recordsModule = active;
-        await load(true);
-        workspaceMounted = true;
-      } else { message = "已重新登录，未提交编辑已保留。"; }
-    } catch (error) { message = errorMessage(error); }
-    finally { loading = false; }
-  }
-  async function load(restoreLocal = false) {
-    if (!restoreLocal && loading) return;
-    if (!restoreLocal && (settingsDirty || hasRecovery) && !confirm("重新读取会丢弃侧栏和公告的未保存配置及合并备份，是否继续？")) return;
-    loading = true; message = "";
-    try {
-      const [postData, routineData, sidebarData, announcementData] = await Promise.all([
-        api("/api/writing/posts/?_=" + Date.now()), api("/api/writing/content/routines/"), api(configPath("sidebar")), api(configPath("announcements"))
-      ]);
-      // Parse all replies before changing any draft or version.
-      const nextSidebar = JSON.parse(sidebarData.source) as Sidebar;
-      const nextAnnouncements = JSON.parse(announcementData.source) as Announcement;
-      if (!Array.isArray(nextSidebar.leftComponents) || !Array.isArray(nextSidebar.rightComponents) || typeof sidebarData.version !== "string" || typeof announcementData.version !== "string") throw new Error("配置读取结果无效，当前编辑仍保留。");
-      const invalid = validateAnnouncements(nextAnnouncements);
-      if (invalid) throw new Error(invalid);
-      settingsReady = false;
-      posts = postData.posts || []; routines = routineData.items || [];
-      dashboardReady = true;
-      sidebar = nextSidebar; announcements = nextAnnouncements;
-      sidebarVersion = sidebarBaselineVersion = sidebarData.version;
-      announcementVersion = announcementBaselineVersion = announcementData.version;
-      sidebarBaseline = JSON.stringify(nextSidebar);
-      announcementBaseline = announcementSource(nextAnnouncements);
-      sidebarBackup = ""; announcementBackup = ""; comparison = null; conflictModule = null;
-      if (restoreLocal) {
-        try {
-          const buffer = loadLocalBuffer<ConfigBuffer>(localStorage, settingsBufferKey);
-          if (buffer.error) bufferMessage = buffer.error;
-          const saved = buffer.value;
-          if (saved?.sidebar && typeof saved.sidebar.version === "string" && Array.isArray(saved.sidebar.value?.leftComponents) && Array.isArray(saved.sidebar.value?.rightComponents)) {
-            sidebar = saved.sidebar.value; sidebarVersion = saved.sidebar.version; sidebarBackup = saved.sidebar.previousLocal || "";
-          }
-          const savedAnnouncement = saved?.announcements;
-          if (savedAnnouncement && typeof savedAnnouncement.version === "string" && Array.isArray(savedAnnouncement.value?.items) && savedAnnouncement.value.items.every(item => item && typeof item.title === "string" && typeof item.content === "string" && Number.isFinite(item.sort))) {
-            announcements = savedAnnouncement.value; announcementVersion = savedAnnouncement.version; announcementBackup = savedAnnouncement.previousLocal || "";
-          }
-        } catch { bufferMessage = "无法读取本机暂存，浏览器存储不可用；请保留当前页面或复制配置。"; }
-      }
-      settingsReady = true;
-    } catch (error) { message = errorMessage(error); }
-    finally { loading = false; }
-  }
-  function sessionExpired() {
-    authenticated = false; accountOpen = false; themeOpen = false; mobileOpen = false;
-    message = "登录已过期，请重新登录；当前编辑和版本仍保留。";
-  }
-  async function logout() {
-    if (loading) return;
-    loading = true;
-    try { await api("/api/writing/logout/", { method: "POST" }); authenticated = false; preview = false; accountOpen = false; message = "已退出登录，未提交编辑仍保留。"; }
-    catch (error) { message = errorMessage(error); }
-    finally { loading = false; }
-  }
-  function applyTheme(next: "dark" | "light" | "system", remember = true) {
-    theme = next;
-    const dark = next === "dark" || (next === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-    document.documentElement.classList.toggle("dark", dark);
-    document.documentElement.setAttribute("data-theme", dark ? darkTheme : lightTheme);
-    if (remember) {
-      try { localStorage.setItem("firefly-admin-theme", next); }
-      catch { bufferMessage = "浏览器存储不可用，主题偏好无法记住；当前编辑仍保留。"; }
-    }
-  }
-  function chooseTheme(next: "dark" | "light" | "system") { applyTheme(next); themeOpen = false; }
-  function toggleAccount() { if (preview) return; accountOpen = !accountOpen; themeOpen = false; }
-  function toggleTheme() { themeOpen = !themeOpen; accountOpen = false; }
-  function setSidebarValue(side: "leftComponents" | "rightComponents", index: number, enabled: boolean) {
-    if (!sidebar || loading) return;
-    sidebar = { ...sidebar, [side]: sidebar[side].map((item, i) => i === index ? { ...item, enable: enabled } : item) };
-  }
-  function setSideEnabled(side: "leftComponents" | "rightComponents", enabled: boolean) {
-    if (!sidebar || loading) return;
-    sidebar = { ...sidebar, [side]: sidebar[side].map(item => ({ ...item, enable: enabled })) };
-  }
-  function moveComponent(side: "leftComponents" | "rightComponents", index: number, direction: -1 | 1) {
-    if (!sidebar || loading) return;
-    const next = index + direction;
-    if (next < 0 || next >= sidebar[side].length) return;
-    const items = [...sidebar[side]];
-    [items[index], items[next]] = [items[next], items[index]];
-    sidebar = { ...sidebar, [side]: items };
-  }
-  async function addAnnouncement() {
-    if (!announcements || loading) return;
-    const max = Math.max(0, ...announcements.items.map(item => item.sort));
-    const item: AnnouncementItem = { tag: "", title: "", content: "", time: announcementDate(), sort: max + 1, enabled: true };
-    announcements.items = [item, ...announcements.items];
-    const key = itemKey(announcements.items[0]);
-    announcementView = "edit";
-    await tick();
-    document.getElementById("announcement-item-" + key)?.querySelector<HTMLInputElement>('input[data-announcement-title]')?.focus();
-  }
-  function removeAnnouncement(item: AnnouncementItem) {
-    if (!announcements || loading || !confirm("删除公告“" + (item.title.trim() || "未命名公告") + "”？点击保存公告后才会更新公开展示。")) return;
-    announcements.items = announcements.items.filter(candidate => itemKey(candidate) !== itemKey(item));
-  }
-  function moveAnnouncement(item: AnnouncementItem, direction: -1 | 1) {
-    if (!announcements || loading) return;
-    const items = sortAnnouncementItems(announcements.items);
-    const index = items.findIndex(candidate => itemKey(candidate) === itemKey(item));
-    const next = index + direction;
-    if (index < 0 || next < 0 || next >= items.length) return;
-    [items[index], items[next]] = [items[next], items[index]];
-    items.forEach((entry, position) => entry.sort = items.length - position);
-    announcements.items = items;
-  }
-  function clearConfigConflict(module: ConfigModule) {
-    if (conflictModule === module) conflictModule = null;
-    if (comparison?.module === module) comparison = null;
-  }
-  function cancelConfig(module: ConfigModule) {
-    if (loading) return;
-    if (module === "sidebar" && sidebarBaseline) {
-      sidebar = JSON.parse(sidebarBaseline); sidebarVersion = sidebarBaselineVersion; sidebarBackup = "";
-    }
-    if (module === "announcements" && announcementBaseline) {
-      announcements = JSON.parse(announcementBaseline); announcementVersion = announcementBaselineVersion; announcementBackup = "";
-    }
-    clearConfigConflict(module); message = "";
-  }
-  function savedConfig(module: ConfigModule, source: string, version: string) {
-    if (module === "sidebar") {
-      sidebarVersion = sidebarBaselineVersion = version; sidebarBaseline = JSON.stringify(JSON.parse(source)); sidebarBackup = "";
-    } else {
-      announcementVersion = announcementBaselineVersion = version; announcementBaseline = announcementSource(JSON.parse(source)); announcementBackup = "";
-    }
-    clearConfigConflict(module);
-  }
-  async function saveConfig(module: ConfigModule) {
-    const value = module === "sidebar" ? sidebar : announcements;
-    const version = module === "sidebar" ? sidebarVersion : announcementVersion;
-    if (!value || !version || loading || !authenticated) return;
-    const normalized = module === "announcements" ? normalizeAnnouncements(value as Announcement) : value;
-    if (module === "announcements") {
-      const invalid = validateAnnouncements(normalized);
-      if (invalid) { message = invalid; return; }
-    }
-    const source = JSON.stringify(normalized, null, 2);
-    loading = true; message = ""; commitUrl = "";
-    try {
-      const result = await api(configPath(module), { method: "PUT", body: JSON.stringify({ source, version }) });
-      if (typeof result.version !== "string") throw new Error("保存响应不完整，正在核验提交结果。");
-      savedConfig(module, source, result.version);
-      const link = result.commit?.url || result.commit?.html_url;
-      if (typeof link === "string" && /^https?:\/\//.test(link)) commitUrl = link;
-      message = result.commit ? "已保存到仓库，等待构建部署。" : "已保存到本地文件。";
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
-        conflictModule = module; message = "版本冲突：编辑内容已保留，请读取仓库版本进行比较。";
-      } else if (!(error instanceof ApiError) || [408, 502, 503, 504].includes(error.status)) {
-        // A lost reply may follow a successful commit. Verify before offering a retry.
-        try {
-          const read = await api(configPath(module));
-          const actual = JSON.parse(read.source);
-          const matches = JSON.stringify(module === "announcements" ? normalizeAnnouncements(actual) : actual) === JSON.stringify(normalized);
-          if (matches && typeof read.version === "string") { savedConfig(module, source, read.version); message = "已核验保存结果，内容已保存；网站以构建结果为准。"; }
-          else { message = errorMessage(error) + " 当前仓库内容与本次提交不同，输入已保留；请比较后重试。"; conflictModule = module; }
-        } catch { message = errorMessage(error) + " 暂时无法核验保存结果，输入已保留；恢复连接后先重新读取比较。"; conflictModule = module; }
-      } else { message = errorMessage(error); }
-    } finally { loading = false; }
-  }
-  async function compareConfig(module = conflictModule) {
-    if (!module || loading) return;
-    loading = true;
-    try {
-      const result = await api(configPath(module));
-      comparison = { module, source: result.source, version: result.version };
-      await tick(); document.getElementById("admin-comparison")?.scrollIntoView({ block: "center" });
-    } catch (error) { message = errorMessage(error); }
-    finally { loading = false; }
-  }
-  function acceptRepositoryConfig() {
-    if (!comparison || loading || !confirm("以仓库版本为新的编辑基础？本机内容会保留为只读备份，请手动合并后保存。")) return;
-    const { module, source, version } = comparison;
-    try {
-      const value = JSON.parse(source);
-      if (module === "announcements") { const invalid = validateAnnouncements(value); if (invalid) throw new Error(invalid); }
-      if (module === "sidebar") {
-        sidebarBackup = JSON.stringify(sidebar, null, 2); sidebar = value; sidebarVersion = sidebarBaselineVersion = version; sidebarBaseline = JSON.stringify(value);
-      } else {
-        announcementBackup = JSON.stringify(announcements, null, 2); announcements = value; announcementVersion = announcementBaselineVersion = version; announcementBaseline = announcementSource(value);
-      }
-      clearConfigConflict(module);
-      message = "已采用仓库版本作为编辑基础，原本机内容保留在下方；请手动合并后保存。";
-    } catch (error) { message = errorMessage(error); }
-  }
-  async function switchPage(id: string) {
-    active = resolveAdminPage("#" + id);
-    mobileOpen = false; accountOpen = false; themeOpen = false;
-    if (isContentModule(active)) recordsModule = active;
-    await tick();
-    history.replaceState(history.state, "", "#" + active);
-    window.scrollTo({ top: 0, behavior: "instant" });
-  }
-  $effect(() => {
-    if (!settingsReady) return;
-    const buffer: ConfigBuffer = {};
-    if ((sidebarDirty || sidebarBackup) && sidebar) buffer.sidebar = { value: sidebar, version: sidebarVersion, previousLocal: sidebarBackup };
-    if ((announcementDirty || announcementBackup) && announcements) buffer.announcements = { value: announcements, version: announcementVersion, previousLocal: announcementBackup };
-    try {
-      const needed = Object.keys(buffer).length > 0;
-      const result = needed ? saveLocalBuffer(localStorage, settingsBufferKey, buffer) : removeLocalBuffer(localStorage, settingsBufferKey);
-      bufferMessage = result.ok ? (needed ? "已暂存到本机" : "") : result.error;
-    } catch { bufferMessage = "本机暂存失败，当前编辑仍保留在内存；请保留页面或复制内容。"; }
-  });
-  onMount(() => {
-    try { settingsBufferKey = getTabBufferKey(sessionStorage, "settings"); }
-    catch { bufferMessage = "浏览器存储不可用，当前编辑仍保留在内存。"; }
-    try {
-      const stored = localStorage.getItem("firefly-admin-theme");
-      if (stored === "dark" || stored === "light" || stored === "system") theme = stored;
-      sessionStorage.removeItem("firefly-writing-auth");
-    } catch { /* Theme and editor memory remain available. */ }
-    applyTheme(theme, false);
-    const abort = new AbortController();
-    const media = matchMedia("(prefers-color-scheme: dark)");
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-    const hardware = navigator as Navigator & { deviceMemory?: number };
-    const limited = (typeof hardware.deviceMemory === "number" && hardware.deviceMemory > 0 && hardware.deviceMemory <= 4) || (hardware.hardwareConcurrency > 0 && hardware.hardwareConcurrency <= 4);
-    const updateMotion = () => { motionAllowed = !reduced.matches && !limited; pageVisible = !document.hidden; };
-    updateMotion();
-    media.addEventListener("change", () => { if (theme === "system") applyTheme("system", false); }, { signal: abort.signal });
-    reduced.addEventListener("change", updateMotion, { signal: abort.signal });
-    document.addEventListener("visibilitychange", updateMotion, { signal: abort.signal });
-    document.addEventListener("pointerdown", event => { if (!(event.target instanceof Element) || !event.target.closest(".admin-account")) { accountOpen = false; themeOpen = false; } }, { signal: abort.signal });
-    document.addEventListener("keydown", event => { if (event.key === "Escape") { accountOpen = false; themeOpen = false; mobileOpen = false; } }, { signal: abort.signal });
-    window.addEventListener("hashchange", () => { if (workspaceMounted) void switchPage(resolveAdminPage(location.hash)); }, { signal: abort.signal });
-    window.addEventListener("beforeunload", event => { if (settingsDirty || hasRecovery) { event.preventDefault(); event.returnValue = ""; } }, { signal: abort.signal });
-    void (async () => {
-      loading = true;
-      try {
-        const session = await api("/api/writing/session/");
-        preview = session.preview === true; authenticated = true;
-        active = resolveAdminPage(location.hash);
-        if (isContentModule(active)) recordsModule = active;
-        await load(true); workspaceMounted = true;
-        await switchPage(active);
-      } catch (error) { if (!(error instanceof ApiError && error.status === 401)) message = errorMessage(error); }
-      finally { loading = false; }
-    })();
-    return () => abort.abort();
-  });
+const api = async (path: string, init: RequestInit = {}) => {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), 30000);
+	try {
+		const response = await fetch(path, {
+			...init,
+			signal: controller.signal,
+			credentials: "same-origin",
+			cache: "no-store",
+			headers: { "Content-Type": "application/json", ...(init.headers || {}) },
+		});
+		const data = await response.json().catch(() => ({}));
+		if (!response.ok) {
+			if (response.status === 401) sessionExpired();
+			throw new ApiError(
+				data.error || "请求失败（" + response.status + "）",
+				response.status,
+			);
+		}
+		return data;
+	} finally {
+		clearTimeout(timeout);
+	}
+};
+const configPath = (module: ConfigModule) =>
+	"/api/writing/content/" + module + "/";
+const errorMessage = (error: unknown) =>
+	error instanceof Error
+		? error.name === "AbortError"
+			? "请求超时，输入已保留。"
+			: error.message
+		: String(error);
+async function login() {
+	if (!password || loading) return;
+	loading = true;
+	message = "";
+	try {
+		await api("/api/writing/auth/", {
+			method: "POST",
+			body: JSON.stringify({ password }),
+		});
+		authenticated = true;
+		preview = false;
+		password = "";
+		if (!workspaceMounted) {
+			active = resolveAdminPage(location.hash);
+			if (isContentModule(active)) recordsModule = active;
+			await load(true);
+			workspaceMounted = true;
+		} else {
+			message = "已重新登录，未提交编辑已保留。";
+		}
+	} catch (error) {
+		message = errorMessage(error);
+	} finally {
+		loading = false;
+	}
+}
+async function load(restoreLocal = false) {
+	if (!restoreLocal && loading) return;
+	if (
+		!restoreLocal &&
+		(settingsDirty || hasRecovery) &&
+		!confirm("重新读取会丢弃侧栏和公告的未保存配置及合并备份，是否继续？")
+	)
+		return;
+	loading = true;
+	message = "";
+	try {
+		const [postData, routineData, sidebarData, announcementData] =
+			await Promise.all([
+				api("/api/writing/posts/?_=" + Date.now()),
+				api("/api/writing/content/routines/"),
+				api(configPath("sidebar")),
+				api(configPath("announcements")),
+			]);
+		// Parse all replies before changing any draft or version.
+		const nextSidebar = JSON.parse(sidebarData.source) as Sidebar;
+		const nextAnnouncements = JSON.parse(
+			announcementData.source,
+		) as Announcement;
+		if (
+			!Array.isArray(nextSidebar.leftComponents) ||
+			!Array.isArray(nextSidebar.rightComponents) ||
+			typeof sidebarData.version !== "string" ||
+			typeof announcementData.version !== "string"
+		)
+			throw new Error("配置读取结果无效，当前编辑仍保留。");
+		const invalid = validateAnnouncements(nextAnnouncements);
+		if (invalid) throw new Error(invalid);
+		settingsReady = false;
+		posts = postData.posts || [];
+		routines = routineData.items || [];
+		dashboardReady = true;
+		sidebar = nextSidebar;
+		announcements = nextAnnouncements;
+		sidebarVersion = sidebarBaselineVersion = sidebarData.version;
+		announcementVersion = announcementBaselineVersion =
+			announcementData.version;
+		sidebarBaseline = JSON.stringify(nextSidebar);
+		announcementBaseline = announcementSource(nextAnnouncements);
+		sidebarBackup = "";
+		announcementBackup = "";
+		comparison = null;
+		conflictModule = null;
+		if (restoreLocal) {
+			try {
+				const buffer = loadLocalBuffer<ConfigBuffer>(
+					localStorage,
+					settingsBufferKey,
+				);
+				if (buffer.error) bufferMessage = buffer.error;
+				const saved = buffer.value;
+				if (
+					saved?.sidebar &&
+					typeof saved.sidebar.version === "string" &&
+					Array.isArray(saved.sidebar.value?.leftComponents) &&
+					Array.isArray(saved.sidebar.value?.rightComponents)
+				) {
+					sidebar = saved.sidebar.value;
+					sidebarVersion = saved.sidebar.version;
+					sidebarBackup = saved.sidebar.previousLocal || "";
+				}
+				const savedAnnouncement = saved?.announcements;
+				if (
+					savedAnnouncement &&
+					typeof savedAnnouncement.version === "string" &&
+					Array.isArray(savedAnnouncement.value?.items) &&
+					savedAnnouncement.value.items.every(
+						(item) =>
+							item &&
+							typeof item.title === "string" &&
+							typeof item.content === "string" &&
+							Number.isFinite(item.sort),
+					)
+				) {
+					announcements = savedAnnouncement.value;
+					announcementVersion = savedAnnouncement.version;
+					announcementBackup = savedAnnouncement.previousLocal || "";
+				}
+			} catch {
+				bufferMessage =
+					"无法读取本机暂存，浏览器存储不可用；请保留当前页面或复制配置。";
+			}
+		}
+		settingsReady = true;
+	} catch (error) {
+		message = errorMessage(error);
+	} finally {
+		loading = false;
+	}
+}
+function sessionExpired() {
+	authenticated = false;
+	accountOpen = false;
+	themeOpen = false;
+	mobileOpen = false;
+	message = "登录已过期，请重新登录；当前编辑和版本仍保留。";
+}
+async function logout() {
+	if (loading) return;
+	loading = true;
+	try {
+		await api("/api/writing/logout/", { method: "POST" });
+		authenticated = false;
+		preview = false;
+		accountOpen = false;
+		message = "已退出登录，未提交编辑仍保留。";
+	} catch (error) {
+		message = errorMessage(error);
+	} finally {
+		loading = false;
+	}
+}
+function applyTheme(next: "dark" | "light" | "system", remember = true) {
+	theme = next;
+	const dark =
+		next === "dark" ||
+		(next === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+	document.documentElement.classList.toggle("dark", dark);
+	document.documentElement.setAttribute(
+		"data-theme",
+		dark ? darkTheme : lightTheme,
+	);
+	if (remember) {
+		try {
+			localStorage.setItem("firefly-admin-theme", next);
+		} catch {
+			bufferMessage = "浏览器存储不可用，主题偏好无法记住；当前编辑仍保留。";
+		}
+	}
+}
+function chooseTheme(next: "dark" | "light" | "system") {
+	applyTheme(next);
+	themeOpen = false;
+}
+function toggleAccount() {
+	if (preview) return;
+	accountOpen = !accountOpen;
+	themeOpen = false;
+}
+function toggleTheme() {
+	themeOpen = !themeOpen;
+	accountOpen = false;
+}
+function setSidebarValue(
+	side: "leftComponents" | "rightComponents",
+	index: number,
+	enabled: boolean,
+) {
+	if (!sidebar || loading) return;
+	sidebar = {
+		...sidebar,
+		[side]: sidebar[side].map((item, i) =>
+			i === index ? { ...item, enable: enabled } : item,
+		),
+	};
+}
+function setSideEnabled(
+	side: "leftComponents" | "rightComponents",
+	enabled: boolean,
+) {
+	if (!sidebar || loading) return;
+	sidebar = {
+		...sidebar,
+		[side]: sidebar[side].map((item) => ({ ...item, enable: enabled })),
+	};
+}
+function moveComponent(
+	side: "leftComponents" | "rightComponents",
+	index: number,
+	direction: -1 | 1,
+) {
+	if (!sidebar || loading) return;
+	const next = index + direction;
+	if (next < 0 || next >= sidebar[side].length) return;
+	const items = [...sidebar[side]];
+	[items[index], items[next]] = [items[next], items[index]];
+	sidebar = { ...sidebar, [side]: items };
+}
+async function addAnnouncement() {
+	if (!announcements || loading) return;
+	const max = Math.max(0, ...announcements.items.map((item) => item.sort));
+	const item: AnnouncementItem = {
+		tag: "",
+		title: "",
+		content: "",
+		time: announcementDate(),
+		sort: max + 1,
+		enabled: true,
+	};
+	announcements.items = [item, ...announcements.items];
+	const key = itemKey(announcements.items[0]);
+	announcementView = "edit";
+	await tick();
+	document
+		.getElementById("announcement-item-" + key)
+		?.querySelector<HTMLInputElement>("input[data-announcement-title]")
+		?.focus();
+}
+function removeAnnouncement(item: AnnouncementItem) {
+	if (
+		!announcements ||
+		loading ||
+		!confirm(
+			"删除公告“" +
+				(item.title.trim() || "未命名公告") +
+				"”？点击保存公告后才会更新公开展示。",
+		)
+	)
+		return;
+	announcements.items = announcements.items.filter(
+		(candidate) => itemKey(candidate) !== itemKey(item),
+	);
+}
+function moveAnnouncement(item: AnnouncementItem, direction: -1 | 1) {
+	if (!announcements || loading) return;
+	const items = sortAnnouncementItems(announcements.items);
+	const index = items.findIndex(
+		(candidate) => itemKey(candidate) === itemKey(item),
+	);
+	const next = index + direction;
+	if (index < 0 || next < 0 || next >= items.length) return;
+	[items[index], items[next]] = [items[next], items[index]];
+	items.forEach((entry, position) => {
+		entry.sort = items.length - position;
+	});
+	announcements.items = items;
+}
+function clearConfigConflict(module: ConfigModule) {
+	if (conflictModule === module) conflictModule = null;
+	if (comparison?.module === module) comparison = null;
+}
+function cancelConfig(module: ConfigModule) {
+	if (loading) return;
+	if (module === "sidebar" && sidebarBaseline) {
+		sidebar = JSON.parse(sidebarBaseline);
+		sidebarVersion = sidebarBaselineVersion;
+		sidebarBackup = "";
+	}
+	if (module === "announcements" && announcementBaseline) {
+		announcements = JSON.parse(announcementBaseline);
+		announcementVersion = announcementBaselineVersion;
+		announcementBackup = "";
+	}
+	clearConfigConflict(module);
+	message = "";
+}
+function savedConfig(module: ConfigModule, source: string, version: string) {
+	if (module === "sidebar") {
+		sidebarVersion = sidebarBaselineVersion = version;
+		sidebarBaseline = JSON.stringify(JSON.parse(source));
+		sidebarBackup = "";
+	} else {
+		announcementVersion = announcementBaselineVersion = version;
+		announcementBaseline = announcementSource(JSON.parse(source));
+		announcementBackup = "";
+	}
+	clearConfigConflict(module);
+}
+async function saveConfig(module: ConfigModule) {
+	const value = module === "sidebar" ? sidebar : announcements;
+	const version = module === "sidebar" ? sidebarVersion : announcementVersion;
+	if (!value || !version || loading || !authenticated) return;
+	const normalized =
+		module === "announcements"
+			? normalizeAnnouncements(value as Announcement)
+			: value;
+	if (module === "announcements") {
+		const invalid = validateAnnouncements(normalized);
+		if (invalid) {
+			message = invalid;
+			return;
+		}
+	}
+	const source = JSON.stringify(normalized, null, 2);
+	loading = true;
+	message = "";
+	commitUrl = "";
+	try {
+		const result = await api(configPath(module), {
+			method: "PUT",
+			body: JSON.stringify({ source, version }),
+		});
+		if (typeof result.version !== "string")
+			throw new Error("保存响应不完整，正在核验提交结果。");
+		savedConfig(module, source, result.version);
+		const link = result.commit?.url || result.commit?.html_url;
+		if (typeof link === "string" && /^https?:\/\//.test(link)) commitUrl = link;
+		message = result.commit
+			? "已保存到仓库，等待构建部署。"
+			: "已保存到本地文件。";
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 409) {
+			conflictModule = module;
+			message = "版本冲突：编辑内容已保留，请读取仓库版本进行比较。";
+		} else if (
+			!(error instanceof ApiError) ||
+			[408, 502, 503, 504].includes(error.status)
+		) {
+			// A lost reply may follow a successful commit. Verify before offering a retry.
+			try {
+				const read = await api(configPath(module));
+				const actual = JSON.parse(read.source);
+				const matches =
+					JSON.stringify(
+						module === "announcements"
+							? normalizeAnnouncements(actual)
+							: actual,
+					) === JSON.stringify(normalized);
+				if (matches && typeof read.version === "string") {
+					savedConfig(module, source, read.version);
+					message = "已核验保存结果，内容已保存；网站以构建结果为准。";
+				} else {
+					message =
+						errorMessage(error) +
+						" 当前仓库内容与本次提交不同，输入已保留；请比较后重试。";
+					conflictModule = module;
+				}
+			} catch {
+				message =
+					errorMessage(error) +
+					" 暂时无法核验保存结果，输入已保留；恢复连接后先重新读取比较。";
+				conflictModule = module;
+			}
+		} else {
+			message = errorMessage(error);
+		}
+	} finally {
+		loading = false;
+	}
+}
+async function compareConfig(module = conflictModule) {
+	if (!module || loading) return;
+	loading = true;
+	try {
+		const result = await api(configPath(module));
+		comparison = { module, source: result.source, version: result.version };
+		await tick();
+		document
+			.getElementById("admin-comparison")
+			?.scrollIntoView({ block: "center" });
+	} catch (error) {
+		message = errorMessage(error);
+	} finally {
+		loading = false;
+	}
+}
+function acceptRepositoryConfig() {
+	if (
+		!comparison ||
+		loading ||
+		!confirm(
+			"以仓库版本为新的编辑基础？本机内容会保留为只读备份，请手动合并后保存。",
+		)
+	)
+		return;
+	const { module, source, version } = comparison;
+	try {
+		const value = JSON.parse(source);
+		if (module === "announcements") {
+			const invalid = validateAnnouncements(value);
+			if (invalid) throw new Error(invalid);
+		}
+		if (module === "sidebar") {
+			sidebarBackup = JSON.stringify(sidebar, null, 2);
+			sidebar = value;
+			sidebarVersion = sidebarBaselineVersion = version;
+			sidebarBaseline = JSON.stringify(value);
+		} else {
+			announcementBackup = JSON.stringify(announcements, null, 2);
+			announcements = value;
+			announcementVersion = announcementBaselineVersion = version;
+			announcementBaseline = announcementSource(value);
+		}
+		clearConfigConflict(module);
+		message =
+			"已采用仓库版本作为编辑基础，原本机内容保留在下方；请手动合并后保存。";
+	} catch (error) {
+		message = errorMessage(error);
+	}
+}
+async function switchPage(id: string) {
+	active = resolveAdminPage("#" + id);
+	mobileOpen = false;
+	accountOpen = false;
+	themeOpen = false;
+	if (isContentModule(active)) recordsModule = active;
+	await tick();
+	history.replaceState(history.state, "", "#" + active);
+	window.scrollTo({ top: 0, behavior: "instant" });
+}
+$effect(() => {
+	if (!settingsReady) return;
+	const buffer: ConfigBuffer = {};
+	if ((sidebarDirty || sidebarBackup) && sidebar)
+		buffer.sidebar = {
+			value: sidebar,
+			version: sidebarVersion,
+			previousLocal: sidebarBackup,
+		};
+	if ((announcementDirty || announcementBackup) && announcements)
+		buffer.announcements = {
+			value: announcements,
+			version: announcementVersion,
+			previousLocal: announcementBackup,
+		};
+	try {
+		const needed = Object.keys(buffer).length > 0;
+		const result = needed
+			? saveLocalBuffer(localStorage, settingsBufferKey, buffer)
+			: removeLocalBuffer(localStorage, settingsBufferKey);
+		bufferMessage = result.ok ? (needed ? "已暂存到本机" : "") : result.error;
+	} catch {
+		bufferMessage =
+			"本机暂存失败，当前编辑仍保留在内存；请保留页面或复制内容。";
+	}
+});
+onMount(() => {
+	try {
+		settingsBufferKey = getTabBufferKey(sessionStorage, "settings");
+	} catch {
+		bufferMessage = "浏览器存储不可用，当前编辑仍保留在内存。";
+	}
+	try {
+		const stored = localStorage.getItem("firefly-admin-theme");
+		if (stored === "dark" || stored === "light" || stored === "system")
+			theme = stored;
+		sessionStorage.removeItem("firefly-writing-auth");
+	} catch {
+		/* Theme and editor memory remain available. */
+	}
+	applyTheme(theme, false);
+	const abort = new AbortController();
+	const media = matchMedia("(prefers-color-scheme: dark)");
+	const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+	const hardware = navigator as Navigator & { deviceMemory?: number };
+	const limited =
+		(typeof hardware.deviceMemory === "number" &&
+			hardware.deviceMemory > 0 &&
+			hardware.deviceMemory <= 4) ||
+		(hardware.hardwareConcurrency > 0 && hardware.hardwareConcurrency <= 4);
+	const updateMotion = () => {
+		motionAllowed = !reduced.matches && !limited;
+		pageVisible = !document.hidden;
+	};
+	updateMotion();
+	media.addEventListener(
+		"change",
+		() => {
+			if (theme === "system") applyTheme("system", false);
+		},
+		{ signal: abort.signal },
+	);
+	reduced.addEventListener("change", updateMotion, { signal: abort.signal });
+	document.addEventListener("visibilitychange", updateMotion, {
+		signal: abort.signal,
+	});
+	document.addEventListener(
+		"pointerdown",
+		(event) => {
+			if (
+				!(event.target instanceof Element) ||
+				!event.target.closest(".admin-account")
+			) {
+				accountOpen = false;
+				themeOpen = false;
+			}
+		},
+		{ signal: abort.signal },
+	);
+	document.addEventListener(
+		"keydown",
+		(event) => {
+			if (event.key === "Escape") {
+				accountOpen = false;
+				themeOpen = false;
+				mobileOpen = false;
+			}
+		},
+		{ signal: abort.signal },
+	);
+	window.addEventListener(
+		"hashchange",
+		() => {
+			if (workspaceMounted) void switchPage(resolveAdminPage(location.hash));
+		},
+		{ signal: abort.signal },
+	);
+	window.addEventListener(
+		"beforeunload",
+		(event) => {
+			if (settingsDirty || hasRecovery) {
+				event.preventDefault();
+				event.returnValue = "";
+			}
+		},
+		{ signal: abort.signal },
+	);
+	void (async () => {
+		loading = true;
+		try {
+			const session = await api("/api/writing/session/");
+			preview = session.preview === true;
+			authenticated = true;
+			active = resolveAdminPage(location.hash);
+			if (isContentModule(active)) recordsModule = active;
+			await load(true);
+			workspaceMounted = true;
+			await switchPage(active);
+		} catch (error) {
+			if (!(error instanceof ApiError && error.status === 401))
+				message = errorMessage(error);
+		} finally {
+			loading = false;
+		}
+	})();
+	return () => abort.abort();
+});
 </script>
 
 {#if !authenticated}

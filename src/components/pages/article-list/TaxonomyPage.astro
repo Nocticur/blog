@@ -1,0 +1,42 @@
+---
+import type { CollectionEntry } from "astro:content";
+import PageTitle from "@/components/common/PageTitle.astro";
+import { coverImageConfig } from "@/config/coverImageConfig";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import type { ArticleListPost } from "@/types/article-list";
+import {
+	CARD_COVER_SIZES,
+	CARD_COVER_WIDTHS,
+	createArticleListPost,
+} from "@/utils/article-list-posts";
+import { getTagUrl, url } from "@/utils/url-utils";
+import ArticleList from "./ArticleList.astro";
+import "@/styles/pages/article-list.css";
+interface Props {
+	title: string;
+	entries: CollectionEntry<"posts">[];
+	robots?: string;
+}
+const { title, entries, robots } = Astro.props;
+const cards: ArticleListPost[] = [];
+for (const entry of entries)
+	cards.push(
+		await createArticleListPost(entry, CARD_COVER_WIDTHS, CARD_COVER_SIZES),
+	);
+const relatedTags = [...new Set(entries.flatMap((entry) => entry.data.tags))];
+const description = `${title} · ${entries.length} 篇文章`;
+const randomCover = coverImageConfig.randomCoverImage;
+const fallbackImageUrl =
+	randomCover.enable && randomCover.fallback ? url(randomCover.fallback) : "";
+---
+<MainGridLayout title={title} description={description} hasOwnH1 robots={robots}>
+  <section class="article-list-page px-4 py-6 md:px-9">
+    <PageTitle title={title} description={description} variant="stacked" />
+    <nav aria-label="专题导航" class="flex flex-wrap gap-3 my-5">
+      <a href={url('/categories/')}>分类与标签</a>
+      <a href={url('/tags/')}>全部标签</a>
+      {relatedTags.map(tag => <a href={getTagUrl(tag)}>#{tag}</a>)}
+    </nav>
+    <ArticleList pinnedPosts={[]} regularPosts={cards} totalPosts={cards.length} currentPage={1} totalPages={1} {fallbackImageUrl} showCoverLoading={randomCover.showLoading ?? true} />
+  </section>
+</MainGridLayout>

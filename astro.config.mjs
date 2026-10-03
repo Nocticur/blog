@@ -1,17 +1,17 @@
 import sitemap from "@astrojs/sitemap";
 import { writingDevApi } from './src/lib/writing-dev-api.mjs';
+import { pagefindDev } from './src/lib/pagefind-dev.mjs';
 import svelte from "@astrojs/svelte";
 import tailwindcss from "@tailwindcss/vite";
 import { setMaxListeners } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
-import matter from "gray-matter";
+import matter from "./api/_lib/safe-matter.mjs";
 import { pluginCollapsibleSections } from "@expressive-code/plugin-collapsible-sections";
 import { pluginLineNumbers } from "@expressive-code/plugin-line-numbers";
 import swup from "@swup/astro";
 import { defineConfig } from "astro/config";
 import expressiveCode from "astro-expressive-code";
-import icon from "astro-icon";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypeComponents from "rehype-components"; /* Render the custom directive content */
 import rehypeKatex from "rehype-katex";
@@ -96,11 +96,11 @@ const postsDir = path.resolve("./src/content/posts");
 const postLastmodCache = new Map();
 function getPostLastmod(postId) {
 	if (postLastmodCache.has(postId)) return postLastmodCache.get(postId);
-	const filePath = path.join(postsDir, `${postId}.md`);
+	const filePath = ["md", "mdx"].map((extension) => path.join(postsDir, `${postId}.${extension}`)).find((file) => fs.existsSync(file));
 	let lastmod = null;
-	if (fs.existsSync(filePath)) {
+	if (filePath) {
 		try {
-			const { data } = matter.read(filePath);
+			const { data } = matter(fs.readFileSync(filePath, "utf8"));
 			lastmod = data.updated || data.published || null;
 		} catch {
 			// frontmatter 解析失败时返回 null
@@ -159,9 +159,6 @@ export default defineConfig({
 			skipPopStateHandling: (event) => {
 				return event.state?.url?.includes("#");
 			},
-		}),
-		icon({
-			// 不使用 include，让 astro-icon 自动从 Iconify 包加载图标
 		}),
 		expressiveCode({
 			themes: [expressiveCodeConfig.darkTheme, expressiveCodeConfig.lightTheme],
@@ -378,6 +375,7 @@ export default defineConfig({
 		plugins: [
 			tailwindcss(),
 			writingDevApi(),
+			pagefindDev(),
 		],
 		server: {
 			watch: {

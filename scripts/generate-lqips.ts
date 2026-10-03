@@ -12,12 +12,14 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createHash } from 'node:crypto';
 import { glob } from "glob";
 import sharp from "sharp";
 
 const SRC_DIR = "src";
 const PUBLIC_DIR = "public";
 const OUTPUT_FILE = "src/constants/lqips.json";
+const FINGERPRINT_FILE = '.cache/lqip-fingerprints.json';
 
 // 不需要占位色的目录：看板娘贴图集、favicon、字体与音频封面之外的静态件
 const IGNORE_DIRS = [
@@ -43,6 +45,8 @@ function rgbToHex(color: RgbColor): string {
 async function processImage(imagePath: string): Promise<string | null> {
 	try {
 		const { data, info } = await sharp(imagePath)
+			.toColourspace('srgb')
+			.removeAlpha()
 			.resize(2, 2, { fit: "fill" })
 			.raw()
 			.toBuffer({ resolveWithObject: true });
@@ -85,14 +89,11 @@ async function readExistingLqips(): Promise<LqipMap> {
 
 async function main(): Promise<void> {
 	const existing = await readExistingLqips();
+	const previousFingerprints: Record<string, string> = await fs.readFile(FINGERPRINT_FILE, 'utf8').then(JSON.parse).catch(() => ({}));
+	const fingerprints: Record<string, string> = {};
 	const files = await glob("{src,public}/**/*.{png,jpg,jpeg,webp,avif}", {
 		ignore: IGNORE_DIRS,
 	});
-
-	if (files.length === 0) {
-		console.log("[lqip] 未找到图片，跳过");
-		return;
-	}
 
 	const lqips: LqipMap = { ...existing };
 
@@ -103,9 +104,13 @@ async function main(): Promise<void> {
 		delete lqips[key];
 	}
 
-	const pendingFiles = files.filter(
-		(file) => !(filePathToKey(file) in existing),
-	);
+	const pendingFiles: string[] = [];
+	for (const file of files) {
+		const key = filePathToKey(file);
+		const fingerprint = createHash('sha256').update(await fs.readFile(file)).digest('hex');
+		fingerprints[key] = fingerprint;
+		if (!(key in existing) || previousFingerprints[key] !== fingerprint) pendingFiles.push(file);
+	}
 	console.log(
 		`[lqip] 共 ${files.length} 张图片，新增 ${pendingFiles.length} 张待处理，清理 ${staleKeys.length} 条失效记录`,
 	);
@@ -113,7 +118,7 @@ async function main(): Promise<void> {
 	let processed = 0;
 	for (const file of pendingFiles) {
 		const compact = await processImage(path.resolve(file));
-		if (compact === null) continue;
+		if (compact === null) { delete lqips[filePathToKey(file)]; delete fingerprints[filePathToKey(file)]; continue; }
 		lqips[filePathToKey(file)] = compact;
 		processed++;
 	}
@@ -128,6 +133,8 @@ async function main(): Promise<void> {
 		`${JSON.stringify(sorted, null, "\t")}\n`,
 		"utf-8",
 	);
+	await fs.mkdir(path.dirname(FINGERPRINT_FILE), { recursive: true });
+	await fs.writeFile(FINGERPRINT_FILE, JSON.stringify(fingerprints), 'utf8');
 
 	console.log(
 		`[lqip] 完成，新增 ${processed}/${pendingFiles.length}，合计 ${Object.keys(sorted).length} 条 → ${OUTPUT_FILE}`,

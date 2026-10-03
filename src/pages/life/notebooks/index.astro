@@ -1,16 +1,19 @@
 ---
-import FilteredList from "@/components/features/FilteredList.astro";
-import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { getCollection } from "astro:content";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import FilteredList from "@/components/features/FilteredList.astro";
 import { siteConfig } from "@/config";
+
 if (!siteConfig.pages.books) return Astro.redirect("/404/");
-const entries = (await getCollection("life")).filter((entry) => entry.id.startsWith("notebooks/") && !entry.data.draft);
+const entries = (await getCollection("life")).filter(
+	(entry) => entry.id.startsWith("notebooks/") && !entry.data.draft,
+);
 const books = new Map<string, typeof entries>();
 for (const entry of entries) {
-  const key = entry.id.split("/")[1] || "default";
-  const bucket = books.get(key) || [];
-  bucket.push(entry);
-  books.set(key, bucket);
+	const key = entry.id.split("/")[1] || "default";
+	const bucket = books.get(key) || [];
+	bucket.push(entry);
+	books.set(key, bucket);
 }
 ---
 <MainGridLayout title="笔记本" description="成长日记、学习复盘和灵感随笔">

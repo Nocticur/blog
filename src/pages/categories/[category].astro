@@ -1,0 +1,26 @@
+---
+import TaxonomyPage from "@/components/pages/article-list/TaxonomyPage.astro";
+import { siteConfig } from "@/config/siteConfig";
+import { getSortedPosts } from "@/utils/content-utils";
+import { termToRouteParam } from "@/utils/term-slug";
+export async function getStaticPaths() {
+	if (!siteConfig.pages.categories) return [];
+	const posts = await getSortedPosts();
+	const names = [
+		...new Set(
+			posts
+				.map((post) => post.data.category?.trim())
+				.filter((name): name is string => Boolean(name)),
+		),
+	];
+	return names.map((name) => ({
+		params: { category: termToRouteParam(name) },
+		props: {
+			name,
+			entries: posts.filter((post) => post.data.category?.trim() === name),
+		},
+	}));
+}
+const { name, entries } = Astro.props;
+---
+<TaxonomyPage title={name} entries={entries} />

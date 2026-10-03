@@ -1,11 +1,20 @@
 ---
+import { getCollection, render } from "astro:content";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import PlacesMap from "@/components/pages/PlacesMap.svelte";
-import {getCollection,render} from "astro:content";
-import {siteConfig} from "@/config";
-import {normalizePlace} from "@/utils/feature-data";
-if(!siteConfig.pages.places) return Astro.redirect("/404/");
-const places=await Promise.all((await getCollection("life")).filter(entry=>entry.id.startsWith("places/") && !entry.data.draft).map(async entry=>({entry,place:normalizePlace(entry.data),Content:(await render(entry)).Content})));
+import { siteConfig } from "@/config";
+import { normalizePlace } from "@/utils/feature-data";
+
+if (!siteConfig.pages.places) return Astro.redirect("/404/");
+const places = await Promise.all(
+	(await getCollection("life"))
+		.filter((entry) => entry.id.startsWith("places/") && !entry.data.draft)
+		.map(async (entry) => ({
+			entry,
+			place: normalizePlace(entry.data),
+			Content: (await render(entry)).Content,
+		})),
+);
 ---
 <MainGridLayout title="去过的地方" description="足迹地图与旅行记录">
  <div class="card-base p-6 md:p-9">

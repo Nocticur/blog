@@ -7,7 +7,7 @@ try {
  const context = await browser.newContext({viewport:{width:1280,height:900}});
  const page = await context.newPage();
  const errors=[];
- page.on('pageerror', error => errors.push(error.message));
+ page.on('pageerror', error => { errors.push(error.message); console.error(error.stack); });
  page.on('console', event => { if(event.type()==='error') console.error('Console:',event.text()); });
  const initialSidebar={enable:true,position:'both',leftComponents:[{type:'profile',enable:true,position:'top'}],rightComponents:[{type:'calendar',enable:true,position:'top'}],mobileBottomComponents:[]};
  const posts=[{file:'fixture.md',title:'隔离文章',published:'2026-01-01',draft:false,version:'p1',tags:[],description:''}];
@@ -96,10 +96,10 @@ try {
  loggedIn=true;
  const blocked=await browser.newPage();
  const blockedErrors=[];
- blocked.on('pageerror',error=>blockedErrors.push(error.message));
+ blocked.on('pageerror',error=>{blockedErrors.push(error.message);console.error(error.stack);});
  await blocked.addInitScript(()=>{
-  Object.defineProperty(window,'localStorage',{get(){throw new DOMException('Storage disabled','SecurityError');}});
-  Object.defineProperty(window,'sessionStorage',{get(){throw new DOMException('Storage disabled','SecurityError');}});
+  Object.defineProperty(window,'localStorage',{get(){const error=new Error('Storage disabled');error.name='SecurityError';throw error;}});
+  Object.defineProperty(window,'sessionStorage',{get(){const error=new Error('Storage disabled');error.name='SecurityError';throw error;}});
  });
  await blocked.route('**/api/writing/**',mockApi);
  await blocked.goto(origin+'/admin/',{waitUntil:'domcontentloaded'});

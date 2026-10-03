@@ -1,6 +1,10 @@
 ---
-interface Props { label?:string; years?:boolean; pageSize?:number; }
-const {label="标签",years=false,pageSize=12}=Astro.props;
+interface Props {
+	label?: string;
+	years?: boolean;
+	pageSize?: number;
+}
+const { label = "标签", years = false, pageSize = 12 } = Astro.props;
 ---
 <filtered-content data-size={pageSize}>
   <div class="flex flex-wrap items-center gap-3 my-5" data-controls hidden>

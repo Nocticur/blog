@@ -1,4 +1,4 @@
-import { type CollectionEntry, getCollection, render } from "astro:content";
+import { type CollectionEntry, getCollection } from "astro:content";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import {
@@ -8,12 +8,14 @@ import {
 import { getCategoryUrl, getPostUrlBySlug, getTagUrl } from "@utils/url-utils";
 import type { MarkdownHeading } from "astro";
 import { siteConfig } from "@/config";
+import { renderPostOnce } from "./post-render";
+import { getPublicPostHeadings } from "./public-post-metadata";
 
 let cachedPosts: CollectionEntry<"posts">[] | null = null;
 let cachedHeadings: Map<string, MarkdownHeading[]> | null = null;
 
 async function getAllPosts(): Promise<CollectionEntry<"posts">[]> {
-	if (cachedPosts) return cachedPosts;
+	if (import.meta.env.PROD && cachedPosts) return cachedPosts;
 	cachedPosts = await getCollection("posts", ({ data }) => {
 		return import.meta.env.PROD ? data.draft !== true : true;
 	});
@@ -106,15 +108,19 @@ export async function getTagList(): Promise<Tag[]> {
 export async function getAllPostHeadings(): Promise<
 	Map<string, MarkdownHeading[]>
 > {
-	if (cachedHeadings) return cachedHeadings;
+	if (import.meta.env.PROD && cachedHeadings) return cachedHeadings;
 
 	const posts = await getAllPosts();
 	const startedAt = performance.now();
 	const headingMap = new Map<string, MarkdownHeading[]>();
 
 	for (const post of posts) {
-		const { headings } = await render(post);
-		headingMap.set(post.id, headings);
+		if (post.data.password) {
+			headingMap.set(post.id, []);
+			continue;
+		}
+		const { headings } = await renderPostOnce(post);
+		headingMap.set(post.id, getPublicPostHeadings(post.data, headings));
 	}
 
 	// 构建期一次性日志：render() 走全 markdown 链，耗时需要可观测

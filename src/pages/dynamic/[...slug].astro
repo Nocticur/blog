@@ -1,14 +1,16 @@
 ---
-import {getCollection,render} from "astro:content";
-import {siteConfig} from "@/config";
+import { getCollection, render } from "astro:content";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import Comment from "@/components/comment/index.astro";
-export async function getStaticPaths(){
- if(!siteConfig.pages.dynamic) return [];
- return (await getCollection("dynamic")).filter(entry=>!entry.data.draft).map(entry=>({params:{slug:entry.id},props:{entry}}));
+import { siteConfig } from "@/config";
+export async function getStaticPaths() {
+	if (!siteConfig.pages.dynamic) return [];
+	return (await getCollection("dynamic"))
+		.filter((entry) => !entry.data.draft)
+		.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
 }
-const {entry}=Astro.props;
-const {Content}=await render(entry);
+const { entry } = Astro.props;
+const { Content } = await render(entry);
 ---
 <MainGridLayout title={entry.data.title || "动态"} description={entry.data.description}>
  <article class="card-base p-6 md:p-9 prose dark:prose-invert max-w-none">

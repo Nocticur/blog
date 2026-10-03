@@ -1,12 +1,36 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { createHash } from 'node:crypto';
-import matter from 'gray-matter';
-import { createLocalStore, executeContent, uploadContentImage } from '../../api/_lib/content-management.mjs';
-import { cookieSession, sessionCookie, requireSameOrigin, MAX_IMAGE_BYTES, MAX_REQUEST_BYTES } from '../../api/_lib/writing-session.mjs';
-import { buildMarkdown, formatDate, resolveRepo, resolvePasswordHash, signSession, verifyPassword, verifySession } from './writing-server.mjs';
+import { createHash, randomUUID } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { articleDateError } from "../../api/_lib/article-validation.mjs";
+import {
+	createLocalStore,
+	executeContent,
+	uploadContentImage,
+} from "../../api/_lib/content-management.mjs";
+import { createLoginLimiter } from "../../api/_lib/login-limiter.mjs";
+import matter from "../../api/_lib/safe-matter.mjs";
+import {
+	cookieSession,
+	MAX_IMAGE_BYTES,
+	MAX_REQUEST_BYTES,
+	requireSameOrigin,
+	sessionCookie,
+} from "../../api/_lib/writing-session.mjs";
+import {
+	buildMarkdown,
+	formatDate,
+	resolvePasswordHash,
+	resolveRepo,
+	signSession,
+	verifyPassword,
+	verifySession,
+} from "./writing-server.mjs";
 
-export function writingDevApi(root = process.cwd(), { preview = process.env.WRITING_DEV_PREVIEW === '1' } = {}) {
+export function writingDevApi(
+	root = process.cwd(),
+	{ preview = process.env.WRITING_DEV_PREVIEW === "1" } = {},
+) {
+	const loginLimiter = createLoginLimiter();
 	const postsDir = path.resolve(root, "src/content/posts");
 	const postsDirPrefix = `${postsDir}${path.sep}`;
 	const validSegment = /^[\p{L}\p{N}][\p{L}\p{N}._-]*$/u;
@@ -92,11 +116,11 @@ export function writingDevApi(root = process.cwd(), { preview = process.env.WRIT
 					walk(abs, relPath);
 				} else if (/\.(md|mdx)$/i.test(entry.name)) {
 					try {
-						const raw = fs.readFileSync(abs, 'utf8');
+						const raw = fs.readFileSync(abs, "utf8");
 						const { data } = matter(raw);
 						out.push({
 							file: relPath,
-							version: createHash('sha256').update(raw).digest('hex'),
+							version: createHash("sha256").update(raw).digest("hex"),
 							title: data.title || entry.name,
 							published: formatDate(data.published),
 							draft: data.draft === true,
@@ -123,7 +147,11 @@ export function writingDevApi(root = process.cwd(), { preview = process.env.WRIT
 			req.on("data", (chunk) => {
 				size += chunk.length;
 				if (size > MAX_BODY_SIZE) {
-					reject(Object.assign(new Error('请求体过大，图片上限为 3 MiB'), { status: 413 }));
+					reject(
+						Object.assign(new Error("请求体过大，图片上限为 3 MiB"), {
+							status: 413,
+						}),
+					);
 					return;
 				}
 				chunks.push(chunk);
@@ -143,31 +171,70 @@ export function writingDevApi(root = process.cwd(), { preview = process.env.WRIT
 				const fileParam = requestUrl.searchParams.get("file") || "";
 
 				const handle = async () => {
-					const origin = `${req.socket?.encrypted ? 'https' : 'http'}://${req.headers.host}`;
-					if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) requireSameOrigin(req.headers, origin);
+					const origin = `${req.socket?.encrypted ? "https" : "http"}://${req.headers.host}`;
+					if (!["GET", "HEAD", "OPTIONS"].includes(req.method))
+						requireSameOrigin(req.headers, origin);
 					const authenticated = verifySession(cookieSession(req.headers));
-					const previewMode = !authenticated && preview &&
-						['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket?.remoteAddress) &&
-						['localhost', '127.0.0.1', '[::1]'].includes(new URL(origin).hostname) &&
-						(!req.headers.origin || req.headers.origin === origin) && req.headers['sec-fetch-site'] !== 'cross-site';
-					const sessionInfo = (isPreview = previewMode) => ({ authenticated: true, mode: 'dev', ...(isPreview ? { preview: true } : {}), repo: resolveRepo(), branch: (process.env.WRITING_GITHUB_BRANCH || '').trim(), tokenReady: Boolean(process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN) });
+					const previewMode =
+						!authenticated &&
+						preview &&
+						["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
+							req.socket?.remoteAddress,
+						) &&
+						["localhost", "127.0.0.1", "[::1]"].includes(
+							new URL(origin).hostname,
+						) &&
+						(!req.headers.origin || req.headers.origin === origin) &&
+						req.headers["sec-fetch-site"] !== "cross-site";
+					const sessionInfo = (isPreview = previewMode) => ({
+						authenticated: true,
+						mode: "dev",
+						...(isPreview ? { preview: true } : {}),
+						repo: resolveRepo(),
+						branch: (process.env.WRITING_GITHUB_BRANCH || "").trim(),
+						tokenReady: Boolean(
+							process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN,
+						),
+					});
 					// 登录：服务端校验密码并签发会话 token（与线上 Vercel Function 同契约）
 					if (req.method === "POST" && route === "/auth") {
- if(!resolvePasswordHash()) return error(res,503,"请先配置 WRITING_PASSWORD 或 WRITING_PASSWORD_HASH");
+						if (!resolvePasswordHash())
+							return error(
+								res,
+								503,
+								"请先配置 WRITING_PASSWORD 或 WRITING_PASSWORD_HASH",
+							);
 						let body;
+						const retryAfter = loginLimiter.consume(
+							req.socket?.remoteAddress || "unknown",
+						);
+						if (retryAfter) {
+							res.setHeader("Retry-After", String(retryAfter));
+							return error(res, 429, "登录尝试过多，请稍后重试");
+						}
 						try {
 							body = JSON.parse(await readBody(req));
 						} catch (err) {
-							return error(res, err.status || 400, err.status ? err.message : "Invalid JSON body");
+							return error(
+								res,
+								err.status || 400,
+								err.status ? err.message : "Invalid JSON body",
+							);
 						}
 						if (!body || !verifyPassword(body.password)) {
 							return error(res, 401, "密码不正确");
 						}
-						res.setHeader('Set-Cookie', sessionCookie(signSession(), req.socket?.encrypted === true));
+						res.setHeader(
+							"Set-Cookie",
+							sessionCookie(signSession(), req.socket?.encrypted === true),
+						);
 						return json(res, 200, sessionInfo(false));
 					}
-					if (req.method === 'POST' && route === '/logout') {
-						res.setHeader('Set-Cookie', sessionCookie('', req.socket?.encrypted === true));
+					if (req.method === "POST" && route === "/logout") {
+						res.setHeader(
+							"Set-Cookie",
+							sessionCookie("", req.socket?.encrypted === true),
+						);
 						return json(res, 200, { ok: true, authenticated: false });
 					}
 					// 其余接口要求有效会话 token（HMAC 签名 + 有效期）
@@ -175,22 +242,42 @@ export function writingDevApi(root = process.cwd(), { preview = process.env.WRIT
 						error(res, 401, "登录已过期，请重新登录");
 						return;
 					}
-					if (previewMode && req.method !== 'GET') return error(res, 403, '当前为本地预览，可浏览和试填；保存需要正常登录。');
-					if (req.method === 'GET' && route === '/session') return json(res, 200, sessionInfo());
-					if(route.startsWith("/content/") || route.startsWith('/settings/')) {
- const match=/^\/(?:content|settings)\/([a-z]+)(\/images)?$/.exec(route);
- if(!match) return error(res,404,"Not found");
- const body=req.method==="GET"?Object.fromEntries(requestUrl.searchParams):JSON.parse(await readBody(req));
- if(match[2] && req.method!=="POST") return error(res,405,"Method not allowed");
- return json(res,200,await(match[2]?uploadContentImage(store,match[1],body):executeContent(store,match[1],req.method,body)));
- }
- if (route === "/posts" && req.method === "GET") {
+					if (previewMode && req.method !== "GET")
+						return error(
+							res,
+							403,
+							"当前为本地预览，可浏览和试填；保存需要正常登录。",
+						);
+					if (req.method === "GET" && route === "/session")
+						return json(res, 200, sessionInfo());
+					if (route.startsWith("/content/") || route.startsWith("/settings/")) {
+						const match = /^\/(?:content|settings)\/([a-z]+)(\/images)?$/.exec(
+							route,
+						);
+						if (!match) return error(res, 404, "Not found");
+						const body =
+							req.method === "GET"
+								? Object.fromEntries(requestUrl.searchParams)
+								: JSON.parse(await readBody(req));
+						if (match[2] && req.method !== "POST")
+							return error(res, 405, "Method not allowed");
+						return json(
+							res,
+							200,
+							await (match[2]
+								? uploadContentImage(store, match[1], body)
+								: executeContent(store, match[1], req.method, body)),
+						);
+					}
+					if (route === "/posts" && req.method === "GET") {
 						if (fileParam) {
 							const fullPath = resolvePostPath(fileParam);
 							if (!fullPath) return error(res, 400, "Invalid file name");
 							if (!fs.existsSync(fullPath))
 								return error(res, 404, "Post not found");
-							const current = await store.read(`src/content/posts/${fileParam}`);
+							const current = await store.read(
+								`src/content/posts/${fileParam}`,
+							);
 							const raw = current.source;
 							const { data, content } = matter(raw);
 							return json(res, 200, {
@@ -226,7 +313,11 @@ export function writingDevApi(root = process.cwd(), { preview = process.env.WRIT
 						try {
 							body = JSON.parse(await readBody(req));
 						} catch (err) {
-							return error(res, err.status || 400, err.status ? err.message : "Invalid JSON body");
+							return error(
+								res,
+								err.status || 400,
+								err.status ? err.message : "Invalid JSON body",
+							);
 						}
 						const upload = resolveImageUpload(body);
 						if (!upload) {
@@ -237,10 +328,10 @@ export function writingDevApi(root = process.cwd(), { preview = process.env.WRIT
 						if (!targetDir.startsWith(postsDirPrefix)) {
 							return error(res, 400, "Invalid slug (file name)");
 						}
-						const fileName = `${upload.slug}-${imageTimestamp()}${upload.extension}`;
+						const fileName = `${upload.slug}-${imageTimestamp()}-${randomUUID()}${upload.extension}`;
 						const fullPath = path.join(targetDir, fileName);
 						fs.mkdirSync(targetDir, { recursive: true });
-						fs.writeFileSync(fullPath, upload.image);
+						fs.writeFileSync(fullPath, upload.image, { flag: "wx" });
 						setImmediate(() => {
 							server.watcher.emit("add", fullPath);
 						});
@@ -257,14 +348,17 @@ export function writingDevApi(root = process.cwd(), { preview = process.env.WRIT
 						try {
 							body = JSON.parse(await readBody(req));
 						} catch (err) {
-							return error(res, err.status || 400, err.status ? err.message : "Invalid JSON body");
+							return error(
+								res,
+								err.status || 400,
+								err.status ? err.message : "Invalid JSON body",
+							);
 						}
 						if (!body || !String(body.title || "").trim()) {
 							return error(res, 400, "Title is required");
 						}
-						if (!/^\d{4}-\d{2}-\d{2}$/.test(formatDate(body.published) || "")) {
-							return error(res, 400, "Published date is required (YYYY-MM-DD)");
-						}
+						const dateError = articleDateError(body);
+						if (dateError) return error(res, 400, dateError);
 						const isCreate = req.method === "POST";
 						let targetFile;
 						if (isCreate) {
@@ -284,14 +378,23 @@ export function writingDevApi(root = process.cwd(), { preview = process.env.WRIT
 							const fullPath = resolvePostPath(targetFile);
 							if (!fullPath) return error(res, 400, "Invalid file name");
 							if (!fs.existsSync(fullPath))
-								return error(res, 409, '文章已删除，请重新读取后合并');
+								return error(res, 409, "文章已删除，请重新读取后合并");
 						}
 						const fullPath = path.resolve(postsDir, targetFile);
 						const current = await store.read(`src/content/posts/${targetFile}`);
-						if (isCreate ? Boolean(current) : (!body.version || body.version !== current?.version)) return error(res, 409, '版本冲突，请重新读取后合并');
+						if (
+							isCreate
+								? Boolean(current)
+								: !body.version || body.version !== current?.version
+						)
+							return error(res, 409, "版本冲突，请重新读取后合并");
 						const existingData = current ? matter(current.source).data : {};
- const md = buildMarkdown(body, body.content, existingData);
-						const version = await store.write(`src/content/posts/${targetFile}`, Buffer.from(md), current?.version || null);
+						const md = buildMarkdown(body, body.content, existingData);
+						const version = await store.write(
+							`src/content/posts/${targetFile}`,
+							Buffer.from(md),
+							current?.version || null,
+						);
 						// Astro 7 的 content watcher 对新增文件的热更新不可靠（withastro/astro#17335），
 						// 手动派发 chokidar 事件，借 glob loader 自己的 onChange 管线完成同步
 						setImmediate(() => {
@@ -304,8 +407,9 @@ export function writingDevApi(root = process.cwd(), { preview = process.env.WRIT
 						const fullPath = resolvePostPath(fileParam);
 						if (!fullPath) return error(res, 400, "Invalid file name");
 						const current = await store.read(`src/content/posts/${fileParam}`);
-						const version = requestUrl.searchParams.get('version');
-						if (!current || !version || version !== current.version) return error(res, 409, '版本冲突，请重新读取后合并');
+						const version = requestUrl.searchParams.get("version");
+						if (!current || !version || version !== current.version)
+							return error(res, 409, "版本冲突，请重新读取后合并");
 						await store.write(`src/content/posts/${fileParam}`, null, version);
 						setImmediate(() => {
 							server.watcher.emit("unlink", fullPath);
@@ -317,7 +421,11 @@ export function writingDevApi(root = process.cwd(), { preview = process.env.WRIT
 				};
 
 				handle().catch((err) => {
-					error(res, err.status || 500, err && err.message ? err.message : "Internal error");
+					error(
+						res,
+						err.status || 500,
+						err && err.message ? err.message : "Internal error",
+					);
 				});
 			});
 		},

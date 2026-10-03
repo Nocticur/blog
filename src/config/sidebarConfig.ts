@@ -1,5 +1,5 @@
-import type { SidebarLayoutConfig } from "../types/config";
 import sidebarData from "../data/sidebar.json";
+import type { SidebarLayoutConfig } from "../types/config";
 
 /**
  * 侧边栏布局配置

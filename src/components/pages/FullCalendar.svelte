@@ -1,23 +1,47 @@
 <script lang="ts">
- import {Solar} from "lunar-typescript";
- import {onMount} from "svelte";
- export let events:{date:string;title:string;type:string;note?:string;url?:string}[]=[];
- export let initialMonth:string;
- export let minYear:number;
- export let maxYear:number;
- let month=initialMonth, selected="";
- const key=(date:Date)=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
- $: [year,number]=month.split("-").map(Number);
- $: start=new Date(year,number-1,1).getDay();
- $: count=new Date(year,number,0).getDate();
- $: cells=Array.from({length:Math.ceil((start+count)/7)*7},(_,index)=>index<start||index>=start+count?0:index-start+1);
- $: dayKey=(day:number)=>`${month}-${String(day).padStart(2,"0")}`;
- $: chosen=events.filter(event=>event.date===selected);
- $: upcoming=events.filter(event=>event.date>=(selected||month+"-01")).slice(0,12);
- const lunar=(day:number)=>Solar.fromYmd(year,number,day).getLunar().getDayInChinese();
- function move(step:number){const date=new Date(year,number-1+step,1);if(date.getFullYear()<minYear||date.getFullYear()>maxYear)return;month=key(date).slice(0,7);selected="";}
- function today(){const date=new Date();month=key(date).slice(0,7);selected=key(date);}
- onMount(today);
+import { Solar } from "lunar-typescript";
+import { onMount } from "svelte";
+export let events: {
+	date: string;
+	title: string;
+	type: string;
+	note?: string;
+	url?: string;
+}[] = [];
+export let initialMonth: string;
+export let minYear: number;
+export let maxYear: number;
+let month = initialMonth;
+let selected = "";
+const key = (date: Date) =>
+	`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+$: [year, number] = month.split("-").map(Number);
+$: start = new Date(year, number - 1, 1).getDay();
+$: count = new Date(year, number, 0).getDate();
+$: cells = Array.from(
+	{ length: Math.ceil((start + count) / 7) * 7 },
+	(_, index) =>
+		index < start || index >= start + count ? 0 : index - start + 1,
+);
+$: dayKey = (day: number) => `${month}-${String(day).padStart(2, "0")}`;
+$: chosen = events.filter((event) => event.date === selected);
+$: upcoming = events
+	.filter((event) => event.date >= (selected || month + "-01"))
+	.slice(0, 12);
+const lunar = (day: number) =>
+	Solar.fromYmd(year, number, day).getLunar().getDayInChinese();
+function move(step: number) {
+	const date = new Date(year, number - 1 + step, 1);
+	if (date.getFullYear() < minYear || date.getFullYear() > maxYear) return;
+	month = key(date).slice(0, 7);
+	selected = "";
+}
+function today() {
+	const date = new Date();
+	month = key(date).slice(0, 7);
+	selected = key(date);
+}
+onMount(today);
 </script>
 <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
  <h1 class="text-2xl font-semibold">{year} 年 {number} 月</h1>

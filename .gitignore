@@ -3,6 +3,7 @@ dist/
 
 # generated types
 .astro/
+.cache/
 
 # dependencies
 node_modules/
@@ -17,6 +18,9 @@ pnpm-debug.log*
 .env
 .env.cf
 .env.production
+.env.*
+!.env.example
+!.env.*.example
 .wrangler/
 # macOS-specific files
 .DS_Store

@@ -38,7 +38,7 @@ async function fetchYear(
 	try {
 		const res = await fetch(url, {
 			headers: { Accept: "application/json" },
-            signal: AbortSignal.timeout(5000),
+			signal: AbortSignal.timeout(5000),
 		});
 		if (!res.ok) {
 			console.warn(`[holidays] ${url} responded ${res.status}`);
@@ -118,5 +118,8 @@ async function loadHolidays(): Promise<HolidayEntry[]> {
 	return all;
 }
 
-let cached:Promise<HolidayEntry[]> | undefined;
-export function getHolidays(){ return cached ??= loadHolidays(); }
+let cached: Promise<HolidayEntry[]> | undefined;
+export function getHolidays() {
+	if (!cached) cached = loadHolidays();
+	return cached;
+}

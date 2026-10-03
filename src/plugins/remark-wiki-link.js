@@ -8,7 +8,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { slug } from "github-slugger";
-import matter from "gray-matter";
+import matter from "../../api/_lib/safe-matter.mjs";
 import { coverImageConfig } from "../config/coverImageConfig.ts";
 import { getApiUrlList, processCoverImageSync } from "../utils/image-utils.ts";
 import { getPostUrlBySlug, url } from "../utils/url-utils.ts";

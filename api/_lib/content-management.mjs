@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import matter from 'gray-matter';
+import matter from './safe-matter.mjs';
 import { MAX_IMAGE_BYTES } from './writing-session.mjs';
 import { normalizeAnnouncements, validateAnnouncements } from '../../src/utils/announcement-data.mjs';
 
@@ -118,7 +118,7 @@ export function createLocalStore(root) {
           if(item.name.startsWith('.') || item.isSymbolicLink()) continue;
           const file = `${rel}/${item.name}`;
           if(item.isDirectory()) await walk(path.join(dir,item.name),file);
-          else if(item.isFile() && /\.md$/.test(item.name)) results.push(file);
+          else if(item.isFile() && /\.mdx?$/.test(item.name)) results.push(file);
         }
       }
       await walk(await target(prefix),prefix);
@@ -160,7 +160,7 @@ export function createGithubStore({request, repo, branch}) {
     async list(prefix) {
       const data = await checked(await request(`/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`));
       if(data.truncated) fail('仓库目录过大，请通过 Git 管理内容',413);
-      return data.tree.filter(x=>x.type==='blob' && x.path.startsWith(prefix+'/') && x.path.endsWith('.md')).map(x=>x.path).sort();
+      return data.tree.filter(x=>x.type==='blob' && x.path.startsWith(prefix+'/') && /\.mdx?$/.test(x.path)).map(x=>x.path).sort();
     },
     async write(file,bytes,expected) {
       const data = await checked(await request(contents(file), {method:bytes===null?'DELETE':'PUT',body:JSON.stringify({message:`${bytes===null?'删除':'保存'}内容：${file}`,branch,...(expected?{sha:expected}:{}),...(bytes===null?{}:{content:Buffer.from(bytes).toString('base64')})})}));
@@ -174,7 +174,7 @@ export async function executeContent(store,module,method,body={}) {
   if(!config) fail('未知内容模块',404);
   if(method === 'GET' && !body.file && !config.file) return {items:(await store.list(config.root)).map(file=>({file:file.slice(config.root.length+1)}))};
   const file = config.file ? 'list.json' : body.file;
-  if(!validPath(file) || (!config.file && !file.endsWith('.md'))) fail('路径无效，仅支持 Markdown 文件');
+  if(!validPath(file) || (!config.file && !/\.mdx?$/.test(file))) fail('路径无效，仅支持 Markdown 或 MDX 文件');
   const destination = config.file || `${config.root}/${file}`;
   const current = await store.read(destination);
   if(method === 'GET') { if(!current) fail('文件不存在',404); return {file,...current}; }

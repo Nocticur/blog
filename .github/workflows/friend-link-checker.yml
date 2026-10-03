@@ -1,5 +1,9 @@
 name: 🤝 自动更新友链
 
+concurrency:
+  group: friend-request-updates
+  cancel-in-progress: false
+
 on:
   issues:
     types: [opened, reopened]
@@ -22,16 +26,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
 
       - name: Process friend request
         uses: actions/github-script@v7

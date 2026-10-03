@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { URL } = require('node:url');
-const { chromium } = require('playwright');
+const { validateApplication, isPublicAddress, hasBacklink, fetchPublicPage } = require('./friend-policy.cjs');
 
 const FRIENDS_CONFIG_RELATIVE_PATH = 'src/data/friends.json';
 
@@ -179,15 +179,8 @@ function updateFriendsConfig(repoRoot, data) {
 	};
 
 	const existingIndex = friends.findIndex((friend) => trimTrailingSlash(friend.siteurl) === normalizedUrl);
-	if (existingIndex >= 0) {
-		// 重复申请且未提交封面图时，保留旧数据中的封面图
-		if (!nextFriend.image && friends[existingIndex].image) {
-			nextFriend.image = friends[existingIndex].image;
-		}
-		friends[existingIndex] = nextFriend;
-	} else {
-		friends.push(nextFriend);
-	}
+	if (existingIndex >= 0) throw new Error('站点已存在，更新资料请联系站长人工审核');
+	friends.push(nextFriend);
 
 	const updatedContent = JSON.stringify(friends, null, 2) + "\n";
 
@@ -227,81 +220,12 @@ function formatFriendsConfig(repoRoot) {
 	run(biomeBinary, ["format", "--write", FRIENDS_CONFIG_RELATIVE_PATH], { cwd: repoRoot });
 }
 
-async function validateFriendPage(pageUrl) {
-	const browser = await chromium.launch({
-		headless: true,
-		args: ['--no-sandbox'],
-	});
-	const context = await browser.newContext({
-		userAgent:
-			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-	});
-	const page = await context.newPage();
-
-	let response = null;
-	let lastError = null;
-
-	try {
-		for (let index = 0; index < 3; index += 1) {
-			try {
-				response = await page.goto(pageUrl, {
-					waitUntil: 'domcontentloaded',
-					timeout: 12000,
-				});
-				if (response && response.ok()) break;
-				lastError = `HTTP ${response ? response.status() : 'unknown'}`;
-			} catch (error) {
-				lastError = error.message || '无法访问';
-			}
-			if (index < 2) {
-				await page.waitForTimeout(2000);
-			}
-		}
-
-		const actualUrl = page.url() || pageUrl;
-		const pageTitle = await page.title();
-		const statusCode = response ? response.status() : null;
-
-		if (!response || !response.ok()) {
-			return {
-				ok: false,
-				kind: 'unreachable',
-				actualUrl,
-				pageTitle,
-				statusCode,
-				error: lastError || '无法访问页面',
-			};
-		}
-
-		await page.waitForTimeout(3000);
-		const content = await page.content();
-		const allLinks = await page.evaluate(() => {
-			return Array.from(document.querySelectorAll('a[href]')).map((item) => item.href);
-		});
-
-		const joined = `${content}\n${allLinks.join('\n')}`.toLowerCase();
-		const backlinkHost = trimTrailingSlash(SITE_INFO.url).replace(/^https?:\/\//, '').toLowerCase();
-		const hasBacklink = joined.includes(backlinkHost) || joined.includes(SITE_INFO.name.toLowerCase());
-
-		if (!hasBacklink) {
-			return {
-				ok: false,
-				kind: 'missing-backlink',
-				actualUrl,
-				pageTitle,
-				statusCode,
-			};
-		}
-
-		return {
-			ok: true,
-			actualUrl,
-			pageTitle,
-			statusCode,
-		};
-	} finally {
-		await browser.close();
-	}
+async function validateFriendPage(pageUrl, siteUrl) {
+ try {
+  const response = await fetchPublicPage(pageUrl, new URL(siteUrl).origin);
+  const ok = response.status >= 200 && response.status < 300;
+  return { ok: ok && hasBacklink(response.content, SITE_INFO.url), kind: ok ? 'missing-backlink' : 'unreachable', actualUrl: response.actualUrl, pageTitle: '', statusCode: response.status };
+ } catch (error) { return {ok:false,kind:'unreachable',actualUrl:pageUrl,error:error.message}; }
 }
 
 async function addLabels(github, owner, repo, issueNumber, labels) {
@@ -418,7 +342,8 @@ module.exports = async function processFriendRequest({ github, context }) {
 			return;
 		}
 
-		const validation = await validateFriendPage(formData.friend_page_url);
+		validateApplication(formData);
+		const validation = await validateFriendPage(formData.friend_page_url, formData.site_url);
 
 		if (!validation.ok) {
 			const failureMessage =
@@ -502,3 +427,5 @@ ${formData.site_image ? `- 封面图: ${formData.site_image}\n` : ''}`
 		throw error;
 	}
 };
+
+module.exports.helpers = {validateApplication,isPublicAddress,hasBacklink,updateFriendsConfig};

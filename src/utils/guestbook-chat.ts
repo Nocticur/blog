@@ -254,10 +254,11 @@ export function flattenGuestbookComments(
 export function mergeGuestbookMessages(
 	current: GuestbookChatMessage[],
 	incoming: GuestbookChatMessage[],
+	{ replace = false }: { replace?: boolean } = {},
 ): GuestbookChatMessage[] {
 	const localMessages = current.filter((message) => message.localState);
 	const serverMessages = new Map(
-		current
+		(replace ? [] : current)
 			.filter((message) => !message.localState)
 			.map((message) => [message.id, message]),
 	);

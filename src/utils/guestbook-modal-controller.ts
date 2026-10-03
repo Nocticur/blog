@@ -53,7 +53,10 @@ export function bindGuestbookModalController(
 	}
 
 	const unbind = () => {
-		targetWindow.removeEventListener(GUESTBOOK_MODAL_TOGGLE_EVENT, handleToggle);
+		targetWindow.removeEventListener(
+			GUESTBOOK_MODAL_TOGGLE_EVENT,
+			handleToggle,
+		);
 		if (targetWindow.__fireflyGuestbookModalController === controller) {
 			delete targetWindow.__fireflyGuestbookModalController;
 		}

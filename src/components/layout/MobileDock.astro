@@ -15,10 +15,13 @@ import { LinkPresets } from "@/constants/link-presets";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
 import { LinkPreset, type NavBarLink } from "@/types/config";
+import {
+	announcementTitle,
+	visibleAnnouncements,
+} from "@/utils/announcement-data.mjs";
 import { getTagList } from "@/utils/content-utils";
 import { getFallbackFormat, getImageFormats } from "@/utils/image-utils";
 import { getTagUrl, url } from "@/utils/url-utils";
-import { announcementTitle, visibleAnnouncements } from "@/utils/announcement-data.mjs";
 
 const resolveLink = (link: NavBarLink | LinkPreset): NavBarLink =>
 	typeof link === "number" ? LinkPresets[link] : link;

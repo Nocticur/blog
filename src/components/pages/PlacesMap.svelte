@@ -1,23 +1,59 @@
 <script lang="ts">
- import {onMount} from "svelte";
- import {geoNaturalEarth1,geoPath,select,zoom,zoomIdentity,type ZoomBehavior} from "d3";
- export let places:{id:string;name:string;lat:number|null;lng:number|null}[]=[];
- let svg:SVGSVGElement, layer:SVGGElement, message="正在加载地图";
- let behavior:ZoomBehavior<SVGSVGElement,unknown>;
- const projection=geoNaturalEarth1().fitSize([900,460],{type:"Sphere"});
- const project=(lng:number,lat:number)=>projection([lng,lat]) || [0,0];
- let land="";
- onMount(()=>{
-  const controller=new AbortController();
-  fetch("/maps/world-land.geojson",{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error();return r.json();})
-   .then(data=>{land=geoPath(projection)(data)||"";message="拖动地图或使用缩放按钮查看足迹";})
-   .catch(()=>{if(!controller.signal.aborted)message="地图暂不可用，仍可查看下方足迹列表";});
-  behavior=zoom<SVGSVGElement,unknown>().scaleExtent([1,8]).extent([[0,0],[900,460]])
-    .translateExtent([[-200,-100],[1100,560]]).on("zoom",event=>select(layer).attr("transform",event.transform));
-  select(svg).call(behavior).on("wheel.zoom",null);
-  return ()=>{controller.abort();select(svg).on(".zoom",null);};
- });
- const scale=(factor:number)=>select(svg).call(behavior.scaleBy,factor);
+import {
+	geoNaturalEarth1,
+	geoPath,
+	select,
+	type ZoomBehavior,
+	zoom,
+	zoomIdentity,
+} from "d3";
+import { onMount } from "svelte";
+export let places: {
+	id: string;
+	name: string;
+	lat: number | null;
+	lng: number | null;
+}[] = [];
+let svg: SVGSVGElement;
+let layer: SVGGElement;
+let message = "正在加载地图";
+let behavior: ZoomBehavior<SVGSVGElement, unknown>;
+const projection = geoNaturalEarth1().fitSize([900, 460], { type: "Sphere" });
+const project = (lng: number, lat: number) => projection([lng, lat]) || [0, 0];
+let land = "";
+onMount(() => {
+	const controller = new AbortController();
+	fetch("/maps/world-land.geojson", { signal: controller.signal })
+		.then((r) => {
+			if (!r.ok) throw new Error();
+			return r.json();
+		})
+		.then((data) => {
+			land = geoPath(projection)(data) || "";
+			message = "拖动地图或使用缩放按钮查看足迹";
+		})
+		.catch(() => {
+			if (!controller.signal.aborted)
+				message = "地图暂不可用，仍可查看下方足迹列表";
+		});
+	behavior = zoom<SVGSVGElement, unknown>()
+		.scaleExtent([1, 8])
+		.extent([
+			[0, 0],
+			[900, 460],
+		])
+		.translateExtent([
+			[-200, -100],
+			[1100, 560],
+		])
+		.on("zoom", (event) => select(layer).attr("transform", event.transform));
+	select(svg).call(behavior).on("wheel.zoom", null);
+	return () => {
+		controller.abort();
+		select(svg).on(".zoom", null);
+	};
+});
+const scale = (factor: number) => select(svg).call(behavior.scaleBy, factor);
 </script>
 <div class="rounded-2xl border border-neutral-500/20 overflow-hidden">
  <div class="flex items-center gap-2 p-3">

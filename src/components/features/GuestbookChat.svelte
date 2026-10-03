@@ -257,6 +257,10 @@ function persistAuthentication(user: GuestbookAuthUser) {
 }
 
 function clearAuthentication() {
+	dataController?.abort();
+	messages = messages.filter((message) => message.localState);
+	currentPage = 1;
+	totalCount = 0;
 	authUser = null;
 	editingMessageId = null;
 	editDraft = "";
@@ -364,6 +368,7 @@ async function loadInitial() {
 		messages = mergeGuestbookMessages(
 			messages,
 			flattenGuestbookComments(response.data),
+			{ replace: true },
 		);
 		currentPage = 1;
 		totalPages = response.totalPages;
@@ -418,7 +423,9 @@ async function syncLatest() {
 		const freshCount = incoming.filter(
 			(message) => !knownIds.has(message.id),
 		).length;
-		messages = mergeGuestbookMessages(messages, incoming);
+		messages = mergeGuestbookMessages(messages, incoming, {
+			replace: currentPage === 1,
+		});
 		totalPages = response.totalPages;
 		totalCount = response.count;
 		lastSyncedAt = Date.now();

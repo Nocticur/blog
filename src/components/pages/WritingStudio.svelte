@@ -23,8 +23,17 @@ import {
 } from "lucide-svelte";
 import { marked } from "marked";
 import { onMount } from "svelte";
+import {
+	buildPostMutation,
+	getTabBufferKey,
+	loadLocalBuffer,
+	type PostEditorState,
+	type PostIntent,
+	postDeleteUrl,
+	removeLocalBuffer,
+	saveLocalBuffer,
+} from "@/utils/admin-editor-state";
 import { sanitizeMarkdownHtml } from "@/utils/admin-markdown-preview";
-import { buildPostMutation, getTabBufferKey, loadLocalBuffer, postDeleteUrl, removeLocalBuffer, saveLocalBuffer, type PostEditorState, type PostIntent } from "@/utils/admin-editor-state";
 import "@/styles/components/writing-studio.css";
 
 interface PostItem {
@@ -55,7 +64,19 @@ interface PostDetail {
 	content: string;
 }
 
-let { defaultRepo = "", authenticated = false, isActive = true, embedded = false, onsessionexpired }: { defaultRepo?: string; authenticated?: boolean; isActive?: boolean; embedded?: boolean; onsessionexpired?: () => void } = $props();
+let {
+	defaultRepo = "",
+	authenticated = false,
+	isActive = true,
+	embedded = false,
+	onsessionexpired,
+}: {
+	defaultRepo?: string;
+	authenticated?: boolean;
+	isActive?: boolean;
+	embedded?: boolean;
+	onsessionexpired?: () => void;
+} = $props();
 
 // --- 会话与视图状态 ---
 const bufferKey = () => getTabBufferKey(sessionStorage, "posts:editor");
@@ -114,7 +135,9 @@ let coverFileInput: HTMLInputElement | undefined = $state();
 let uploadingCover = $state(false);
 let coverUploadError = $state("");
 
-const previewHtml = $derived(sanitizeMarkdownHtml(marked.parse(content) as string));
+const previewHtml = $derived(
+	sanitizeMarkdownHtml(marked.parse(content) as string),
+);
 const allCategories = $derived([
 	...new Set(posts.map((p) => p.category).filter(Boolean)),
 ]);
@@ -156,7 +179,14 @@ $effect(() => {
 });
 
 $effect(() => {
-	if (mounted && embedded && authenticated && isActive && view === "login" && !listLoading) {
+	if (
+		mounted &&
+		embedded &&
+		authenticated &&
+		isActive &&
+		view === "login" &&
+		!listLoading
+	) {
 		void initializeWorkspace();
 	}
 });
@@ -169,8 +199,13 @@ async function initializeWorkspace() {
 // --- 登录 ---
 async function logout() {
 	persistNow();
-	const res = await fetch("/api/writing/logout/", { method: "POST" }).catch(() => null);
-	if (!res?.ok) { listError = "退出失败，请重试"; return; }
+	const res = await fetch("/api/writing/logout/", { method: "POST" }).catch(
+		() => null,
+	);
+	if (!res?.ok) {
+		listError = "退出失败，请重试";
+		return;
+	}
 	password = "";
 	loginError = "";
 	view = "login";
@@ -231,15 +266,27 @@ function authHeaders(): Record<string, string> {
 }
 
 function editorState(): PostEditorState {
-	return { file: editingFile, version: editingVersion, originalDraft, form: { ...form }, tags: [...tags], content };
+	return {
+		file: editingFile,
+		version: editingVersion,
+		originalDraft,
+		form: { ...form },
+		tags: [...tags],
+		content,
+	};
 }
 
 function persistNow() {
 	if (!bufferEnabled || JSON.stringify(editorState()) === baseline) return;
 	try {
-		const result = saveLocalBuffer(localStorage, bufferKey(), { ...editorState(), previousLocalCopy });
+		const result = saveLocalBuffer(localStorage, bufferKey(), {
+			...editorState(),
+			previousLocalCopy,
+		});
 		bufferStatus = result.ok ? "已暂存到本机" : result.error;
-	} catch { bufferStatus = "本机暂存失败，请保留当前页面或复制正文。"; }
+	} catch {
+		bufferStatus = "本机暂存失败，请保留当前页面或复制正文。";
+	}
 }
 
 $effect(() => {
@@ -250,43 +297,100 @@ $effect(() => {
 
 function restoreBuffer(expectedFile?: string | null) {
 	try {
-		const restored = loadLocalBuffer<PostEditorState & { previousLocalCopy?: string }>(localStorage, bufferKey());
-		if (restored.error) { bufferStatus = restored.error; return; }
+		const restored = loadLocalBuffer<
+			PostEditorState & { previousLocalCopy?: string }
+		>(localStorage, bufferKey());
+		if (restored.error) {
+			bufferStatus = restored.error;
+			return;
+		}
 		const saved = restored.value;
-		if (!saved || typeof saved.content !== "string" || typeof saved.version !== "string" || typeof saved.originalDraft !== "boolean" || !saved.form || !Array.isArray(saved.tags) || (expectedFile !== undefined && saved.file !== expectedFile)) return;
-		editingFile = saved.file; editingVersion = saved.version; originalDraft = saved.originalDraft;
-		form = { ...form, ...saved.form } as typeof form; tags = [...saved.tags]; content = saved.content;
-		previousLocalCopy = typeof saved.previousLocalCopy === "string" ? saved.previousLocalCopy : "";
-		slugTouched = true; bufferEnabled = true; baseline = "restored";
+		if (
+			!saved ||
+			typeof saved.content !== "string" ||
+			typeof saved.version !== "string" ||
+			typeof saved.originalDraft !== "boolean" ||
+			!saved.form ||
+			!Array.isArray(saved.tags) ||
+			(expectedFile !== undefined && saved.file !== expectedFile)
+		)
+			return;
+		editingFile = saved.file;
+		editingVersion = saved.version;
+		originalDraft = saved.originalDraft;
+		form = { ...form, ...saved.form } as typeof form;
+		tags = [...saved.tags];
+		content = saved.content;
+		previousLocalCopy =
+			typeof saved.previousLocalCopy === "string"
+				? saved.previousLocalCopy
+				: "";
+		slugTouched = true;
+		bufferEnabled = true;
+		baseline = "restored";
 		bufferStatus = "已恢复本机暂存；保存时仍校验最初读取的版本";
 		view = "editor";
-	} catch { bufferStatus = "无法读取本机暂存，请检查浏览器存储权限。"; }
+	} catch {
+		bufferStatus = "无法读取本机暂存，请检查浏览器存储权限。";
+	}
 }
 
 function applyRepository(data: PostDetail) {
 	const fm = data.frontmatter;
-	editingFile = data.file; editingVersion = data.version; originalDraft = fm.draft;
+	editingFile = data.file;
+	editingVersion = data.version;
+	originalDraft = fm.draft;
 	slugTouched = true;
-	form = { title: fm.title, slug: data.file.replace(/\.(md|mdx)$/i, ""), published: fm.published, updated: fm.updated, description: fm.description, image: fm.image, category: fm.category, draft: fm.draft };
-	tags = [...fm.tags]; tagInput = ""; content = data.content;
-	baseline = JSON.stringify(editorState()); bufferEnabled = true; bufferStatus = "";
+	form = {
+		title: fm.title,
+		slug: data.file.replace(/\.(md|mdx)$/i, ""),
+		published: fm.published,
+		updated: fm.updated,
+		description: fm.description,
+		image: fm.image,
+		category: fm.category,
+		draft: fm.draft,
+	};
+	tags = [...fm.tags];
+	tagInput = "";
+	content = data.content;
+	baseline = JSON.stringify(editorState());
+	bufferEnabled = true;
+	bufferStatus = "";
 }
 
 async function compareRepository() {
 	if (!editingFile) return;
 	try {
-		const res = await fetch(`/api/writing/posts/?file=${encodeURIComponent(editingFile)}`, { cache: "no-store" });
-		if (res.status === 401) { handleSessionExpired(); return; }
+		const res = await fetch(
+			`/api/writing/posts/?file=${encodeURIComponent(editingFile)}`,
+			{ cache: "no-store" },
+		);
+		if (res.status === 401) {
+			handleSessionExpired();
+			return;
+		}
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		repositoryCopy = await res.json();
-	} catch { saveError = "读取仓库版本失败，当前输入已保留，请重试。"; }
+	} catch {
+		saveError = "读取仓库版本失败，当前输入已保留，请重试。";
+	}
 }
 
 function useRepositoryCopy() {
-	if (!repositoryCopy || !confirm("将仓库版作为新的编辑基础？当前本机内容将保留在下方比较区，请手动合并后再保存。")) return;
+	if (
+		!repositoryCopy ||
+		!confirm(
+			"将仓库版作为新的编辑基础？当前本机内容将保留在下方比较区，请手动合并后再保存。",
+		)
+	)
+		return;
 	previousLocalCopy = JSON.stringify(editorState(), null, 2);
-	applyRepository(repositoryCopy); conflict = false; saveError = "";
-	baseline = "merged"; persistNow();
+	applyRepository(repositoryCopy);
+	conflict = false;
+	saveError = "";
+	baseline = "merged";
+	persistNow();
 }
 
 async function loadList() {
@@ -343,7 +447,9 @@ async function openEdit(item: PostItem) {
 		coverUploadError = "";
 		mobilePane = "edit";
 		view = "editor";
-		conflict = false; repositoryCopy = null; previousLocalCopy = "";
+		conflict = false;
+		repositoryCopy = null;
+		previousLocalCopy = "";
 		restoreBuffer(data.file);
 	} catch {
 		listError = "读取文章失败，请重试";
@@ -352,7 +458,8 @@ async function openEdit(item: PostItem) {
 
 function openCreate() {
 	editingFile = null;
-	editingVersion = ""; originalDraft = true;
+	editingVersion = "";
+	originalDraft = true;
 	slugTouched = false;
 	form = {
 		title: "",
@@ -373,8 +480,11 @@ function openCreate() {
 	justSavedUrl = "";
 	mobilePane = "edit";
 	view = "editor";
-	conflict = false; repositoryCopy = null; previousLocalCopy = "";
-	baseline = ""; bufferEnabled = true;
+	conflict = false;
+	repositoryCopy = null;
+	previousLocalCopy = "";
+	baseline = "";
+	bufferEnabled = true;
 	restoreBuffer(null);
 }
 
@@ -382,7 +492,11 @@ async function uploadCover(event: Event) {
 	const input = event.currentTarget as HTMLInputElement;
 	const file = input.files?.[0];
 	if (!file || uploadingCover) return;
-	if (file.size > 3 * 1024 * 1024) { coverUploadError = "图片不能超过 3 MiB"; input.value = ""; return; }
+	if (file.size > 3 * 1024 * 1024) {
+		coverUploadError = "图片不能超过 3 MiB";
+		input.value = "";
+		return;
+	}
 
 	coverUploadError = "";
 	uploadingCover = true;
@@ -447,17 +561,25 @@ async function savePost(intent: PostIntent = "save"): Promise<string | null> {
 		justSavedFile = (data as { file?: string }).file ?? "";
 		// 线上模式保存即提交，响应里带 commit 链接
 		justSavedUrl = (data as { url?: string }).url ?? "";
-		bufferEnabled = false; baseline = JSON.stringify(editorState());
-		try { const cleared = removeLocalBuffer(localStorage, bufferKey()); bufferStatus = cleared.ok ? "" : cleared.error; } catch { bufferStatus = "本机暂存无法清除，请核对仓库内容。"; }
+		bufferEnabled = false;
+		baseline = JSON.stringify(editorState());
+		try {
+			const cleared = removeLocalBuffer(localStorage, bufferKey());
+			bufferStatus = cleared.ok ? "" : cleared.error;
+		} catch {
+			bufferStatus = "本机暂存无法清除，请核对仓库内容。";
+		}
 		// 发布的文章回到「我的文章」，草稿留在草稿箱
 		listTab = body.draft ? "drafts" : "published";
 		await loadList();
 		return justSavedFile || null;
 	} catch (error) {
 		saveError =
-			error instanceof Error && error.message.includes("版本") ? error.message : mode === "deployed"
-				? "保存失败：无法连接写作服务，请重试"
-				: "保存失败：无法连接本地写作服务（请确认 npm run dev 正在运行）";
+			error instanceof Error && error.message.includes("版本")
+				? error.message
+				: mode === "deployed"
+					? "保存失败：无法连接写作服务，请重试"
+					: "保存失败：无法连接本地写作服务（请确认 npm run dev 正在运行）";
 		return null;
 	} finally {
 		saving = false;
@@ -468,13 +590,10 @@ async function deletePost(item: PostItem) {
 	if (!confirm(`确定删除《${item.title}》吗？此操作不可恢复。`)) return;
 	listError = "";
 	try {
-		const res = await fetch(
-			postDeleteUrl(item.file, item.version),
-			{
-				method: "DELETE",
-				headers: authHeaders(),
-			},
-		);
+		const res = await fetch(postDeleteUrl(item.file, item.version), {
+			method: "DELETE",
+			headers: authHeaders(),
+		});
 		if (res.status === 401) {
 			handleSessionExpired();
 			return;
@@ -574,11 +693,16 @@ onMount(() => {
 				if (!res.ok) return;
 			}
 			await initializeWorkspace();
-		} catch { loginError = "无法连接管理服务，请重试。"; }
+		} catch {
+			loginError = "无法连接管理服务，请重试。";
+		}
 	};
 	if (!embedded) void start();
 	window.addEventListener("beforeunload", persistNow);
-	return () => { persistNow(); window.removeEventListener("beforeunload", persistNow); };
+	return () => {
+		persistNow();
+		window.removeEventListener("beforeunload", persistNow);
+	};
 });
 </script>
 

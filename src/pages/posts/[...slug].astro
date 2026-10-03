@@ -1,5 +1,4 @@
 ---
-import { render } from "astro:content";
 import Comment from "@components/comment/index.astro";
 import Icon from "@components/common/Icon.astro";
 import Markdown from "@components/common/Markdown.astro";
@@ -9,9 +8,10 @@ import KatexManager from "@components/features/KatexManager.astro";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
-import SharePoster from "@/components/features/SharePoster.svelte";
 import QRCode from "qrcode";
+import SharePoster from "@/components/features/SharePoster.svelte";
 import PostHeaderNav from "@/components/misc/PostHeaderNav.astro";
+import { renderPostOnce } from "@/utils/post-render";
 import "@/styles/components/post-hero.css";
 import "@/styles/components/post-header-nav.css";
 import { getSortedPosts } from "@utils/content-utils";
@@ -54,7 +54,7 @@ export async function getStaticPaths() {
 }
 
 const { entry } = Astro.props;
-const { Content, remarkPluginFrontmatter } = await render(entry);
+const { Content, remarkPluginFrontmatter } = await renderPostOnce(entry);
 const publishedDateParts = formatDateI18nParts(entry.data.published);
 const postAiSummaryModel = "DeepSeek";
 
@@ -217,6 +217,7 @@ const serializedJsonLd = serializeJsonLd(jsonLd);
   lang={entry.data.lang}
   setOGTypeArticle={true}
   postSlug={entry.id}
+  ogImage={structuredImageUrl}
   postCategory={entry.data.category || undefined}
   bannerPostMeta={bannerPostMeta}
   articleMeta={{

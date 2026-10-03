@@ -366,3 +366,8 @@
 		}
 	}
 }
+.article-outline-rail__browse-row { display:flex;align-items:center;gap:.2rem; }
+.article-outline-rail__browse-row[hidden] { display:none; }
+.article-outline-rail__browse-row > a { flex:1;min-width:0; }
+.article-outline-rail__browse-row > button { flex:none;width:1.4rem;cursor:pointer; }
+.article-outline-rail__browse-row > button:focus-visible { outline:2px solid var(--primary);border-radius:.2rem; }

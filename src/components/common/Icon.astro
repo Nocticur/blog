@@ -1,11 +1,6 @@
 ---
 import type { HTMLAttributes } from "astro/types";
-/**
- * 本地 Icon 包装组件
- * 强制使用 is:inline 模式，直接输出 SVG 路径，不依赖 sprite
- * 解决 astro-icon v1.x 的 sprite 机制在 SSG 模式下丢失 <symbol> 定义的 bug
- */
-import { Icon as AstroIcon } from "astro-icon/components";
+import { renderLocalIcon } from "@/utils/local-icon.mjs";
 
 interface Props extends HTMLAttributes<"svg"> {
 	name: string;
@@ -17,7 +12,21 @@ interface Props extends HTMLAttributes<"svg"> {
 	height?: number | string;
 }
 
-const { name, "is:inline": _, ...rest } = Astro.props;
+const {
+	name,
+	"is:inline": _,
+	title,
+	desc,
+	size,
+	width,
+	height,
+	...rest
+} = Astro.props;
+const icon = renderLocalIcon(name);
 ---
 
-<AstroIcon name={name as any} is:inline {...rest} />
+<svg xmlns="http://www.w3.org/2000/svg" {...icon.attributes} width={width ?? size ?? "1em"} height={height ?? size ?? "1em"} role={title ? "img" : undefined} aria-hidden={title ? undefined : "true"} data-icon={name} {...rest}>
+  {title && <title>{title}</title>}
+  {desc && <desc>{desc}</desc>}
+  <Fragment set:html={icon.body} />
+</svg>

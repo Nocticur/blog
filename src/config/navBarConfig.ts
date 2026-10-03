@@ -28,8 +28,12 @@ const buildNavBarConfig = (): NavBarConfig => {
 	}
 
 	if (siteConfig.pages.dynamic) {
-		postsChildren.push({ name: "动态", url: "/dynamic/", icon: "material-symbols:dynamic-feed" });
-	}	// 子项全部关闭时不渲染空的下拉菜单
+		postsChildren.push({
+			name: "动态",
+			url: "/dynamic/",
+			icon: "material-symbols:dynamic-feed",
+		});
+	} // 子项全部关闭时不渲染空的下拉菜单
 	const postsNav: NavBarLink | null =
 		postsChildren.length > 0
 			? {
@@ -57,23 +61,47 @@ const buildNavBarConfig = (): NavBarConfig => {
 	}
 
 	if (siteConfig.pages.calendar) {
-		myChildren.push({ name: "日历", url: "/calendar/", icon: "material-symbols:calendar-month" });
+		myChildren.push({
+			name: "日历",
+			url: "/calendar/",
+			icon: "material-symbols:calendar-month",
+		});
 	}
 	if (siteConfig.pages.pengyou) {
-		myChildren.push({ name: "朋友圈", url: "/pengyou/", icon: "material-symbols:group" });
+		myChildren.push({
+			name: "朋友圈",
+			url: "/pengyou/",
+			icon: "material-symbols:group",
+		});
 	}
 	if (siteConfig.pages.places) {
-		myChildren.push({ name: "足迹", url: "/life/places/", icon: "material-symbols:map" });
+		myChildren.push({
+			name: "足迹",
+			url: "/life/places/",
+			icon: "material-symbols:map",
+		});
 	}
 	if (siteConfig.pages.routines) {
-		myChildren.push({ name: "规划", url: "/life/routines/", icon: "material-symbols:checklist" });
+		myChildren.push({
+			name: "规划",
+			url: "/life/routines/",
+			icon: "material-symbols:checklist",
+		});
 	}
 	if (siteConfig.pages.books) {
-		myChildren.push({ name: "笔记本", url: "/life/notebooks/", icon: "material-symbols:menu-book" });
+		myChildren.push({
+			name: "笔记本",
+			url: "/life/notebooks/",
+			icon: "material-symbols:menu-book",
+		});
 	}
 	if (siteConfig.pages.timeline) {
-		myChildren.push({ name: "时间线", url: "/timeline/", icon: "material-symbols:history" });
-	}	// 子项全部关闭时不渲染空的下拉菜单
+		myChildren.push({
+			name: "时间线",
+			url: "/timeline/",
+			icon: "material-symbols:history",
+		});
+	} // 子项全部关闭时不渲染空的下拉菜单
 	const myNav: NavBarLink | null =
 		myChildren.length > 0
 			? {

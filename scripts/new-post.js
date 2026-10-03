@@ -2,7 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import matter from "gray-matter";
+import matter from "../api/_lib/safe-matter.mjs";
 
 function getDate() {
 	const today = new Date();

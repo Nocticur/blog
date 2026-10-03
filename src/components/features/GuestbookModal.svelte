@@ -1,11 +1,11 @@
 <script lang="ts">
+import { navigateToPage } from "@utils/navigation-utils";
 import { onMount } from "svelte";
+import GuestbookChat from "@/components/features/GuestbookChat.svelte";
 import I18nKey from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
-import { navigateToPage } from "@utils/navigation-utils";
-import { url as formatUrl } from "@/utils/url-utils";
 import { bindGuestbookModalController } from "@/utils/guestbook-modal-controller";
-import GuestbookChat from "@/components/features/GuestbookChat.svelte";
+import { url as formatUrl } from "@/utils/url-utils";
 import "@/styles/components/guestbook-chat.css";
 
 // --- State ---

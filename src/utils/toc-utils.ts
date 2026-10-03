@@ -183,20 +183,21 @@ export class TOCManager {
 						: heading.id || "Heading";
 			}
 
-			const escapedHeadingText = this.escapeHtmlAttr(headingText);
+			const escapedHeadingText = this.escapeHtmlAttr(String(headingText));
+			const escapedHeadingId = this.escapeHtmlAttr(heading.id);
 
 			tocHTML += `
         <a 
-          href="#${heading.id}" 
+          href="#${this.escapeHtmlAttr(encodeURIComponent(heading.id))}"
 			  class="toc-item toc-level-${depthLevel}"
-          data-heading-id="${heading.id}"
+          data-heading-id="${escapedHeadingId}"
 		  aria-label="${escapedHeadingText}"
 		  title="${escapedHeadingText}"
         >
 			  <div class="toc-badge ${depth === this.minDepth ? "toc-badge-index" : ""}">
             ${badgeContent}
           </div>
-			  <div class="toc-label ${depth <= this.minDepth + 1 ? "toc-label-primary" : "toc-label-secondary"}">${headingText}</div>
+			  <div class="toc-label ${depth <= this.minDepth + 1 ? "toc-label-primary" : "toc-label-secondary"}">${escapedHeadingText}</div>
         </a>
       `;
 		});

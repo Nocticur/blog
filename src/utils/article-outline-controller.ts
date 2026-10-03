@@ -1,4 +1,5 @@
 import { definePageIsland } from "@/utils/swup-lifecycle";
+import { buildOutlineTree } from "./article-outline-tree";
 
 type OutlineLevel = 1 | 2 | 3;
 
@@ -67,6 +68,8 @@ export class ArticleOutlineRailController {
 	private railBarsByHeading: HTMLElement[][] = [];
 	private railBarCentersByHeading: number[][] = [];
 	private activeIndex = -1;
+	private collapsedHeadings = new Set<number>();
+	private outlineTree: ReturnType<typeof buildOutlineTree> = [];
 	private activeRailBar: HTMLElement | null = null;
 	private isScrolling = false;
 	private articleStart = 0;
@@ -286,9 +289,21 @@ export class ArticleOutlineRailController {
 
 	private renderBrowseList(): void {
 		if (!this.browseList) return;
+		this.outlineTree = buildOutlineTree(this.headings);
 
 		const fragment = document.createDocumentFragment();
 		this.headings.forEach((heading) => {
+			const row = document.createElement("div");
+			row.dataset.outlineRow = String(heading.index);
+			row.className = "article-outline-rail__browse-row";
+			const node = this.outlineTree[heading.index];
+			if (node.children.length) {
+				const toggle = document.createElement("button");
+				toggle.type = "button";
+				toggle.dataset.outlineToggle = String(heading.index);
+				toggle.textContent = "▾";
+				row.append(toggle);
+			}
 			const item = document.createElement("a");
 			item.className = "article-outline-rail__browse-item";
 			item.dataset.outlineTarget = String(heading.index);
@@ -298,9 +313,37 @@ export class ArticleOutlineRailController {
 				: "#";
 			item.title = heading.text;
 			item.textContent = heading.text;
-			fragment.appendChild(item);
+			row.append(item);
+			fragment.appendChild(row);
 		});
 		this.browseList.replaceChildren(fragment);
+		this.syncOutlineBranches();
+	}
+	private syncOutlineBranches(): void {
+		for (const node of this.outlineTree) {
+			let parent = node.parent;
+			let hidden = false;
+			while (parent !== null) {
+				if (this.collapsedHeadings.has(parent)) hidden = true;
+				parent = this.outlineTree[parent].parent;
+			}
+			const row = this.browseList?.querySelector<HTMLElement>(
+				`[data-outline-row="${node.index}"]`,
+			);
+			if (row) row.hidden = hidden;
+			const toggle = row?.querySelector<HTMLButtonElement>(
+				"[data-outline-toggle]",
+			);
+			if (toggle) {
+				const expanded = !this.collapsedHeadings.has(node.index);
+				toggle.setAttribute("aria-expanded", String(expanded));
+				toggle.setAttribute(
+					"aria-label",
+					`${expanded ? "收起" : "展开"} ${this.headings[node.index].text}`,
+				);
+				toggle.textContent = expanded ? "▾" : "▸";
+			}
+		}
 	}
 
 	private bindInteractions(): void {
@@ -381,6 +424,12 @@ export class ArticleOutlineRailController {
 		const nextActiveIndex = this.getActiveIndex();
 		if (nextActiveIndex !== this.activeIndex) {
 			this.activeIndex = nextActiveIndex;
+			let parent = this.outlineTree[nextActiveIndex]?.parent ?? null;
+			while (parent !== null) {
+				this.collapsedHeadings.delete(parent);
+				parent = this.outlineTree[parent].parent;
+			}
+			this.syncOutlineBranches();
 			if (!this.isScrolling || this.root.classList.contains("is-expanded")) {
 				this.syncActiveHeading(this.headings[nextActiveIndex]);
 			}
@@ -520,6 +569,17 @@ export class ArticleOutlineRailController {
 
 	private navigateToHeading(event: Event): void {
 		const target = event.target as Element | null;
+		const toggle = target?.closest<HTMLElement>("[data-outline-toggle]");
+		if (toggle) {
+			const index = Number(toggle.dataset.outlineToggle);
+			if (!this.outlineTree[index]) return;
+			event.preventDefault();
+			this.collapsedHeadings.has(index)
+				? this.collapsedHeadings.delete(index)
+				: this.collapsedHeadings.add(index);
+			this.syncOutlineBranches();
+			return;
+		}
 		const item = target?.closest<HTMLElement>("[data-outline-target]");
 		if (!item) return;
 

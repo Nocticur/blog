@@ -1,5 +1,7 @@
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
+import { siteConfig } from "../config/siteConfig";
+import { taxonomyPath } from "./term-slug";
 
 /**
  * 移除文件扩展名（.md, .mdx, .markdown）
@@ -22,7 +24,7 @@ export function getPostUrlBySlug(slug: string): string {
 
 export function getTagUrl(tag: string): string {
 	if (!tag) return url("/archive/");
-	return url(`/archive/?tag=${encodeURIComponent(tag.trim())}`);
+	return url(taxonomyPath("tags", tag, siteConfig.pages.categories));
 }
 
 export function getCategoryUrl(category: string | null): string {
@@ -32,7 +34,7 @@ export function getCategoryUrl(category: string | null): string {
 		category.trim().toLowerCase() === i18n(I18nKey.uncategorized).toLowerCase()
 	)
 		return url("/archive/?uncategorized=true");
-	return url(`/archive/?category=${encodeURIComponent(category.trim())}`);
+	return url(taxonomyPath("categories", category, siteConfig.pages.categories));
 }
 
 export function getFileDirFromPath(filePath: string): string {

@@ -1,13 +1,20 @@
 ---
-import FilteredList from "@/components/features/FilteredList.astro";
-import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { getCollection, render } from "astro:content";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import FilteredList from "@/components/features/FilteredList.astro";
 import { siteConfig } from "@/config";
 import { sortDynamicEntries } from "@/utils/feature-data";
 
 if (!siteConfig.pages.dynamic) return Astro.redirect("/404/");
-const entries = sortDynamicEntries((await getCollection("dynamic")).filter((entry) => !entry.data.draft));
-const renderedEntries = await Promise.all(entries.map(async (entry) => ({ entry, Content: (await render(entry)).Content })));
+const entries = sortDynamicEntries(
+	(await getCollection("dynamic")).filter((entry) => !entry.data.draft),
+);
+const renderedEntries = await Promise.all(
+	entries.map(async (entry) => ({
+		entry,
+		Content: (await render(entry)).Content,
+	})),
+);
 ---
 <MainGridLayout title="动态" description="记录生活中的点点滴滴">
   <div class="card-base p-6 md:p-9">

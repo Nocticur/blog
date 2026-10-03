@@ -1,5 +1,5 @@
-import type { AnnouncementConfig } from "../types/config";
 import announcementData from "../data/announcements.json";
+import type { AnnouncementConfig } from "../types/config";
 
 export const announcementConfig: AnnouncementConfig = {
 	// 公告标题
@@ -10,8 +10,7 @@ export const announcementConfig: AnnouncementConfig = {
 		{
 			tag: "欢迎",
 			title: "欢迎来到我的博客",
-			content:
-				"欢迎来到我的博客。",
+			content: "欢迎来到我的博客。",
 			time: "2026-08-13",
 			link: "/about/",
 			sort: 1,
@@ -19,8 +18,7 @@ export const announcementConfig: AnnouncementConfig = {
 		{
 			tag: "公告",
 			title: "公告",
-			content:
-				"本站所有内容仅为个人观念，如有不适，请自行关闭。",
+			content: "本站所有内容仅为个人观念，如有不适，请自行关闭。",
 			time: "2026-08-13",
 			sort: 2,
 		},

@@ -1,0 +1,16 @@
+---
+import PageTitle from "@/components/common/PageTitle.astro";
+import { siteConfig } from "@/config/siteConfig";
+import MainGridLayout from "@/layouts/MainGridLayout.astro";
+import { getTagList } from "@/utils/content-utils";
+import { getTagUrl } from "@/utils/url-utils";
+
+const tags = await getTagList();
+if (!siteConfig.pages.categories) return Astro.redirect("/404/");
+---
+<MainGridLayout title="全部标签" hasOwnH1>
+  <section class="card-base p-6 my-6">
+    <PageTitle title="全部标签" description="按主题浏览文章" variant="stacked" />
+    <ul class="flex flex-wrap gap-4 mt-6">{tags.map(tag => <li><a href={getTagUrl(tag.name)}>#{tag.name}（{tag.count}）</a></li>)}</ul>
+  </section>
+</MainGridLayout>

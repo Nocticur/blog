@@ -1,14 +1,24 @@
 ---
-import Layout from "@layouts/Layout.astro";
 import AdminDashboard from "@components/pages/AdminDashboard.svelte";
+import Layout from "@layouts/Layout.astro";
 import type { ImageMetadata } from "astro";
 import { expressiveCodeConfig, homeConfig } from "@/config";
 import { url } from "@/utils/url-utils";
 
 const avatar = homeConfig.avatar || "/assets/images/logo-nocticur.png";
-const images = import.meta.glob<ImageMetadata>("../**/*.{png,jpg,jpeg,webp,avif,gif,svg}", { import: "default" });
-const image = !avatar.startsWith("/") && !/^https?:\/\//.test(avatar) ? images["../" + avatar] : undefined;
-const avatarUrl = image ? (await image()).src : avatar.startsWith("/") ? url(avatar) : avatar;
+const images = import.meta.glob<ImageMetadata>(
+	"../**/*.{png,jpg,jpeg,webp,avif,gif,svg}",
+	{ import: "default" },
+);
+const image =
+	!avatar.startsWith("/") && !/^https?:\/\//.test(avatar)
+		? images["../" + avatar]
+		: undefined;
+const avatarUrl = image
+	? (await image()).src
+	: avatar.startsWith("/")
+		? url(avatar)
+		: avatar;
 ---
 <Layout title="博客管理" description="个人博客管理工作台" robots="noindex,nofollow" admin>
   <AdminDashboard client:load {avatarUrl} siteUrl={url("/")} darkTheme={expressiveCodeConfig.darkTheme} lightTheme={expressiveCodeConfig.lightTheme} />

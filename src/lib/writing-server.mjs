@@ -11,8 +11,15 @@
  * .env 文件仅作本地备选），绝不进前端或打包产物。
  */
 import { execSync } from "node:child_process";
-import matter from "gray-matter";
-export { resolvePasswordHash, verifyPassword, resolveSessionSecret, signSession, verifySession } from '../../api/_lib/writing-session.mjs';
+import matter from "../../api/_lib/safe-matter.mjs";
+
+export {
+	resolvePasswordHash,
+	resolveSessionSecret,
+	signSession,
+	verifyPassword,
+	verifySession,
+} from "../../api/_lib/writing-session.mjs";
 
 // 没有显式密码时拒绝登录。
 
@@ -68,7 +75,7 @@ export function formatDate(value) {
  */
 export function buildMarkdown(fm, content, existing = {}) {
 	const data = {
-        ...existing,
+		...existing,
 		title: String(fm.title || "").trim(),
 		published: formatDate(fm.published) || formatDate(new Date()),
 		description: String(fm.description || ""),
@@ -82,7 +89,7 @@ export function buildMarkdown(fm, content, existing = {}) {
 	};
 	const updated = formatDate(fm.updated);
 	if (updated) data.updated = updated;
- else delete data.updated;
+	else delete data.updated;
 	let md = matter.stringify(String(content || ""), data);
 	md = md.replace(/^(published|updated): '(\d{4}-\d{2}-\d{2})'$/gm, "$1: $2");
 	return md;

@@ -21,7 +21,10 @@
  * WRITING_SESSION_SECRET），除 /auth 和清除会话外的所有请求都要求有效 Cookie；
  * 密码哈希不随页面下发到浏览器。
  */
-import matter from "gray-matter";
+import { randomUUID } from 'node:crypto';
+import { createLoginLimiter, loginClient } from '../_lib/login-limiter.mjs';
+import matter from '../_lib/safe-matter.mjs';
+import { articleDateError } from '../_lib/article-validation.mjs';
 import {createGithubStore,executeContent,uploadContentImage} from "../_lib/content-management.mjs";
 import { resolvePasswordHash, verifyPassword, signSession, verifySession, cookieSession, sessionCookie, requireSameOrigin, MAX_IMAGE_BYTES, MAX_REQUEST_BYTES, assertRequestSize } from '../_lib/writing-session.mjs';
 
@@ -213,6 +216,7 @@ async function readRequestBody(request) {
 
 function adaptNodeRequest(request) {
 	return {
+		clientAddress: request.socket?.remoteAddress,
 		url: absoluteRequestUrl(request),
 		method: String(request.method || "GET").toUpperCase(),
 		headers: createHeaders(request.headers),
@@ -375,8 +379,11 @@ async function mapWithConcurrency(items, worker) {
 function sessionInfo() {
 	return { authenticated: true, mode: 'deployed', repo: resolveRepo(), branch: (process.env.WRITING_GITHUB_BRANCH || '').trim(), tokenReady: Boolean(process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN) };
 }
+const loginLimiter = createLoginLimiter();
 async function handleAuth(request) {
  if (!resolvePasswordHash()) return fail("请先配置 WRITING_PASSWORD 或 WRITING_PASSWORD_HASH",503);
+	const retryAfter = loginLimiter.consume(loginClient(request));
+	if (retryAfter) return json({ error: '登录尝试过多，请稍后重试' }, 429, { 'Retry-After': String(retryAfter) });
 	const body = await readJson(request);
 	if (!body || !verifyPassword(body.password)) {
 		return fail("密码不正确", 401);
@@ -468,7 +475,7 @@ async function handleUploadImage(request) {
 	const repo = pickRepo();
 	const token = requireToken();
 	const branch = await resolveBranch(repo, token);
-	const fileName = `${upload.slug}-${imageTimestamp()}${upload.extension}`;
+	const fileName = `${upload.slug}-${imageTimestamp()}-${randomUUID()}${upload.extension}`;
 	const remotePath = `src/content/posts/image/${upload.slug}.assets/${fileName}`;
 	const put = await githubFetch(
 		`/repos/${repo}/contents/${remotePath.split("/").map(encodeURIComponent).join("/")}`,
@@ -490,9 +497,8 @@ async function handleSave(request, isCreate) {
 	const body = await readJson(request);
 	if (!body) return fail("Invalid JSON body");
 	if (!String(body.title || "").trim()) return fail("Title is required");
-	if (!/^\d{4}-\d{2}-\d{2}$/.test(formatDate(body.published) || "")) {
-		return fail("Published date is required (YYYY-MM-DD)");
-	}
+	const dateError = articleDateError(body);
+	if (dateError) return fail(dateError);
 	const repo = pickRepo();
 	// 本地可判定的校验全部前置，通过后才发起 GitHub 请求
 	let file;

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, main ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -36,6 +36,27 @@ jobs:
 
       - name: Run Astro Check
         run: pnpm astro check
+      - name: Type check
+        run: pnpm type-check
+      - name: Unit and security regressions
+        run: pnpm test:unit
+      - name: Build and search index
+        run: pnpm build
+
+  browser:
+    runs-on: ubuntu-latest
+    name: Browser regressions
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chrome
+      - run: pnpm test:security-browser
+      - run: pnpm build
+      - run: pnpm test:browser
 
   quality:
     runs-on: ubuntu-latest
