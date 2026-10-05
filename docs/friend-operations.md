@@ -10,7 +10,7 @@ Vercel 项目环境变量配置 `IMGBED_BASE_URL=https://image.nocticur.eu.cc` �
 
 ## 执行时间与报告
 
-`Friend link check` 每天北京时间 10:00 计划运行（实际开始时间由 GitHub 调度决定），默认分支上的 `src/data/friends.json` 变更会触发，也可以在 Actions 手动运行。GitHub 友链申请流程写入友链后会调用同一个工作流，补足 `GITHUB_TOKEN` 产生的提交通常不会触发其他 push 工作流的情况。所有报告任务共享串行队列，不取消已经运行的检查。
+`Friend link check` 每天北京时间 10:00 计划运行（实际开始时间由 GitHub 调度决定），默认分支上的 `src/data/friends.json` 或巡检工作流变更会触发，也可以在 Actions 手动运行。本次首次发布会自动生成报告。GitHub 友链申请流程写入友链后会调用同一个工作流，补足 `GITHUB_TOKEN` 产生的提交通常不会触发其他 push 工作流的情况。所有报告任务共享串行队列，不取消已经运行的检查。
 
 工作流读取最新默认分支上的启用友链，只访问公网 HTTP(S) 地址；每次解析都校验全部 DNS 答案，连接使用校验过的地址，并限制跳转、时间和响应大小。首页可跟随公网跨域跳转；公开申请的友链页面仍保持同源要求。填写 `linkpage` 后才检测指向 `src/data/friend-site.json` 中本站地址的真实链接，未填写时报告「未检测」。
 
