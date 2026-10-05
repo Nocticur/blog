@@ -3,11 +3,7 @@
 	"outputDirectory": "dist",
 	"installCommand": "pnpm install",
 	"framework": "astro",
-	"git": {
-		"deploymentEnabled": {
-			"codex/friend-status": false
-		}
-	},
+	"ignoreCommand": "node scripts/ignore-report-deployment.mjs",
 	"rewrites": [
 		{
 			"source": "/api/writing/(.+)",

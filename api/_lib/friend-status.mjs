@@ -3,7 +3,7 @@ import path from 'node:path';
 import { friendWebUrl } from '../../src/utils/friend-data.mjs';
 
 const REPORT_FILE = 'reports/friend-links.json';
-const REPORT_BRANCH = 'codex/friend-status';
+const REPORT_BRANCH = 'master';
 const MAX_REPORT_BYTES = 1024 * 1024;
 const CACHE_MS = 300000;
 export const FRIEND_STATUS_CACHE_CONTROL = 'public, max-age=0, s-maxage=300, stale-while-revalidate=300';

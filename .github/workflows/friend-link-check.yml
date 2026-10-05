@@ -5,7 +5,7 @@ on:
     - cron: "0 2 * * *"
   workflow_dispatch:
   push:
-    branches: [main, master]
+    branches: [master]
     paths: [src/data/friends.json, .github/workflows/friend-link-check.yml]
   workflow_call:
     secrets:

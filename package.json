@@ -23,7 +23,7 @@
 		"test:hero": "node --test scripts/test-home-hero-stars.mjs",
 		"test:hero-browser": "node scripts/test-hero-admin-browser.mjs && node --test scripts/test-hero-stars-regressions.mjs",
 		"test:admin": "node --import tsx --test scripts/test-admin-editor-state.mjs scripts/test-admin-settings.mjs scripts/test-admin-modules.mjs",
-		"test:friends": "node --import tsx --test scripts/test-friend-backend.mjs scripts/test-friend-status.mjs scripts/test-friend-health.mjs",
+		"test:friends": "node --import tsx --test scripts/test-friend-backend.mjs scripts/test-friend-status.mjs scripts/test-friend-health.mjs scripts/test-ignore-report-deployment.mjs",
 		"test:admin-browser": "node scripts/test-admin-navigation-browser.mjs && node scripts/test-admin-state-browser.mjs && node scripts/test-admin-editor-browser.mjs && node scripts/test-content-manager-browser.mjs && node scripts/test-admin-workspace-browser.mjs && node scripts/test-admin-refinement-browser.mjs && node scripts/test-visitor-welcome-browser.mjs",
 		"check:friends": "tsx scripts/check-friends.ts",
 		"check:configuration": "node scripts/configuration-status.mjs",

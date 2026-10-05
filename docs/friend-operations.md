@@ -16,7 +16,7 @@ Vercel 项目环境变量配置 `IMGBED_BASE_URL=https://image.nocticur.eu.cc` �
 
 状态为 `ok`（正常）、`restricted`（401/403/429，检测受限）、`error`（访问异常）和 `unknown`（尚未检测）。反链失败不改变首页可访问状态。任何异常都不会自动停用或删除友链。超过 48 小时的报告由页面标记过期，公开状态接口不可用时仍显示原有卡片。
 
-报告固定写入独立 `codex/friend-status` 分支的 `reports/friend-links.json`。首次通过 GitHub API 创建不继承博客源码的独立提交，包含禁止部署的 `vercel.json`；后续通过 Contents API 携带文件 SHA 更新，发生版本冲突时有限重试，拒绝覆盖较新的报告，不使用强制推送。主分支的 Vercel 配置也禁止此报告分支自动部署。报告通过 `/api/friend-status` 读取并缓存五分钟，每次运行还保留 `friend-link-report` 附件。
+仓库只保留 `master` 分支，报告固定写入其中的 `reports/friend-links.json`。通过 Contents API 携带文件 SHA 更新，发生版本冲突时有限重试，拒绝覆盖较新的报告，不创建分支或使用强制推送。报告提交带有 `[skip ci]`，CI 也忽略仅报告文件的变更；Vercel 忽略脚本仅在相对上次成功部署的变化全部为报告文件时跳过构建，无法确认时正常构建。报告通过 `/api/friend-status` 读取并缓存五分钟，每次运行还保留 `friend-link-report` 附件。
 
 ## 截图规则与限制
 

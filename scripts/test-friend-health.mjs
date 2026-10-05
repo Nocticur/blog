@@ -163,33 +163,35 @@ test('screenshot interception blocks unsafe subresources and fulfills safe respo
   assert.equal(aborted.length, 1);
 });
 
-test('report publisher initializes an orphan disabled-deployment branch and uses Contents SHA on updates', async () => {
+test('report publisher creates and updates only the report file on master through the Contents API', async () => {
   assert.equal(typeof store.publishFriendReport, 'function');
+  assert.equal(store.reportBranch, 'master');
   let exists = false;
   let sha = 'first-report-sha';
   const writes = [];
   const report = { schemaVersion: 1, checkedAt: now.toISOString(), results: [] };
   const api = async (route, { method = 'GET', body } = {}) => {
     writes.push({ route, method, body });
-    if (route.includes('/git/ref/')) { if (!exists) { const e = new Error('not found'); e.status = 404; throw e; } return { object: { sha: 'head' } }; }
-    if (route.endsWith('/git/trees')) return { sha: 'tree' };
-    if (route.endsWith('/git/commits')) { assert.deepEqual(body.parents, []); return { sha: 'orphan' }; }
-    if (route.endsWith('/git/refs')) { exists = true; return {}; }
-    if (route.includes('/contents/vercel.json')) return { sha: 'config', content: Buffer.from('{"git":{"deploymentEnabled":false}}').toString('base64') };
-    if (route.includes('/contents/reports/friend-links.json')) {
-      if (method === 'GET') return { sha, content: Buffer.from(JSON.stringify({ checkedAt: '2026-10-04T00:00:00.000Z', results: [] })).toString('base64') };
-      assert.equal(body.sha, sha); assert.equal(body.branch, 'codex/friend-status'); sha = 'updated'; return {};
+    if (method === 'GET' && route === '/repos/owner/repo/contents/reports/friend-links.json?ref=master') {
+      if (!exists) { const error = new Error('not found'); error.status = 404; throw error; }
+      return { sha, content: Buffer.from(JSON.stringify({ checkedAt: '2026-10-04T00:00:00.000Z', results: [] })).toString('base64') };
+    }
+    if (method === 'PUT' && route === '/repos/owner/repo/contents/reports/friend-links.json') {
+      if (exists) assert.equal(body.sha, sha);
+      else assert.equal(Object.hasOwn(body, 'sha'), false);
+      assert.equal(body.branch, 'master');
+      assert.match(body.message, /\[skip ci\]/);
+      assert.deepEqual(JSON.parse(Buffer.from(body.content, 'base64').toString('utf8')), report);
+      exists = true; sha = 'updated'; return {};
     }
     throw new Error(`Unexpected ${route}`);
   };
   await store.publishFriendReport(report, { repository: 'owner/repo', api });
-  const tree = writes.find(item => item.route.endsWith('/git/trees'));
-  assert.equal(JSON.parse(tree.body.tree.find(item => item.path === 'vercel.json').content).git.deploymentEnabled, false);
-  assert.ok(tree.body.tree.some(item => item.path === 'reports/friend-links.json'));
+  assert.deepEqual(writes.map(item => item.method), ['GET', 'PUT']);
   writes.length = 0;
   await store.publishFriendReport(report, { repository: 'owner/repo', api });
   assert.equal(writes.filter(item => item.method === 'PUT').length, 1);
-  assert.ok(writes.every(item => !item.route.includes('/git/refs')));
+  assert.ok(writes.every(item => !item.route.includes('/git/') && !item.route.includes('/vercel.json')));
 });
 
 test('report writes retry a SHA conflict without force-pushing or overwriting a newer report', async () => {
@@ -197,16 +199,61 @@ test('report writes retry a SHA conflict without force-pushing or overwriting a 
   let gets = 0, puts = 0;
   const report = { schemaVersion: 1, checkedAt: now.toISOString(), results: [] };
   const api = async (route, { method = 'GET', body } = {}) => {
-    if (route.includes('/git/ref/')) return { object: { sha: 'head' } };
-    if (route.includes('/contents/vercel.json')) return { sha: 'config', content: Buffer.from('{"git":{"deploymentEnabled":false}}').toString('base64') };
+    assert.ok(route.startsWith('/repos/owner/repo/contents/reports/friend-links.json'));
     if (method === 'GET') { gets++; return { sha: `sha${gets}`, content: Buffer.from(JSON.stringify({ checkedAt: '2026-10-04T00:00:00.000Z' })).toString('base64') }; }
-    puts++; assert.equal(body.sha, `sha${gets}`);
+    puts++; assert.equal(body.sha, `sha${gets}`); assert.equal(body.branch, 'master');
     if (puts === 1) { const e = new Error('conflict'); e.status = 409; throw e; } return {};
   };
   await store.publishFriendReport(report, { repository: 'owner/repo', api });
   assert.equal(puts, 2);
-  const newerApi = async route => route.includes('/git/ref/') ? {} : route.includes('/vercel.json') ? { sha: 'config', content: Buffer.from('{"git":{"deploymentEnabled":false}}').toString('base64') } : { sha: 'newer', content: Buffer.from(JSON.stringify({ checkedAt: '2026-10-06T00:00:00.000Z' })).toString('base64') };
+  const newerApi = async (_route, { method = 'GET' } = {}) => {
+    assert.equal(method, 'GET', 'newer report must never be written over');
+    return { sha: 'newer', content: Buffer.from(JSON.stringify({ checkedAt: '2026-10-06T00:00:00.000Z' })).toString('base64') };
+  };
   await assert.rejects(store.publishFriendReport(report, { repository: 'owner/repo', api: newerApi }), /较新|newer/);
+});
+
+test('report publisher limits SHA conflict retries to three attempts', async () => {
+  let gets = 0, puts = 0;
+  const api = async (route, { method = 'GET', body } = {}) => {
+    assert.ok(route.startsWith('/repos/owner/repo/contents/reports/friend-links.json'));
+    if (method === 'GET') { gets++; return { sha: `sha${gets}`, content: Buffer.from(JSON.stringify({ checkedAt: '2026-10-04T00:00:00.000Z' })).toString('base64') }; }
+    puts++;
+    assert.equal(body.sha, `sha${gets}`);
+    const error = new Error('SHA conflict'); error.status = 409; throw error;
+  };
+  await assert.rejects(store.publishFriendReport({ checkedAt: now.toISOString(), results: [] }, { repository: 'owner/repo', api }), /SHA conflict/);
+  assert.equal(gets, 3);
+  assert.equal(puts, 3);
+});
+
+test('report retry checks the fresh report time before attempting another write', async () => {
+  let gets = 0, puts = 0;
+  const api = async (_route, { method = 'GET' } = {}) => {
+    if (method === 'GET') {
+      gets++;
+      return { sha: `sha${gets}`, content: Buffer.from(JSON.stringify({ checkedAt: gets === 1 ? '2026-10-04T00:00:00.000Z' : '2026-10-06T00:00:00.000Z' })).toString('base64') };
+    }
+    puts++;
+    const error = new Error('SHA conflict'); error.status = 409; throw error;
+  };
+  await assert.rejects(store.publishFriendReport({ checkedAt: now.toISOString(), results: [] }, { repository: 'owner/repo', api }), /较新|newer/);
+  assert.equal(gets, 2);
+  assert.equal(puts, 1);
+});
+
+test('previous reports are read from master and a missing first report has an empty fallback', async () => {
+  const report = { schemaVersion: 1, checkedAt: now.toISOString(), results: [] };
+  const actual = await store.loadPreviousReport({ repository: 'owner/repo', api: async route => {
+    assert.equal(route, '/repos/owner/repo/contents/reports/friend-links.json?ref=master');
+    return { content: Buffer.from(JSON.stringify(report)).toString('base64') };
+  } });
+  assert.deepEqual(actual, report);
+  const empty = await store.loadPreviousReport({ repository: 'owner/repo', api: async route => {
+    assert.equal(route, '/repos/owner/repo/contents/reports/friend-links.json?ref=master');
+    const error = new Error('not found'); error.status = 404; throw error;
+  } });
+  assert.deepEqual(empty, { schemaVersion: 1, checkedAt: null, results: [] });
 });
 
 test('friend request imports preserve the supplied backlink page', async () => {

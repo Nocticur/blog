@@ -11,7 +11,7 @@ test('public status service reads a fixed GitHub branch and path while caching a
     env:{WRITING_GITHUB_REPO:'owner/blog',GITHUB_TOKEN:'test-only-token'},now:()=>now,
     fetcher:async(url,init)=>{
       calls++;
-      assert.equal(url,'https://api.github.com/repos/owner/blog/contents/reports/friend-links.json?ref=codex%2Ffriend-status');
+      assert.equal(url,'https://api.github.com/repos/owner/blog/contents/reports/friend-links.json?ref=master');
       assert.equal(init.headers.Authorization,'Bearer test-only-token');
       assert.equal(init.redirect,'error');
       return Response.json({type:'file',size:JSON.stringify(report).length,content:Buffer.from(JSON.stringify(report)).toString('base64')});

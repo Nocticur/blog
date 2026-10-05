@@ -52,4 +52,3 @@ scripts/.old-guestbook-export.json
 
 # Local feature verification output
 .feature-*
-reports/friend-links.json
