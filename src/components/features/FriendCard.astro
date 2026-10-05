@@ -28,9 +28,10 @@ try {
 	target="_blank"
 	rel="noopener noreferrer"
 	data-friend-image={hasImage ? friend.image : undefined}
+	data-friend-url={friend.siteurl}
+	data-friend-manual-image={hasImage ? "true" : undefined}
 >
-	{hasImage && (
-		<span class="friend-card__cover image-pixel-reveal-host" data-friend-cover>
+		<span class="friend-card__cover image-pixel-reveal-host" data-friend-cover hidden={!hasImage}>
 			{/* 加载动效：图片加载完成后由脚本隐藏 */}
 			<span class="friend-card__cover-loader" aria-hidden="true"></span>
 			<span
@@ -46,7 +47,6 @@ try {
 				decoding="async"
 			/>
 		</span>
-	)}
 
 	<span class="friend-card__body">
 		<span class="friend-card__info">
@@ -81,5 +81,6 @@ try {
 		<span class="friend-card__divider" aria-hidden="true"></span>
 
 		<span class="friend-card__desc">{friend.desc}</span>
+		<span class="friend-card__health"><span data-friend-status data-status="unknown">尚未检测</span><span data-friend-check-time></span></span>
 	</span>
 </a>

@@ -16,5 +16,5 @@ try {
     await new Promise(resolve => setTimeout(resolve, 500));
   }
   if (!ready) throw new Error('Development server startup timed out');
-  for (const script of ['scripts/test-project-browser.mjs','scripts/test-feature-browser.mjs','scripts/test-admin-navigation-browser.mjs','scripts/test-admin-state-browser.mjs','scripts/test-admin-editor-browser.mjs','scripts/test-content-manager-browser.mjs','scripts/test-admin-workspace-browser.mjs','scripts/test-admin-refinement-browser.mjs','scripts/test-visitor-welcome-browser.mjs'].filter(script => script.includes(process.env.BROWSER_TEST_FILTER || ''))) await run(script);
+  for (const script of ['scripts/test-project-browser.mjs','scripts/test-feature-browser.mjs','scripts/test-admin-navigation-browser.mjs','scripts/test-admin-state-browser.mjs','scripts/test-admin-editor-browser.mjs','scripts/test-content-manager-browser.mjs','scripts/test-friends-editor-browser.mjs','scripts/test-friend-public-browser.mjs','scripts/test-admin-workspace-browser.mjs','scripts/test-admin-refinement-browser.mjs','scripts/test-visitor-welcome-browser.mjs'].filter(script => script.includes(process.env.BROWSER_TEST_FILTER || ''))) await run(script);
 } finally { await server.stop(); }

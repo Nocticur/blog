@@ -546,7 +546,13 @@ export function mountMusicPlayer(widget, { viewConfig, lazy }) {
 		}
 
 		// Sync initial icon state from persisted preference
-		updateFloatingLrcUI(localStorage.getItem(FLOATING_LRC_KEY) !== "false");
+		let floatingLrcVisible = true;
+		try {
+			floatingLrcVisible = localStorage.getItem(FLOATING_LRC_KEY) !== "false";
+		} catch {
+			// Keep the default visibility when browser storage is unavailable.
+		}
+		updateFloatingLrcUI(floatingLrcVisible);
 
 		// Keep icon in sync with FloatingLyrics (covers its own close button too)
 		on("fm:floating-lyrics-state", (e) => {

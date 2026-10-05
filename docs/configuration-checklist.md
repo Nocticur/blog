@@ -52,7 +52,7 @@ JSON 列表为空时保持 [] 即可，不能将注释直接写入 JSON。朋友
 - 评论沿用 src/config/commentConfig.ts 的现有 Waline 配置。动态评论位于详情页；记录文件名决定评论路径，发布后尽量不要重命名。
 - 日历沿用现有生日与建站日；如需调整，修改 src/config/calendarConfig.ts。外部节假日接口不可用时仍展示内置节日。
 - 本地开发保存内容后可预览；线上保存会产生仓库提交，需等待平台重新构建。静态托管本身不能运行写作 API，线上编辑使用已有 Vercel Functions 方案。
-- 友链巡检在 GitHub Actions 启用且工作流位于默认分支后，每天北京时间 10:00 计划运行；实际开始时间由 GitHub 调度决定。无需新增密钥；报告位于工作流运行摘要和 friend-link-report 附件。
+- 友链巡检每天北京时间 10:00 计划运行，也响应默认分支友链数据变更并支持手动触发；实际开始时间由 GitHub 调度决定。报告固定保存到 `codex/friend-status` 分支并保留 friend-link-report 附件。自动截图另需 Actions Secret `IMGBED_API_TOKEN`；图床地址默认 `https://image.nocticur.eu.cc`，可用 Variable `IMGBED_BASE_URL` 覆盖。后台上传头像在 Vercel 配置同名环境变量，详见 [友链管理与巡检](friend-operations.md)。
 - 真实发布链路需要你填完 GitHub 凭据后再验证。本次没有推送、发布或调用付费服务。
 
 ## 部署前核对归属与安全设置

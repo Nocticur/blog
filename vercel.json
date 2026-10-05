@@ -3,6 +3,11 @@
 	"outputDirectory": "dist",
 	"installCommand": "pnpm install",
 	"framework": "astro",
+	"git": {
+		"deploymentEnabled": {
+			"codex/friend-status": false
+		}
+	},
 	"rewrites": [
 		{
 			"source": "/api/writing/(.+)",

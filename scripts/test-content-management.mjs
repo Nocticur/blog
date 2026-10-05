@@ -26,7 +26,7 @@ test('lists use existing friend fields; invalid URLs and simultaneous writes are
   await fs.mkdir(path.join(root,'src/data'),{recursive:true});
   await fs.writeFile(path.join(root,'src/data/friends.json'),'[]');
   const read=await executeContent(store,'friends','GET');
-  const source=JSON.stringify([{title:'friend',siteurl:'https://example.test',imgurl:'',desc:'',enabled:true,weight:5}]);
+  const source=JSON.stringify([{title:'friend',siteurl:'https://example.test',imgurl:'/assets/avatar.png',desc:'Friend description',enabled:true,weight:5}]);
   await assert.rejects(()=>executeContent(store,'friends','PUT',{source:source.replace('https://example.test','javascript:alert(1)'),version:read.version}),/HTTP/);
   const results=await Promise.allSettled([1,2].map(()=>executeContent(store,'friends','PUT',{source,version:read.version})));
   assert.equal(results.filter(x=>x.status==='fulfilled').length,1);

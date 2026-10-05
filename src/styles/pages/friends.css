@@ -167,6 +167,12 @@
 	height: 7rem;
 	overflow: hidden;
 }
+.friend-card__cover[hidden] { display: none; }
+.friend-card__health { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; align-items: center; margin-top: .85rem; color: var(--content-meta); font-size: .65rem; }
+.friend-card__health [data-friend-status] { padding: .2rem .45rem; border: 1px solid var(--line-divider); border-radius: 99px; }
+.friend-card__health [data-status="ok"] { color: #00a29b; }
+.friend-card__health [data-status="restricted"] { color: #b89751; }
+.friend-card__health [data-status="error"] { color: #d97973; }
 .friend-card__cover-img {
 	width: 100%;
 	height: 100%;

@@ -15,6 +15,7 @@ import {
 	updateListField,
 	updateRecordFields,
 } from "@/utils/content-editor";
+import FriendsEditor from "./FriendsEditor.svelte";
 export let authenticated = false;
 export let selectedModule = "dynamic";
 export let embedded = false;
@@ -269,13 +270,15 @@ async function request(method: string, body?: object, suffix = "") {
 	return data;
 }
 async function action(fn: () => Promise<void>) {
-	if (busy || (embedded && (!authenticated || !isActive))) return;
+	if (busy || (embedded && (!authenticated || !isActive))) return false;
 	busy = true;
 	message = "";
 	try {
 		await fn();
+		return true;
 	} catch (error) {
 		message = error instanceof Error ? error.message : String(error);
+		return false;
 	} finally {
 		busy = false;
 	}
@@ -474,6 +477,37 @@ async function upload(event: Event) {
 		input.value = "";
 	}
 }
+async function saveFriends(rows: Record<string, unknown>[]) {
+	if (busy || (embedded && (!authenticated || !isActive))) return false;
+	const originalSource = source;
+	const attemptedSource = JSON.stringify(rows, null, 2) + "\n";
+	source = attemptedSource;
+	dirty = true;
+	const saved = await action(save);
+	if (!saved) {
+		source = originalSource;
+		previousLocal = attemptedSource;
+		persist();
+	}
+	return saved;
+}
+async function uploadFriendAvatar(image: File): Promise<string> {
+	let result = "";
+	const ok = await action(async () => {
+		if (image.size > 3 * 1024 * 1024) throw new Error("图片不能超过 3 MiB");
+		const dataUrl = await new Promise<string>((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(String(reader.result));
+			reader.onerror = () => reject(new Error("图片读取失败"));
+			reader.readAsDataURL(image);
+		});
+		result = (await request("POST", { dataUrl }, "/images")).image || "";
+		if (!result) throw new Error("图片上传接口未返回地址，原头像链接已保留。");
+		message = "头像已上传并回填，点击添加或保存后生效。";
+	});
+	if (!ok) throw new Error(message || "图片上传失败，原头像地址已保留。");
+	return result;
+}
 onMount(() => {
 	mounted = true;
 	if (!embedded) {
@@ -500,16 +534,32 @@ onMount(() => {
 
 <section class="card-base p-6 my-6">
   <h2 class="text-xl font-semibold">{moduleTransition ? requestedLabel : contentModules.find(item => item.id === module)?.label || "内容管理"}</h2>
-  <p class="text-sm text-neutral-500 my-3">支持 Markdown 正文和完整元信息；列表以 JSON 编辑。新建记录默认草稿，手动保存才提交。</p>
+  <p class="text-sm text-neutral-500 my-3">{module === "friends" ? "填写站点名称、描述、链接和头像即可添加。" : "支持 Markdown 正文和完整元信息；列表以 JSON 编辑。新建记录默认草稿，手动保存才提交。"}</p>
   {#if moduleTransition}<p role="status" class="cm-transition-note">正在切换至{requestedLabel}…请等待当前操作完成。</p>{/if}
   <fieldset disabled={busy || moduleTransition || (embedded && !authenticated)} class:cm-transition={moduleTransition} aria-busy={busy}>
-  <button disabled={busy} onclick={() => { if (mayLeave()) void action(load); }} class="control">打开 / 刷新内容管理</button>
+  <button disabled={busy} onclick={() => { if (mayLeave()) void action(load); }} class="control">{module === "friends" ? "刷新友链" : "打开 / 刷新内容管理"}</button>
   {#if opened}
     {#if !embedded}
       <nav aria-label="内容模块" class="flex flex-wrap gap-2 my-4">
         {#each contentModules as item}<button class="control" aria-pressed={module === item.id} disabled={busy} onclick={() => void action(() => choose(item.id))}>{item.label}</button>{/each}
       </nav>
     {/if}
+    {#if module === "friends"}
+      {#if previewError}<p role="alert" class="mt-4">友链数据无法读取：{previewError}。请刷新后重试。</p>{:else}
+        <FriendsEditor rows={listRows} {busy} onsave={saveFriends} onupload={uploadFriendAvatar} ondirty={() => dirty = true} />
+      {/if}
+      {#if conflict}
+        <div class="mt-4 border border-amber-500/40 rounded-lg p-4">
+          <p class="text-sm">仓库内容已修改，当前输入仍保留。请读取并比较后手动合并。</p>
+          <button class="control mt-2" disabled={busy} onclick={() => action(compare)}>读取仓库版进行比较</button>
+          {#if repository}
+            <label class="block mt-3 text-sm">仓库版本（只读）<textarea readonly class="control w-full min-h-48 font-mono mt-2" value={repository.source}></textarea></label>
+            <button class="control mt-2" disabled={busy} onclick={useRepository}>以仓库版为基础合并</button>
+          {/if}
+        </div>
+      {/if}
+      {#if previousLocal}<details class="mt-4"><summary>查看合并前的本机内容</summary><textarea aria-label="合并前的本机友链" readonly class="control w-full min-h-48 font-mono mt-2" value={previousLocal}></textarea></details>{/if}
+    {:else}
     <div class="grid gap-4 mt-4 md:grid-cols-[12rem_1fr]">
       <div class="space-y-2">
         {#if !isList}<button class="control" disabled={busy} onclick={create}>新建草稿</button>{/if}
@@ -572,6 +622,7 @@ onMount(() => {
         {#if !isList}<details class="my-4"><summary>Markdown 预览</summary><p class="text-sm my-2">预览基础 Markdown；MDX 组件、数学公式及扩展语法以构建后的页面为准。</p>{#if previewError}<p>{previewError}</p>{:else}<div class="custom-md prose">{@html previewHtml}</div>{/if}</details>{/if}
       </div>
     </div>
+    {/if}
   {/if}
   </fieldset>
   {#if localStatus}<p role="status" class="mt-3 text-sm">{localStatus}</p>{/if}

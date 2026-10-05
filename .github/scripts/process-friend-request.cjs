@@ -173,6 +173,7 @@ function updateFriendsConfig(repoRoot, data) {
 		desc: data.site_desc || '',
 		siteurl: data.site_url,
 		image: data.site_image || '',
+		...(data.friend_page_url ? { linkpage: data.friend_page_url } : {}),
 		tags: [data.site_tag || DEFAULT_TAG],
 		weight: 5,
 		enabled: true,
@@ -412,6 +413,7 @@ ${formData.site_image ? `- 封面图: ${formData.site_image}\n` : ''}`
 			state: 'closed',
 			state_reason: 'completed',
 		});
+		return { changed: committed };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		console.error(message);
