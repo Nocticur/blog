@@ -4,15 +4,34 @@ on:
   schedule:
     - cron: "0 2 * * *"
   workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths: [src/data/friends.json, .github/workflows/friend-link-check.yml]
+  workflow_call:
+    secrets:
+      IMGBED_API_TOKEN:
+        required: false
+
+concurrency:
+  group: friend-health-report
+  cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      IMGBED_BASE_URL: ${{ vars.IMGBED_BASE_URL || 'https://image.nocticur.eu.cc' }}
+      IMGBED_API_TOKEN: ${{ secrets.IMGBED_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
         with:
           version: 9.14.4
@@ -21,7 +40,13 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec tsx scripts/check-friends.ts
+      - name: Install screenshot browser
+        if: env.IMGBED_API_TOKEN != ''
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Check links and refresh screenshots
+        run: pnpm exec tsx scripts/check-friends.ts
+      - name: Publish report without rebuilding the blog
+        run: node scripts/publish-friend-report.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

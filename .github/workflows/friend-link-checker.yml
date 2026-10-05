@@ -12,6 +12,8 @@ on:
 
 jobs:
   update-friends:
+    outputs:
+      changed: ${{ steps.process.outputs.changed }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -35,10 +37,20 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Process friend request
+        id: process
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const path = require('node:path');
             const handler = require(path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/process-friend-request.cjs'));
-            await handler({ github, context, core });
+            const result = await handler({ github, context, core });
+            core.setOutput('changed', result?.changed === true ? 'true' : 'false');
+
+  refresh-friend-report:
+    needs: update-friends
+    if: needs.update-friends.outputs.changed == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/friend-link-check.yml
+    secrets: inherit

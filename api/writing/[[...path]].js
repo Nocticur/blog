@@ -633,11 +633,14 @@ export default async function handler(request, response) {
 		} else if (route.startsWith("/content/") || route.startsWith('/settings/')) {
  const match = /^\/(?:content|settings)\/([a-z]+)(\/images)?$/.exec(route);
  if (!match) return sendResponse(fail("Not found",404),response);
- const repo=pickRepo(), token=requireToken(), branch=await resolveBranch(repo,token);
- const store=createGithubStore({repo,branch,request:(path,init)=>githubFetch(path,token,init)});
  const body=normalizedRequest.method==="GET"?Object.fromEntries(url.searchParams):await readJson(normalizedRequest);
  if(match[2] && normalizedRequest.method!=="POST") return sendResponse(fail("Method not allowed",405),response);
- result=json(await(match[2]?uploadContentImage(store,match[1],body):executeContent(store,match[1],normalizedRequest.method,body||{})));
+ if(match[2] && match[1]==='friends') result=json(await uploadContentImage(null,'friends',body));
+ else {
+  const repo=pickRepo(), token=requireToken(), branch=await resolveBranch(repo,token);
+  const store=createGithubStore({repo,branch,request:(path,init)=>githubFetch(path,token,init)});
+  result=json(await(match[2]?uploadContentImage(store,match[1],body):executeContent(store,match[1],normalizedRequest.method,body||{})));
+ }
  } else if (normalizedRequest.method === "GET" && route === "/posts") {
 			// 与 dev middleware 一致：带 file 参数读单篇，否则返回列表
 			result = url.searchParams.get("file")

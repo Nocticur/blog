@@ -30,3 +30,33 @@ test('music widget does not register duplicate listeners when mounted twice', as
     assert.equal(await page.evaluate(() => window.removalCount), counts[0], 'ancestor removal releases window listeners');
   } finally { await browser.close(); }
 });
+
+test('music widget initializes when its floating lyrics preference cannot be read', async () => {
+  const code = await fs.readFile('src/utils/music-player-controller.js', 'utf8');
+  const selectors = [...code.matchAll(/widget\.querySelector\(\s*['"]([^'"]+)['"]\s*\)/g)].map(match => match[1]);
+  const browser = await chromium.launch({channel: 'chrome',headless: true});
+  try {
+    for (const denial of ['getter', 'getItem']) {
+      const page = await browser.newPage();
+      await page.route('https://music.test/**', route => route.fulfill({ contentType: 'text/html', body: '<div id="widget"></div>' }));
+      await page.goto('https://music.test/');
+      await page.evaluate(({selectors, denial}) => {
+        const widget = document.querySelector('#widget');
+        for (const selector of selectors) { const element = document.createElement('div'); element.className = selector.slice(1); widget.append(element); }
+        const template = document.createElement('template'); template.id='playlist-item-template-widget'; document.body.append(template);
+        window.__fireflyMusic = { getState: () => ({ initialized: false }) };
+        const fail = () => { throw new DOMException('Storage disabled', 'SecurityError'); };
+        if (denial === 'getter') Object.defineProperty(window, 'localStorage', { get: fail });
+        else Object.defineProperty(window, 'localStorage', { value: { getItem: fail } });
+      }, {selectors, denial});
+      await page.addScriptTag({content:code.replace('export function mountMusicPlayer','function mountMusicPlayer')+'\nwindow.mountMusicPlayer=mountMusicPlayer;'});
+      const state = await page.evaluate(() => {
+        const widget = document.querySelector('#widget');
+        mountMusicPlayer(widget, {viewConfig:{}, lazy:true});
+        return { initialized: typeof widget.__musicSync === 'function', visible: !widget.querySelector('.icon-floating-lrc-on').classList.contains('hidden') };
+      });
+      assert.deepEqual(state, {initialized:true, visible:true}, `${denial} denial retains the default visibility and completes mounting`);
+      await page.close();
+    }
+  } finally { await browser.close(); }
+});

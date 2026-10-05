@@ -4,6 +4,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import matter from './safe-matter.mjs';
 import { MAX_IMAGE_BYTES } from './writing-session.mjs';
 import { normalizeAnnouncements, validateAnnouncements } from '../../src/utils/announcement-data.mjs';
+import { friendUrlKey, normalizeFriendDraft } from '../../src/utils/friend-data.mjs';
+import { uploadImgbedImage } from './imgbed.mjs';
 
 const modules = {
   dynamic: { root: 'src/content/dynamic' },
@@ -30,6 +32,17 @@ function validate(module, source) {
     const objectConfig = ['sidebar', 'announcements'].includes(module);
     if (objectConfig && (!items || typeof items !== 'object' || Array.isArray(items))) fail('设置内容必须为 JSON 对象');
     if (!objectConfig && !Array.isArray(items)) fail('内容必须为 JSON 数组');
+    if (module === 'friends') {
+      const seen = new Set();
+      const normalized = items.map(item => {
+        const row = normalizeFriendDraft(item);
+        const key = friendUrlKey(row.siteurl);
+        if (seen.has(key)) fail('站点链接重复，请编辑已有友链');
+        seen.add(key);
+        return row;
+      });
+      return JSON.stringify(normalized, null, 2);
+    }
     if (objectConfig) {
       if (module === 'announcements') {
         const normalized = normalizeAnnouncements(items);
@@ -192,6 +205,7 @@ export async function uploadContentImage(store,module,body) {
   if(!match) fail('图片格式无效');
   const bytes = Buffer.from(match[2],'base64');
   if(!bytes.length || bytes.length > MAX_IMAGE_BYTES) fail('图片不能超过 3 MiB');
+  if(module === 'friends') return uploadImgbedImage(bytes,{mimeType:`image/${match[1]}`,folder:'blog/friends/avatars'});
   let directory = `uploads/${module}`;
   if(module === 'gallery') {
     if(!validPath(body.album) || body.album.includes('/')) fail('请填写相册 ID');

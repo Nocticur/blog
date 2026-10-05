@@ -147,6 +147,7 @@ const description = friendsPageConfig.description || i18n(I18nKey.friendsMotto);
       <script>
       import { revealImageWithPixels } from "@/utils/image-pixel-reveal";
       import { definePageIsland } from "@/utils/swup-lifecycle";
+      import { loadFriendStatuses } from "@/utils/friend-status-client";
 
             function initFriendAvatars(): void {
         document
@@ -173,11 +174,10 @@ const description = friendsPageConfig.description || i18n(I18nKey.friendsMotto);
         document
           .querySelectorAll<HTMLElement>("[data-friend-cover]")
           .forEach((cover) => {
+            const img = cover.querySelector("img");
+            if (!img || !img.getAttribute("src")) return;
             if (cover.dataset.coverBound === "true") return;
             cover.dataset.coverBound = "true";
-
-            const img = cover.querySelector("img");
-            if (!img) return;
 
             // 已加载完成（缓存命中）：不显示 loader，图片直接淡入
             if (img.complete) {
@@ -289,12 +289,19 @@ const description = friendsPageConfig.description || i18n(I18nKey.friendsMotto);
         preview?.querySelector("img")?.removeAttribute("src");
       }
 
+      let statusController: AbortController | undefined;
       definePageIsland({
         name: "friends:media",
         // 登记会跨导航留存在运行时登记表里，match 保证只在友链页挂载
         match: () => !!document.querySelector("[data-friend-avatar]"),
-        mount: initFriendMedia,
-        unmount: hideFriendImagePreview,
+        mount: () => {
+          initFriendMedia();
+          statusController = new AbortController();
+          void loadFriendStatuses(document, statusController.signal).then(() => {
+            if (!statusController?.signal.aborted) initFriendCovers();
+          });
+        },
+        unmount: () => { statusController?.abort(); hideFriendImagePreview(); },
       });
       </script>
     </div>

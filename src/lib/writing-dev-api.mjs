@@ -7,6 +7,7 @@ import {
 	executeContent,
 	uploadContentImage,
 } from "../../api/_lib/content-management.mjs";
+import { readLocalFriendStatus } from "../../api/_lib/friend-status.mjs";
 import { createLoginLimiter } from "../../api/_lib/login-limiter.mjs";
 import matter from "../../api/_lib/safe-matter.mjs";
 import {
@@ -164,6 +165,15 @@ export function writingDevApi(
 	return {
 		name: "firefly-writing-dev-api",
 		configureServer(server) {
+			server.middlewares.use("/api/friend-status", (req, res) => {
+				if (req.method !== "GET") {
+					res.setHeader("Allow", "GET");
+					return error(res, 405, "此接口仅支持 GET");
+				}
+				readLocalFriendStatus(root)
+					.then((report) => json(res, 200, report))
+					.catch(() => error(res, 503, "友链检测结果暂不可用，请稍后重试"));
+			});
 			server.middlewares.use("/api/writing", (req, res, next) => {
 				// connect 挂载后 req.url 形如 "/posts?file=xxx"
 				const requestUrl = new URL(req.url, "http://localhost");
