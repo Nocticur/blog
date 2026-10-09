@@ -3,10 +3,10 @@ import type { MusicPlayerConfig } from "../types/config";
 // 音乐播放器配置
 export const musicPlayerConfig: MusicPlayerConfig = {
 	// 禁用音乐播放器方法：
-	// 在本配置文件把showInNavbar设为false即可关闭导航栏入口
+	// 在本配置文件把showInNavbar设为false即可关闭工具栏入口
 
-	// 是否在导航栏显示音乐播放器入口
-	showInNavbar: false,
+	// 是否在桌面工具栏与移动底栏显示音乐播放器入口
+	showInNavbar: true,
 
 	// 使用方式："meting" 使用 Meting API，"local" 使用本地音乐列表
 	mode: "meting",

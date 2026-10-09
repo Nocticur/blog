@@ -2,7 +2,7 @@
  * 首页背景星光。
  *
  * 在背景大图铺开后的激活阶段，用预渲染好的星点贴图在 Canvas 上绘制固定位置的星点：
- * 低亮度白色为主、少量冰蓝点缀，亮度按 3–6 秒周期缓慢起伏。
+ * 白色星点为主、少量冰蓝点缀，每颗按独立的 1.8–4 秒周期明显明暗闪动。
  * 每帧只做贴图合成，不读布局、不建临时数组；颗数按显示面积和档位上限取整，
  * 帧率按档位封顶，采样到超预算的绘制耗时后逐级降档，最低停在一次静态星空。
  */
@@ -325,8 +325,8 @@ export function initHomeHeroStars(
 				Math.floor(index / columns) * cellHeight + random() * cellHeight,
 			);
 			star.radius = 0.6 + random() * 1.1;
-			star.alpha = 0.28 + random() * 0.46;
-			star.period = 3000 + random() * 3000;
+			star.alpha = 0.45 + random() * 0.45;
+			star.period = 1800 + random() * 2200;
 			star.phase = random() * STARS_TAU;
 			star.accent = random() < STARS_ACCENT_RATIO;
 		}
@@ -342,7 +342,8 @@ export function initHomeHeroStars(
 			const wave =
 				0.5 + 0.5 * Math.sin(star.phase + (now / star.period) * STARS_TAU);
 			const size = star.radius * 5;
-			frameContext.globalAlpha = star.alpha * (0.35 + 0.65 * wave);
+			// 低谷接近熄灭，亮峰更集中；独立相位让星点错开闪动。
+			frameContext.globalAlpha = star.alpha * (0.06 + 0.94 * wave * wave);
 			frameContext.drawImage(
 				sprite,
 				star.x - size / 2,

@@ -24,14 +24,14 @@
 		},
 		{
 			"type": "categories",
-			"enable": false,
+			"enable": true,
 			"position": "sticky",
 			"showOnPostPage": true,
 			"responsive": { "collapseThreshold": 5 }
 		},
 		{
 			"type": "tags",
-			"enable": false,
+			"enable": true,
 			"position": "sticky",
 			"showOnPostPage": true,
 			"responsive": { "collapseThreshold": 10 }

@@ -30,7 +30,7 @@ function createFrameContext(env) {
 		globalAlpha: 1,
 		setTransform() {},
 		drawImage(_image, x, y, width, height) {
-			env.draws.push({ x, y, width, height });
+			env.draws.push({ x, y, width, height, alpha: this.globalAlpha });
 		},
 		clearRect() {
 			env.frames += 1;
@@ -325,6 +325,53 @@ test("normal tier draws at most 96 stars at no more than 30 frames per second", 
 		assert.ok(
 			env.starsPerFrame() <= 96,
 			`${env.starsPerFrame()} stars per frame exceeds the cap`,
+		);
+		controller.destroy();
+	} finally {
+		env.restore();
+	}
+});
+
+test("stars visibly brighten and dim independently within four seconds without moving", () => {
+	const env = createEnv();
+	try {
+		const controller = initHomeHeroStars(env.hero, {
+			enabled: true,
+			intensity: 1,
+		});
+		controller.setActive(true);
+		env.step(1000 / 30);
+		const firstFrame = [...env.draws];
+		const count = firstFrame.length;
+		env.step(1000 / 30, 120);
+		const peakTimes = new Set();
+		for (let index = 0; index < count; index += 1) {
+			const samples = env.draws.filter(
+				(_, drawIndex) => drawIndex % count === index,
+			);
+			const alphas = samples.map((sample) => sample.alpha);
+			const peak = Math.max(...alphas);
+			assert.ok(
+				peak >= 0.4,
+				`star ${index} should reach a clearly visible brightness`,
+			);
+			assert.ok(
+				Math.min(...alphas) < peak * 0.15,
+				`star ${index} should dim below 15% of its peak brightness`,
+			);
+			assert.ok(
+				samples.every(
+					(sample) =>
+						sample.x === firstFrame[index].x &&
+						sample.y === firstFrame[index].y,
+				),
+				"twinkling must keep stars in their original positions",
+			);
+			peakTimes.add(alphas.indexOf(peak));
+		}
+		assert.ok(
+			peakTimes.size > count / 2,
+			"stars should peak at different times",
 		);
 		controller.destroy();
 	} finally {

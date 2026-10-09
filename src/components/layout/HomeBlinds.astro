@@ -230,16 +230,30 @@ const runtimeConfig = {
 							data-scene-stand
 							data-stand-index={index}
 						>
-							<img
-								class="home-blinds-scenes__stand-image"
-								src={image}
-								alt=""
-								loading="lazy"
-								decoding="async"
-								data-scene-stand-image
-							/>
+							{image.endsWith(".webm") ? (
+								<video
+									class="home-blinds-scenes__stand-image home-blinds-scenes__stand-image--video"
+									src={image}
+									loop
+									muted
+									playsinline
+									preload="metadata"
+									aria-hidden="true"
+									data-scene-stand-image
+								/>
+							) : (
+								<img
+									class="home-blinds-scenes__stand-image"
+									src={image}
+									alt=""
+									loading="lazy"
+									decoding="async"
+									data-scene-stand-image
+								/>
+							)}
 							<span
 								class="home-blinds-scenes__stand-pole"
+								aria-hidden="true"
 								data-scene-stand-pole></span>
 						</div>
 					))

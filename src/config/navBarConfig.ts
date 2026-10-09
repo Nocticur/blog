@@ -110,11 +110,14 @@ const buildNavBarConfig = (): NavBarConfig => {
 				}
 			: null;
 
-	// 4. 构建导航下拉菜单（子项顺序：个人主站 → 工具导航）
+	// 4. 构建导航下拉菜单（子项顺序：个人主站 → 工具导航 → 友链）
 	// 个人主站是外链、不随页面开关变化，因此下拉至少有一项，无需判空
 	const linksChildren: (NavBarLink | LinkPreset)[] = [LinkPreset.Feibichi];
 	if (siteConfig.pages.collections) {
 		linksChildren.push(LinkPreset.Collections);
+	}
+	if (siteConfig.pages.friends) {
+		linksChildren.push(LinkPreset.Friends);
 	}
 
 	const linksNav: NavBarLink = {

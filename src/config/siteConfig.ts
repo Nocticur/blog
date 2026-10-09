@@ -121,7 +121,7 @@ export const siteConfig: SiteConfig = {
 		// 留言板页面开关，需要配置评论系统
 		guestbook: true,
 		// 相册页面开关
-		gallery: false,
+		gallery: true,
 		// 收藏API页面开关
 		collections: true,
 		// 音乐可视化页面开关

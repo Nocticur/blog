@@ -949,6 +949,17 @@
 	will-change: transform;
 }
 
+/* WebM 画布有透明留白，按高度裁去左右留白以接近原立牌的视觉大小。 */
+.home-blinds-scenes__stand-image--video {
+	object-fit: cover;
+}
+
+/* 鲸鱼娘脚底距视频画布底部约 8%，木杆上移后与脚底相接。 */
+.home-blinds-scenes__stand:has(.home-blinds-scenes__stand-image--video)
+	.home-blinds-scenes__stand-pole {
+	top: 92%;
+}
+
 /* 皮影戏木杆：接在立牌底边正下方，跟着立牌图一起做跳跃位移。
    长度 = 立牌底边到视窗底的 8vh + 最大跳跃高度的余量，多出来的部分由
    .home-blinds-scenes__viewport 的 overflow: hidden 裁掉，所以跳到最高点时

@@ -314,6 +314,7 @@ function setupScenes(context: SetupContext) {
 	const stand = stands[0] ?? null;
 	const standImage =
 		stand?.querySelector<HTMLElement>("[data-scene-stand-image]") ?? null;
+	const standVideo = standImage instanceof HTMLVideoElement ? standImage : null;
 	// 木杆改成立牌的子元素：横位恒定、只随立牌图一起上下动，
 	// 因此不再需要每帧按 getBoundingClientRect 重算两端坐标
 	const standPole =
@@ -350,6 +351,18 @@ function setupScenes(context: SetupContext) {
 	let shrinkTrigger: ScrollTriggerInstance | null = null;
 	let pinTrigger: ScrollTriggerInstance | null = null;
 	let actVisible = false;
+	let standInView = false;
+	const standObserver = standVideo
+		? new IntersectionObserver(([entry]) => {
+				standInView = entry.isIntersecting;
+				if (standInView && actVisible) {
+					void standVideo.play().catch(() => undefined);
+				} else {
+					standVideo.pause();
+				}
+			})
+		: null;
+	if (standVideo) standObserver?.observe(standVideo);
 	let bounceTimeline: GsapTimeline | null = null;
 	// 背景跑马灯：两份等长列表首尾相接，xPercent 从 0 走到 -50 正好换过一整轮，
 	// 即画面持续左移；因为两份内容一致，接缝处画面完全重合，循环看不出跳帧。
@@ -481,6 +494,7 @@ function setupScenes(context: SetupContext) {
 	const showAct = () => {
 		if (actVisible) return;
 		actVisible = true;
+		if (standInView) void standVideo?.play().catch(() => undefined);
 
 		gsap.killTweensOf(cycleStage);
 		gsap.to(cycleStage, {
@@ -514,6 +528,7 @@ function setupScenes(context: SetupContext) {
 	const hideAct = () => {
 		if (!actVisible) return;
 		actVisible = false;
+		standVideo?.pause();
 		stopBounce();
 
 		gsap.killTweensOf(cycleStage);
@@ -827,6 +842,8 @@ function setupScenes(context: SetupContext) {
 		window.clearTimeout(resetWindTimer);
 		window.clearTimeout(resizeTimer);
 		ScrollTrigger.removeEventListener("refresh", handleRefresh);
+		standObserver?.disconnect();
+		standVideo?.pause();
 		stopBounce();
 		cycleLoop.kill();
 		for (const scene of scenes) {

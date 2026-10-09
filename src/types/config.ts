@@ -285,7 +285,7 @@ export type HomeBlindsConfig = {
 		composite: Omit<HomeBlindsSceneItem, "image" | "alt"> & { alt: string };
 		/** 后续画面，运行时最多读取前 4 张 */
 		items: HomeBlindsSceneItem[];
-		/** 立牌图 */
+		/** 立牌素材，支持图片或透明 WebM */
 		standImages: string[];
 	};
 };
@@ -404,7 +404,7 @@ export type HomeConfig = {
 		sticker: HeroStickerConfig;
 		/** galgame 对话框（写死暗黑主题）。配置后替代底部简介气泡 */
 		dialogue?: HeroDialogueConfig;
-		/** 背景星光：固定星点 + 3–6 秒缓慢明暗变化；≤768px 的独立移动首页不创建粒子层。 */
+		/** 背景星光：固定星点 + 1.8–4 秒错开明暗闪动；≤768px 的独立移动首页不创建粒子层。 */
 		stars?: {
 			enabled?: boolean;
 			/** 星点密度，0–1，默认 0.6（克制） */

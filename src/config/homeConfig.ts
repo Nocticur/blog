@@ -131,7 +131,7 @@ export const homeConfig: HomeConfig = {
 				},
 			],
 		},
-		// 背景星光（固定星点 + 3–6 秒缓慢明暗变化；≤768px 的独立移动首页不创建粒子层）
+		// 背景星光（固定星点 + 1.8–4 秒错开明暗闪动；≤768px 的独立移动首页不创建粒子层）
 		stars: {
 			enabled: true,
 			intensity: 0.6,
@@ -212,7 +212,8 @@ export const homeConfig: HomeConfig = {
 					date: "2026 / 09 / 01",
 				},
 			],
-			standImages: ["/assets/images/home-blinds/act4/hutao.png"],
+			// 立牌支持图片或透明 WebM，沿用原有跳跃动画。
+			standImages: ["/assets/images/home-blinds/act4/whale-girl.webm"],
 		},
 	},
 
